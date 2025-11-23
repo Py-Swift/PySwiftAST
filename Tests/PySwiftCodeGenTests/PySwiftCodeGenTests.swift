@@ -84,7 +84,14 @@ func normalizeWhitespace(_ code: String) -> String {
 
 @Test func testDebugChainedAssignment() async throws {
     let source = """
-    merged = {**dict1, **dict2}
+    async def fetch_data(url):
+        response = await http_client.get(url)
+        return response.json()
+
+    async def main():
+        tasks = [fetch_data(url) for url in urls]
+        results = await asyncio.gather(*tasks)
+        return results
     """
     print("Original:", source)
     do {
@@ -439,6 +446,10 @@ func normalizeWhitespace(_ code: String) -> String {
     print("Testing: async_await.py")
     let ast = try parsePython(source)
     let generated = generatePythonCode(from: ast)
+    
+    print("\n=== Generated Code ===")
+    print(generated)
+    print("=== End Generated ===\n")
     
     let reparsed = try parsePython(generated)
     

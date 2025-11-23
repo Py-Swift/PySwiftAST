@@ -1936,6 +1936,40 @@ public class Parser {
         var keywords: [Keyword] = []
         
         while currentToken().type != .rightparen && !isAtEnd() {
+            // Check for **kwargs (dictionary unpacking)
+            if currentToken().type == .doublestar {
+                advance() // consume '**'
+                let value = try parseExpression()
+                // Use None as arg name to indicate **kwargs
+                keywords.append(Keyword(arg: nil, value: value))
+                
+                if currentToken().type == .comma {
+                    advance()
+                }
+                continue
+            }
+            
+            // Check for *args (iterable unpacking)
+            if currentToken().type == .star {
+                let starPos = currentToken()
+                advance() // consume '*'
+                let value = try parseExpression()
+                let starred = Expression.starred(Starred(
+                    value: value,
+                    ctx: .load,
+                    lineno: starPos.line,
+                    colOffset: starPos.column,
+                    endLineno: starPos.endLine,
+                    endColOffset: starPos.endColumn
+                ))
+                args.append(starred)
+                
+                if currentToken().type == .comma {
+                    advance()
+                }
+                continue
+            }
+            
             // Check for keyword argument
             if case .name(let name) = currentToken().type {
                 let nextPos = position + 1
