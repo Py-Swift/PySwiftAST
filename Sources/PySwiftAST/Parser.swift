@@ -135,8 +135,49 @@ public class Parser {
             // Try to parse as expression statement or assignment
             let expr = try parseExpression()
             
+            // Check for type annotation (annotated assignment) - only valid for names
+            if currentToken().type == .colon {
+                guard case .name = expr else {
+                    throw ParseError.expected(message: "Type annotations are only allowed for names", line: currentToken().line)
+                }
+                
+                advance() // consume ':'
+                let annotation = try parseExpression()
+                
+                // Check if there's also an assignment
+                var value: Expression? = nil
+                if currentToken().type == .assign {
+                    advance() // consume '='
+                    value = try parseExpression()
+                }
+                
+                consumeNewlineOrSemicolon()
+                return .annAssign(AnnAssign(
+                    target: expr,
+                    annotation: annotation,
+                    value: value,
+                    simple: true,
+                    lineno: token.line,
+                    colOffset: token.column,
+                    endLineno: nil,
+                    endColOffset: nil
+                ))
+            }
+            
             // Check for assignment
             if currentToken().type == .assign {
+                // Validate that the left side is a valid assignment target
+                switch expr {
+                case .name, .attribute, .subscriptExpr, .tuple, .list:
+                    // Valid assignment targets
+                    break
+                case .starred:
+                    // Starred expressions are valid in tuple/list unpacking
+                    break
+                default:
+                    throw ParseError.expected(message: "Invalid assignment target", line: token.line)
+                }
+                
                 advance() // consume '='
                 let value = try parseExpression()
                 consumeNewlineOrSemicolon()
@@ -667,7 +708,12 @@ public class Parser {
         let body = try parseBlock()
         
         var orElse: [Statement] = []
-        if currentToken().type == .else {
+        
+        // Handle elif and else
+        if currentToken().type == .elif {
+            // Recursively parse elif as a nested if statement
+            orElse = [try parseIf()]
+        } else if currentToken().type == .else {
             advance()
             try consume(.colon, "Expected ':' after else")
             orElse = try parseBlock()
@@ -697,6 +743,13 @@ public class Parser {
         let args = try parseArguments()
         try consume(.rightparen, "Expected ')' after function arguments")
         
+        // Check for return type annotation
+        var returns: Expression? = nil
+        if currentToken().type == .arrow {
+            advance()
+            returns = try parseExpression()
+        }
+        
         try consume(.colon, "Expected ':' after function signature")
         
         let body = try parseBlock()
@@ -706,7 +759,7 @@ public class Parser {
             args: args,
             body: body,
             decoratorList: decorators,
-            returns: nil,
+            returns: returns,
             typeComment: nil,
             typeParams: [],
             lineno: defToken.line,
@@ -725,14 +778,63 @@ public class Parser {
         }
         advance()
         
+        var bases: [Expression] = []
+        var keywords: [Keyword] = []
+        
+        // Parse base classes if present
+        if currentToken().type == .leftparen {
+            advance()
+            
+            if currentToken().type != .rightparen {
+                // Parse base classes and keyword arguments
+                while true {
+                    // Check for keyword argument (like metaclass=Meta)
+                    if case .name(let argName) = currentToken().type {
+                        let nextPos = position + 1
+                        if nextPos < tokens.count && tokens[nextPos].type == .assign {
+                            // Keyword argument
+                            advance() // consume name
+                            advance() // consume '='
+                            let value = try parseExpression()
+                            keywords.append(Keyword(arg: argName, value: value))
+                            
+                            if currentToken().type == .comma {
+                                advance()
+                                if currentToken().type == .rightparen {
+                                    break
+                                }
+                            } else {
+                                break
+                            }
+                            continue
+                        }
+                    }
+                    
+                    // Regular base class
+                    bases.append(try parseExpression())
+                    
+                    if currentToken().type == .comma {
+                        advance()
+                        if currentToken().type == .rightparen {
+                            break
+                        }
+                    } else {
+                        break
+                    }
+                }
+            }
+            
+            try consume(.rightparen, "Expected ')' after class bases")
+        }
+        
         try consume(.colon, "Expected ':' after class name")
         
         let body = try parseBlock()
         
         return .classDef(ClassDef(
             name: name,
-            bases: [],
-            keywords: [],
+            bases: bases,
+            keywords: keywords,
             body: body,
             decoratorList: decorators,
             typeParams: [],
@@ -765,7 +867,6 @@ public class Parser {
     }
     
     private func parseAsync() throws -> Statement {
-        let asyncToken = currentToken()
         advance() // consume 'async'
         
         if currentToken().type == .def {
@@ -795,6 +896,13 @@ public class Parser {
         let args = try parseArguments()
         try consume(.rightparen, "Expected ')' after function arguments")
         
+        // Check for return type annotation
+        var returns: Expression? = nil
+        if currentToken().type == .arrow {
+            advance()
+            returns = try parseExpression()
+        }
+        
         try consume(.colon, "Expected ':' after function signature")
         
         let body = try parseBlock()
@@ -804,7 +912,7 @@ public class Parser {
             args: args,
             body: body,
             decoratorList: decorators,
-            returns: nil,
+            returns: returns,
             typeComment: nil,
             typeParams: [],
             lineno: defToken.line,
@@ -1051,7 +1159,6 @@ public class Parser {
         var kwarg: Arg? = nil
         var defaults: [Expression] = []
         
-        var seenSlash = false
         var seenStar = false
         
         // Parse parameters
@@ -1059,7 +1166,6 @@ public class Parser {
             // Check for /  (positional-only marker)
             if currentToken().type == .slash {
                 advance()
-                seenSlash = true
                 posonlyArgs = args
                 args = []
                 if currentToken().type == .comma {
@@ -1075,8 +1181,16 @@ public class Parser {
                 
                 if case .name(let paramName) = currentToken().type {
                     // *args
-                    vararg = Arg(arg: paramName, annotation: nil, typeComment: nil)
                     advance()
+                    
+                    // Check for type annotation
+                    var annotation: Expression? = nil
+                    if currentToken().type == .colon {
+                        advance()
+                        annotation = try parseExpression()
+                    }
+                    
+                    vararg = Arg(arg: paramName, annotation: annotation, typeComment: nil)
                 }
                 
                 if currentToken().type == .comma {
@@ -1091,8 +1205,16 @@ public class Parser {
                 guard case .name(let paramName) = currentToken().type else {
                     throw ParseError.expected(message: "Expected parameter name after '**'", line: currentToken().line)
                 }
-                kwarg = Arg(arg: paramName, annotation: nil, typeComment: nil)
                 advance()
+                
+                // Check for type annotation
+                var annotation: Expression? = nil
+                if currentToken().type == .colon {
+                    advance()
+                    annotation = try parseExpression()
+                }
+                
+                kwarg = Arg(arg: paramName, annotation: annotation, typeComment: nil)
                 
                 if currentToken().type == .comma {
                     advance()
@@ -1106,7 +1228,14 @@ public class Parser {
             }
             advance()
             
-            let param = Arg(arg: paramName, annotation: nil, typeComment: nil)
+            // Check for type annotation
+            var annotation: Expression? = nil
+            if currentToken().type == .colon {
+                advance()
+                annotation = try parseExpression()
+            }
+            
+            let param = Arg(arg: paramName, annotation: annotation, typeComment: nil)
             
             // Check for default value
             if currentToken().type == .assign {
@@ -1297,7 +1426,31 @@ public class Parser {
                 endColOffset: nil
             ))
         }
-        return try parseComparisonExpression()
+        return try parseIfExpression()
+    }
+    
+    private func parseIfExpression() throws -> Expression {
+        let expr = try parseComparisonExpression()
+        
+        // Check for if-expression (ternary): x if condition else y
+        if currentToken().type == .if {
+            advance()
+            let test = try parseComparisonExpression()
+            try consume(.else, "Expected 'else' in if-expression")
+            let orElse = try parseExpression()
+            
+            return .ifExp(IfExp(
+                test: test,
+                body: expr,
+                orElse: orElse,
+                lineno: currentToken().line,
+                colOffset: currentToken().column,
+                endLineno: nil,
+                endColOffset: nil
+            ))
+        }
+        
+        return expr
     }
     
     private func parseComparisonExpression() throws -> Expression {
@@ -1724,8 +1877,40 @@ public class Parser {
             
         case .number(let num):
             advance()
+            
+            // Parse different number formats
+            let value: ConstantValue
+            
+            if num.hasSuffix("j") || num.hasSuffix("J") {
+                // Complex number
+                let realPart = num.dropLast()
+                if let floatVal = Double(realPart.filter { $0 != "_" }) {
+                    value = .complex(0.0, floatVal)
+                } else {
+                    value = .complex(0.0, 0.0)
+                }
+            } else if num.hasPrefix("0x") || num.hasPrefix("0X") {
+                // Hexadecimal
+                let hex = String(num.dropFirst(2)).filter { $0 != "_" }
+                value = .int(Int(hex, radix: 16) ?? 0)
+            } else if num.hasPrefix("0o") || num.hasPrefix("0O") {
+                // Octal
+                let oct = String(num.dropFirst(2)).filter { $0 != "_" }
+                value = .int(Int(oct, radix: 8) ?? 0)
+            } else if num.hasPrefix("0b") || num.hasPrefix("0B") {
+                // Binary
+                let bin = String(num.dropFirst(2)).filter { $0 != "_" }
+                value = .int(Int(bin, radix: 2) ?? 0)
+            } else if num.contains(".") || num.contains("e") || num.contains("E") {
+                // Float
+                value = .float(Double(num.filter { $0 != "_" }) ?? 0.0)
+            } else {
+                // Integer
+                value = .int(Int(num.filter { $0 != "_" }) ?? 0)
+            }
+            
             return .constant(Constant(
-                value: .int(Int(num) ?? 0),
+                value: value,
                 kind: nil,
                 lineno: token.line,
                 colOffset: token.column,
@@ -1770,6 +1955,17 @@ public class Parser {
             advance()
             return .constant(Constant(
                 value: .none,
+                kind: nil,
+                lineno: token.line,
+                colOffset: token.column,
+                endLineno: token.endLine,
+                endColOffset: token.endColumn
+            ))
+            
+        case .ellipsis:
+            advance()
+            return .constant(Constant(
+                value: .ellipsis,
                 kind: nil,
                 lineno: token.line,
                 colOffset: token.column,
