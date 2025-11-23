@@ -85,10 +85,14 @@ public class Parser {
             return try parseWhile()
             
         case .def:
-            return try parseFunctionDef()
+            return try parseFunctionDef(decorators: [])
             
         case .class:
-            return try parseClassDef()
+            return try parseClassDef(decorators: [])
+            
+        case .at:
+            // Decorator
+            return try parseDecorated()
             
         case .import:
             return try parseImport()
@@ -450,7 +454,7 @@ public class Parser {
         ))
     }
     
-    private func parseFunctionDef() throws -> Statement {
+    private func parseFunctionDef(decorators: [Expression] = []) throws -> Statement {
         let defToken = currentToken()
         advance() // consume 'def'
         
@@ -471,7 +475,7 @@ public class Parser {
             name: name,
             args: args,
             body: body,
-            decoratorList: [],
+            decoratorList: decorators,
             returns: nil,
             typeComment: nil,
             typeParams: [],
@@ -482,7 +486,7 @@ public class Parser {
         ))
     }
     
-    private func parseClassDef() throws -> Statement {
+    private func parseClassDef(decorators: [Expression] = []) throws -> Statement {
         let classToken = currentToken()
         advance() // consume 'class'
         
@@ -500,13 +504,34 @@ public class Parser {
             bases: [],
             keywords: [],
             body: body,
-            decoratorList: [],
+            decoratorList: decorators,
             typeParams: [],
             lineno: classToken.line,
             colOffset: classToken.column,
             endLineno: nil,
             endColOffset: nil
         ))
+    }
+    
+    private func parseDecorated() throws -> Statement {
+        var decorators: [Expression] = []
+        
+        // Parse all decorators
+        while currentToken().type == .at {
+            advance() // consume '@'
+            let decorator = try parseExpression()
+            consumeNewlineOrSemicolon()
+            decorators.append(decorator)
+        }
+        
+        // Now parse the function or class definition
+        if currentToken().type == .def {
+            return try parseFunctionDef(decorators: decorators)
+        } else if currentToken().type == .class {
+            return try parseClassDef(decorators: decorators)
+        } else {
+            throw ParseError.expected(message: "Expected 'def' or 'class' after decorator(s)", line: currentToken().line)
+        }
     }
     
     private func parseImport() throws -> Statement {
@@ -664,15 +689,40 @@ public class Parser {
     }
     
     private func parseArguments() throws -> Arguments {
-        // Simplified for now
+        var args: [Arg] = []
+        var defaults: [Expression] = []
+        
+        // Parse parameters
+        while currentToken().type != .rightparen && !isAtEnd() {
+            guard case .name(let paramName) = currentToken().type else {
+                break
+            }
+            advance()
+            
+            // Check for default value
+            if currentToken().type == .assign {
+                advance()
+                let defaultValue = try parseExpression()
+                defaults.append(defaultValue)
+            }
+            
+            args.append(Arg(arg: paramName, annotation: nil, typeComment: nil))
+            
+            if currentToken().type == .comma {
+                advance()
+            } else {
+                break
+            }
+        }
+        
         return Arguments(
             posonlyArgs: [],
-            args: [],
+            args: args,
             vararg: nil,
             kwonlyArgs: [],
             kwDefaults: [],
             kwarg: nil,
-            defaults: []
+            defaults: defaults
         )
     }
     
@@ -749,6 +799,55 @@ public class Parser {
             return .unaryOp(UnaryOp(
                 op: .not,
                 operand: operand,
+                lineno: token.line,
+                colOffset: token.column,
+                endLineno: nil,
+                endColOffset: nil
+            ))
+        }
+        return try parseLambdaExpression()
+    }
+    
+    private func parseLambdaExpression() throws -> Expression {
+        if currentToken().type == .lambda {
+            let token = currentToken()
+            advance()
+            
+            // Parse lambda parameters (simplified)
+            var params: [String] = []
+            if currentToken().type != .colon {
+                // Parse parameter list
+                if case .name(let param) = currentToken().type {
+                    params.append(param)
+                    advance()
+                    
+                    while currentToken().type == .comma {
+                        advance()
+                        if case .name(let p) = currentToken().type {
+                            params.append(p)
+                            advance()
+                        }
+                    }
+                }
+            }
+            
+            try consume(.colon, "Expected ':' after lambda parameters")
+            let body = try parseExpression()
+            
+            // Convert params to Arguments structure
+            let args = Arguments(
+                posonlyArgs: [],
+                args: params.map { Arg(arg: $0, annotation: nil, typeComment: nil) },
+                vararg: nil,
+                kwonlyArgs: [],
+                kwDefaults: [],
+                kwarg: nil,
+                defaults: []
+            )
+            
+            return .lambda(Lambda(
+                args: args,
+                body: body,
                 lineno: token.line,
                 colOffset: token.column,
                 endLineno: nil,
@@ -1223,7 +1322,7 @@ public class Parser {
             ))
             
         case .leftparen:
-            // Tuple or parenthesized expression
+            // Tuple, parenthesized expression, or generator expression
             advance()
             if currentToken().type == .rightparen {
                 // Empty tuple
@@ -1239,6 +1338,20 @@ public class Parser {
             }
             
             let first = try parseExpression()
+            
+            // Check for generator expression
+            if currentToken().type == .for {
+                let generators = try parseComprehensionGenerators()
+                try consume(.rightparen, "Expected ')' after generator expression")
+                return .generatorExp(GeneratorExp(
+                    elt: first,
+                    generators: generators,
+                    lineno: token.line,
+                    colOffset: token.column,
+                    endLineno: nil,
+                    endColOffset: nil
+                ))
+            }
             
             if currentToken().type == .comma {
                 // Tuple
@@ -1265,17 +1378,46 @@ public class Parser {
             return first
             
         case .leftbracket:
-            // List
+            // List or list comprehension
             advance()
-            var elts: [Expression] = []
             
-            while currentToken().type != .rightbracket && !isAtEnd() {
-                elts.append(try parseExpression())
-                if currentToken().type == .comma {
-                    advance()
-                } else if currentToken().type != .rightbracket {
-                    throw ParseError.expected(message: "Expected ',' or ']' in list", line: currentToken().line)
+            if currentToken().type == .rightbracket {
+                // Empty list
+                try consume(.rightbracket, "Expected ']'")
+                return .list(List(
+                    elts: [],
+                    ctx: .load,
+                    lineno: token.line,
+                    colOffset: token.column,
+                    endLineno: nil,
+                    endColOffset: nil
+                ))
+            }
+            
+            let first = try parseExpression()
+            
+            // Check for list comprehension
+            if currentToken().type == .for {
+                let generators = try parseComprehensionGenerators()
+                try consume(.rightbracket, "Expected ']' after list comprehension")
+                return .listComp(ListComp(
+                    elt: first,
+                    generators: generators,
+                    lineno: token.line,
+                    colOffset: token.column,
+                    endLineno: nil,
+                    endColOffset: nil
+                ))
+            }
+            
+            // Regular list
+            var elts = [first]
+            while currentToken().type == .comma {
+                advance()
+                if currentToken().type == .rightbracket {
+                    break
                 }
+                elts.append(try parseExpression())
             }
             
             try consume(.rightbracket, "Expected ']' after list")
@@ -1289,7 +1431,7 @@ public class Parser {
             ))
             
         case .leftbrace:
-            // Dict or Set
+            // Dict, Set, Dict comprehension, or Set comprehension
             advance()
             
             if currentToken().type == .rightbrace {
@@ -1308,9 +1450,26 @@ public class Parser {
             let first = try parseExpression()
             
             if currentToken().type == .colon {
-                // Dict
+                // Dict or dict comprehension
                 advance()
                 let firstValue = try parseExpression()
+                
+                // Check for dict comprehension
+                if currentToken().type == .for {
+                    let generators = try parseComprehensionGenerators()
+                    try consume(.rightbrace, "Expected '}' after dict comprehension")
+                    return .dictComp(DictComp(
+                        key: first,
+                        value: firstValue,
+                        generators: generators,
+                        lineno: token.line,
+                        colOffset: token.column,
+                        endLineno: nil,
+                        endColOffset: nil
+                    ))
+                }
+                
+                // Regular dict
                 var keys = [first]
                 var values = [firstValue]
                 
@@ -1336,7 +1495,23 @@ public class Parser {
                     endColOffset: nil
                 ))
             } else {
-                // Set
+                // Set or set comprehension
+                
+                // Check for set comprehension
+                if currentToken().type == .for {
+                    let generators = try parseComprehensionGenerators()
+                    try consume(.rightbrace, "Expected '}' after set comprehension")
+                    return .setComp(SetComp(
+                        elt: first,
+                        generators: generators,
+                        lineno: token.line,
+                        colOffset: token.column,
+                        endLineno: nil,
+                        endColOffset: nil
+                    ))
+                }
+                
+                // Regular set
                 var elts = [first]
                 while currentToken().type == .comma {
                     advance()
@@ -1397,6 +1572,33 @@ public class Parser {
         if isNewlineOrSemicolon() {
             advance()
         }
+    }
+    
+    private func parseComprehensionGenerators() throws -> [Comprehension] {
+        var generators: [Comprehension] = []
+        
+        while currentToken().type == .for {
+            advance() // consume 'for'
+            
+            let target = try parseExpression()
+            try consume(.in, "Expected 'in' in comprehension")
+            let iter = try parseExpression()
+            
+            var ifs: [Expression] = []
+            while currentToken().type == .if {
+                advance()
+                ifs.append(try parseExpression())
+            }
+            
+            generators.append(Comprehension(
+                target: target,
+                iter: iter,
+                ifs: ifs,
+                isAsync: false
+            ))
+        }
+        
+        return generators
     }
 }
 
