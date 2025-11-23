@@ -88,7 +88,8 @@ extension GeneratorExp: PyCodeProtocol {
 
 extension Comprehension: PyCodeProtocol {
     public func toPythonCode(context: CodeGenContext) -> String {
-        var code = "for \(target.toPythonCode(context: context)) in \(iter.toPythonCode(context: context))"
+        let forKeyword = isAsync ? "async for" : "for"
+        var code = "\(forKeyword) \(target.toPythonCode(context: context)) in \(iter.toPythonCode(context: context))"
         
         for ifExpr in ifs {
             code += " if \(ifExpr.toPythonCode(context: context))"

@@ -2243,8 +2243,8 @@ public class Parser {
             
             let first = try parseStarExpression()
             
-            // Check for generator expression
-            if currentToken().type == .for {
+            // Check for generator expression (including async)
+            if currentToken().type == .for || currentToken().type == .async {
                 let generators = try parseComprehensionGenerators()
                 try consume(.rightparen, "Expected ')' after generator expression")
                 return .generatorExp(GeneratorExp(
@@ -2300,8 +2300,8 @@ public class Parser {
             
             let first = try parseStarExpression()
             
-            // Check for list comprehension
-            if currentToken().type == .for {
+            // Check for list comprehension (including async comprehension)
+            if currentToken().type == .for || currentToken().type == .async {
                 let generators = try parseComprehensionGenerators()
                 try consume(.rightbracket, "Expected ']' after list comprehension")
                 return .listComp(ListComp(
@@ -2399,8 +2399,8 @@ public class Parser {
                 advance()
                 let firstValue = try parseExpression()
                 
-                // Check for dict comprehension
-                if currentToken().type == .for {
+                // Check for dict comprehension (including async)
+                if currentToken().type == .for || currentToken().type == .async {
                     let generators = try parseComprehensionGenerators()
                     try consume(.rightbrace, "Expected '}' after dict comprehension")
                     return .dictComp(DictComp(
@@ -2451,8 +2451,8 @@ public class Parser {
             } else {
                 // Set or set comprehension
                 
-                // Check for set comprehension
-                if currentToken().type == .for {
+                // Check for set comprehension (including async)
+                if currentToken().type == .for || currentToken().type == .async {
                     let generators = try parseComprehensionGenerators()
                     try consume(.rightbrace, "Expected '}' after set comprehension")
                     return .setComp(SetComp(
@@ -2531,9 +2531,19 @@ public class Parser {
     private func parseComprehensionGenerators() throws -> [Comprehension] {
         var generators: [Comprehension] = []
         
-        while currentToken().type == .for {
+        while currentToken().type == .async || currentToken().type == .for {
+            // Check for async comprehension
+            let isAsync: Bool
+            if currentToken().type == .async {
+                isAsync = true
+                advance() // consume 'async'
+                try consume(.for, "Expected 'for' after 'async' in comprehension")
+            } else {
+                isAsync = false
+                advance() // consume 'for'
+            }
+            
             let forToken = currentToken()
-            advance() // consume 'for'
             
             // Parse target (can be a tuple like: k, v)
             var targetExprs = [try parseBitwiseOrExpression()]
@@ -2573,7 +2583,7 @@ public class Parser {
                 target: target,
                 iter: iter,
                 ifs: ifs,
-                isAsync: false
+                isAsync: isAsync
             ))
         }
         

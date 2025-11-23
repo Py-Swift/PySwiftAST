@@ -83,16 +83,17 @@ func normalizeWhitespace(_ code: String) -> String {
 }
 
 @Test func testDebugChainedAssignment() async throws {
-    let source = """
-    d = {"a": 1, "b": 2}
-    """
-    print("Testing string escaping in dict keys")
+    let source = try loadResource("async_await.py")
+    print("Testing async_await.py")
     do {
+        print("Parsing...")
         let ast = try parsePython(source)
         print("✅ Parsed successfully")
+        print("Generating code...")
         let generated = generatePythonCode(from: ast)
-        print("Generated:")
-        print(generated)
+        print("Generated first 500 chars:")
+        print(String(generated.prefix(500)))
+        print("\nReparsing...")
         _ = try parsePython(generated)
         print("✅ Reparsed successfully")
     } catch {
