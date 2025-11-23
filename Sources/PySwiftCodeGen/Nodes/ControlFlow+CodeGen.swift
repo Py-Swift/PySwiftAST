@@ -124,31 +124,25 @@ extension If: PyCodeProtocol {
             lines.append(stmt.toPythonCode(context: bodyContext))
         }
         
+        // Handle elif/else chains
         if !orElse.isEmpty {
             // Check if orElse is a single if statement (elif case)
             if orElse.count == 1, case .ifStmt(let elifStmt) = orElse[0] {
-                // Convert to elif
-                let elifTest = elifStmt.test.toPythonCode(context: context)
-                lines.append(context.indent + "elif \(elifTest):")
-                
-                for stmt in elifStmt.body {
-                    lines.append(stmt.toPythonCode(context: bodyContext))
-                }
-                
-                // Continue with nested else/elif
-                if !elifStmt.orElse.isEmpty {
-                    for stmt in elifStmt.orElse {
-                        let stmtCode = stmt.toPythonCode(context: context)
-                        // Remove leading indent since we're already at the right level
-                        let unindented = stmtCode.drop(while: { $0 == " " })
-                        if unindented.hasPrefix("if ") {
-                            lines.append(context.indent + "el" + unindented)
-                        } else {
-                            lines.append(stmtCode)
-                        }
+                // Recursively generate elif/else chain
+                let elifCode = elifStmt.toPythonCode(context: context)
+                // Replace "if" with "elif"
+                let elifLines = elifCode.split(separator: "\n", omittingEmptySubsequences: false)
+                for (index, line) in elifLines.enumerated() {
+                    let lineStr = String(line)
+                    if index == 0 && lineStr.trimmingCharacters(in: .whitespaces).hasPrefix("if ") {
+                        let replaced = lineStr.replacingOccurrences(of: "if ", with: "elif ", options: [], range: lineStr.range(of: "if "))
+                        lines.append(replaced)
+                    } else {
+                        lines.append(lineStr)
                     }
                 }
             } else {
+                // Regular else block
                 lines.append(context.indent + "else:")
                 for stmt in orElse {
                     lines.append(stmt.toPythonCode(context: bodyContext))

@@ -337,14 +337,14 @@ public class Tokenizer {
         let startColumn = column
         let char = source[position]
         
-        // Two or three character operators
-        if let twoChar = peekString(2), let type = twoCharOperator(twoChar) {
+        // Three character operators (check first - they're longer!)
+        if let threeChar = peekString(3), let type = threeCharOperator(threeChar) {
             advance()
             advance()
-            return Token(type: type, value: twoChar, line: startLine, column: startColumn, endLine: line, endColumn: column)
+            advance()
+            return Token(type: type, value: threeChar, line: startLine, column: startColumn, endLine: line, endColumn: column)
         }
         
-        // Three character operators
         if let threeChar = peekString(3), threeChar == "..." {
             advance()
             advance()
@@ -352,11 +352,11 @@ public class Tokenizer {
             return Token(type: .ellipsis, value: "...", line: startLine, column: startColumn, endLine: line, endColumn: column)
         }
         
-        if let threeChar = peekString(3), let type = threeCharOperator(threeChar) {
+        // Two character operators
+        if let twoChar = peekString(2), let type = twoCharOperator(twoChar) {
             advance()
             advance()
-            advance()
-            return Token(type: type, value: threeChar, line: startLine, column: startColumn, endLine: line, endColumn: column)
+            return Token(type: type, value: twoChar, line: startLine, column: startColumn, endLine: line, endColumn: column)
         }
         
         // Single character operators

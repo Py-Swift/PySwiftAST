@@ -83,13 +83,16 @@ func normalizeWhitespace(_ code: String) -> String {
 }
 
 @Test func testDebugChainedAssignment() async throws {
-    let source = "unpacking = a, b, c = 1, 2, 3"
+    let source = """
+    d = {"a": 1}
+    """
     print("Original:", source)
     do {
         let ast = try parsePython(source)
         print("✅ Parsed successfully")
         let generated = generatePythonCode(from: ast)
-        print("Generated:", generated)
+        print("Generated:")
+        print(generated)
         _ = try parsePython(generated)
         print("✅ Reparsed successfully")
     } catch {
@@ -298,10 +301,14 @@ func normalizeWhitespace(_ code: String) -> String {
     print("Testing: control_flow.py")
     let ast = try parsePython(source)
     let generated = generatePythonCode(from: ast)
+    print("=== Generated Code ===")
+    print(generated)
     
     let reparsed = try parsePython(generated)
     
     if case .module(let stmts1) = ast, case .module(let stmts2) = reparsed {
+        print("Original statements: \(stmts1.count)")
+        print("Reparsed statements: \(stmts2.count)")
         #expect(stmts1.count == stmts2.count)
     }
 }
@@ -310,8 +317,22 @@ func normalizeWhitespace(_ code: String) -> String {
     let source = try loadResource("operators.py")
     
     print("Testing: operators.py")
+    print("Source lines: \(source.split(separator: "\n").count)")
+    print("Lines 29-33:")
+    let srcLines = source.split(separator: "\n", omittingEmptySubsequences: false)
+    for (i, line) in srcLines.enumerated() where i >= 28 && i <= 32 {
+        print("\(i+1): \(line)")
+    }
+    
     let ast = try parsePython(source)
+    print("✅ Parsed original")
     let generated = generatePythonCode(from: ast)
+    
+    print("Generated code lines 29-33:")
+    let lines = generated.split(separator: "\n", omittingEmptySubsequences: false)
+    for (i, line) in lines.enumerated() where i >= 28 && i <= 32 {
+        print("\(i+1): \(line)")
+    }
     
     let reparsed = try parsePython(generated)
     
@@ -326,6 +347,12 @@ func normalizeWhitespace(_ code: String) -> String {
     print("Testing: collections.py")
     let ast = try parsePython(source)
     let generated = generatePythonCode(from: ast)
+    
+    print("Generated code lines 14-24:")
+    let lines = generated.split(separator: "\n", omittingEmptySubsequences: false)
+    for (i, line) in lines.enumerated() where i >= 13 && i <= 23 {
+        print("\(i+1): \(line)")
+    }
     
     let reparsed = try parsePython(generated)
     
