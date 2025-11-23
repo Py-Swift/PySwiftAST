@@ -6,6 +6,8 @@ PySwiftCodeGen is the inverse of PySwiftAST - it converts AST back to Python sou
 ## Test Results
 **Round-trip tests: 7/13 passing (54%)**
 
+**Note:** Multi-line collections now work after implementing implicit line joining!
+
 ### ✅ Passing Tests
 1. `simple_assignment.py` - Basic assignments and expressions
 2. `imports.py` - Import and from-import statements  
@@ -17,11 +19,11 @@ PySwiftCodeGen is the inverse of PySwiftAST - it converts AST back to Python sou
 
 ### ❌ Failing Tests (Known Issues)
 1. `functions.py` - **F-strings not supported**
-2. `collections.py` - **Multi-line collections not supported**
+2. `collections.py` - **Dictionary unpacking (`**dict`) not supported**
 3. `operators.py` - **F-strings not supported**
-4. `async_await.py` - Unknown (needs investigation)
+4. `async_await.py` - **Argument unpacking (`*args`) not supported**
 5. `type_annotations.py` - **Python 3.12+ `type` statement not implemented**
-6. `new_features.py` - Unknown (needs investigation)
+6. `new_features.py` - **Class metaclass syntax not supported**
 
 ## Known Limitations
 
@@ -56,12 +58,16 @@ f"{x=}"  # Python 3.8+ debug syntax
 - Format spec handling (`:` syntax)
 - Conversion flags (`!s`, `!r`, `!a`)
 
-### 2. Multi-line Collections Not Supported ❌
-**Impact:** MEDIUM - affects 1 test file directly
+### 2. Multi-line Collections FIXED ✅
+**Impact:** MEDIUM - was affecting 1 test file directly
 
-The tokenizer doesn't implement Python's implicit line joining rules. Newlines inside `()`, `[]`, `{}` should be ignored but aren't.
+~~The tokenizer doesn't implement Python's implicit line joining rules. Newlines inside `()`, `[]`, `{}` should be ignored but aren't.~~
 
-**Affected constructs:**
+**Status:** **FIXED** in latest commit!
+
+The tokenizer now tracks paren/bracket/brace depth and skips newline tokens when inside brackets (implicit line joining per PEP 8).
+
+**Working constructs:**
 ```python
 nested_dict = {
     "user1": {"name": "Alice"},
@@ -72,16 +78,26 @@ long_list = [
     1, 2, 3,
     4, 5, 6
 ]
+
+def function(
+    arg1,
+    arg2
+):
+    pass
 ```
 
-**Error:** `Unexpected token '' at line X`
+### 3. Dictionary/Argument Unpacking Not Supported ❌  
+**Impact:** MEDIUM - affects 2 test files
 
-**Resolution:** Tokenizer needs to track paren/bracket/brace depth:
-- Add `parenDepth`, `bracketDepth`, `braceDepth` counters
-- Skip newline tokens when depth > 0
-- Only emit NEWLINE when at depth 0
+Unpacking with `*` and `**` is not implemented:
+```python
+merged = {**dict1, **dict2}  # Dictionary unpacking
+results = await gather(*tasks)  # Argument unpacking
+```
 
-### 3. Python 3.12+ Features Not Implemented ❌
+**Resolution:** Requires parser support for Starred expressions in dict/call contexts
+
+### 4. Python 3.12+ Features Not Implemented ❌
 **Impact:** LOW - only affects cutting-edge Python code
 
 The `type` statement (PEP 695) from Python 3.12 is not supported:
@@ -90,6 +106,16 @@ type Point = tuple[float, float]
 ```
 
 **Resolution:** Add `TypeAlias` statement node and parsing logic
+
+### 5. Class Metaclass Syntax Not Supported ❌
+**Impact:** LOW - affects advanced class definitions
+
+```python
+class MyClass(BaseClass, metaclass=type):
+    pass
+```
+
+**Resolution:** Parser needs to handle keyword arguments in class definitions
 
 ## Recent Fixes
 
@@ -108,6 +134,7 @@ type Point = tuple[float, float]
 
 ### Tokenizer Bugs Fixed (Session 2) ✅
 1. **Three-char operators** - Fixed `//=`, `<<=`, `>>=`, `**=` by checking 3-char operators before 2-char operators
+2. **Implicit line joining** - Implemented bracket/paren/brace depth tracking to skip newlines inside brackets (PEP 8)
 
 ## Code Quality
 
@@ -128,7 +155,7 @@ Round-trip parsing completes in <10ms for typical files.
 ## Next Steps
 
 ### Priority 1: F-String Support
-Implementing f-strings would fix 6 failing tests and greatly improve coverage.
+Implementing f-strings would fix 3 failing tests and greatly improve coverage.
 
 **Tasks:**
 1. Implement f-string tokenization state machine
@@ -138,29 +165,33 @@ Implementing f-strings would fix 6 failing tests and greatly improve coverage.
 
 **Estimated effort:** 3-4 hours
 
-### Priority 2: Multi-line Collections
-Implementing implicit line joining would fix 1 failing test and improve robustness.
+### Priority 2: Starred Expressions (Unpacking) ~~Multi-line Collections~~
+~~Implementing implicit line joining would fix 1 failing test and improve robustness.~~ **DONE!**
+
+Implementing starred expressions would fix 2 failing tests.
 
 **Tasks:**
-1. Add depth tracking to tokenizer
-2. Modify newline emission logic
-3. Test with complex nested structures
+1. Add Starred expression node
+2. Handle `*args` in function calls
+3. Handle `**kwargs` in function calls and dict literals
+4. Update code generation
 
 **Estimated effort:** 1-2 hours
 
-### Priority 3: Investigate Remaining Failures
-- `async_await.py` - Likely related to multi-line collections or f-strings
-- `new_features.py` - Needs investigation
+### Priority 3: Investigate Remaining Failures ~~Investigate Remaining Failures~~
+- ~~`async_await.py` - Likely related to multi-line collections or f-strings~~ - **Identified:** Argument unpacking
+- ~~`new_features.py` - Needs investigation~~ - **Identified:** Class metaclass syntax
 
-**Estimated effort:** 1-2 hours
+**Estimated effort:** 1-2 hours for implementing remaining features
 
 ## Conclusion
 
 **PySwiftCodeGen is 54% complete for comprehensive Python 3.13 support.**
 
 The core architecture is solid and working well. The main gaps are:
-1. F-strings (tokenization unimplemented)
-2. Multi-line collections (implicit line joining unimplemented)
-3. Minor edge cases
+1. F-strings (tokenization unimplemented) - **HIGH PRIORITY**
+2. ~~Multi-line collections (implicit line joining unimplemented)~~ - **FIXED!** ✅
+3. Starred expressions for unpacking - **MEDIUM PRIORITY**
+4. Minor edge cases (metaclass syntax, Python 3.12+ features)
 
-With f-string and multi-line support, the coverage would likely reach **85-90%**.
+With f-string and starred expression support, the coverage would likely reach **85-90%**.
