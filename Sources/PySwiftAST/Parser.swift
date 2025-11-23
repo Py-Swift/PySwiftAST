@@ -2170,8 +2170,10 @@ public class Parser {
             
         case .string(let str):
             advance()
+            // Strip quotes from string literal
+            let unquoted = stripQuotes(from: str)
             return .constant(Constant(
-                value: .string(str),
+                value: .string(unquoted),
                 kind: nil,
                 lineno: token.line,
                 colOffset: token.column,
@@ -2576,6 +2578,32 @@ public class Parser {
         }
         
         return generators
+    }
+    
+    // Strip quotes from string literals
+    private func stripQuotes(from str: String) -> String {
+        var result = str
+        
+        // Check for triple quotes
+        if result.hasPrefix("\"\"\"") && result.hasSuffix("\"\"\"") {
+            result = String(result.dropFirst(3).dropLast(3))
+        } else if result.hasPrefix("'''") && result.hasSuffix("'''") {
+            result = String(result.dropFirst(3).dropLast(3))
+        } else if (result.hasPrefix("\"") && result.hasSuffix("\"")) ||
+                  (result.hasPrefix("'") && result.hasSuffix("'")) {
+            result = String(result.dropFirst().dropLast())
+        }
+        
+        // Unescape common escape sequences
+        result = result
+            .replacingOccurrences(of: "\\n", with: "\n")
+            .replacingOccurrences(of: "\\r", with: "\r")
+            .replacingOccurrences(of: "\\t", with: "\t")
+            .replacingOccurrences(of: "\\\\", with: "\\")
+            .replacingOccurrences(of: "\\\"", with: "\"")
+            .replacingOccurrences(of: "\\'", with: "'")
+        
+        return result
     }
 }
 

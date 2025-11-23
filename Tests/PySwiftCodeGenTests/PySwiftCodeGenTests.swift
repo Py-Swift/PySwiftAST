@@ -84,13 +84,9 @@ func normalizeWhitespace(_ code: String) -> String {
 
 @Test func testDebugChainedAssignment() async throws {
     let source = """
-    numbers = [1, 2, 3, 4, 5]
-    sublist = numbers[1:4]
-    reversed_list = numbers[::-1]
-    every_other = numbers[::2]
-    middle = numbers[1:-1]
+    d = {"a": 1, "b": 2}
     """
-    print("Testing slice code generation")
+    print("Testing string escaping in dict keys")
     do {
         let ast = try parsePython(source)
         print("✅ Parsed successfully")
