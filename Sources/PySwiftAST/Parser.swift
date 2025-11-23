@@ -2331,6 +2331,47 @@ public class Parser {
                 ))
             }
             
+            // Check for **dict unpacking at start
+            if currentToken().type == .doublestar {
+                advance() // consume **
+                let unpackedDict = try parseExpression()
+                
+                var keys: [Expression?] = [nil] // nil key indicates unpacking
+                var values: [Expression] = [unpackedDict]
+                
+                while currentToken().type == .comma {
+                    advance()
+                    if currentToken().type == .rightbrace {
+                        break
+                    }
+                    
+                    // Check for another **dict unpacking
+                    if currentToken().type == .doublestar {
+                        advance()
+                        let nextUnpack = try parseExpression()
+                        keys.append(nil)
+                        values.append(nextUnpack)
+                    } else {
+                        // Regular key-value pair
+                        let key = try parseExpression()
+                        try consume(.colon, "Expected ':' after dict key")
+                        let value = try parseExpression()
+                        keys.append(key)
+                        values.append(value)
+                    }
+                }
+                
+                try consume(.rightbrace, "Expected '}' after dict")
+                return .dict(Dict(
+                    keys: keys,
+                    values: values,
+                    lineno: token.line,
+                    colOffset: token.column,
+                    endLineno: nil,
+                    endColOffset: nil
+                ))
+            }
+            
             let first = try parseExpression()
             
             if currentToken().type == .colon {
@@ -2354,7 +2395,7 @@ public class Parser {
                 }
                 
                 // Regular dict
-                var keys = [first]
+                var keys: [Expression?] = [first]
                 var values = [firstValue]
                 
                 while currentToken().type == .comma {
@@ -2362,11 +2403,20 @@ public class Parser {
                     if currentToken().type == .rightbrace {
                         break
                     }
-                    let key = try parseExpression()
-                    try consume(.colon, "Expected ':' after dict key")
-                    let value = try parseExpression()
-                    keys.append(key)
-                    values.append(value)
+                    
+                    // Check for **dict unpacking
+                    if currentToken().type == .doublestar {
+                        advance()
+                        let unpackedDict = try parseExpression()
+                        keys.append(nil) // nil key indicates unpacking
+                        values.append(unpackedDict)
+                    } else {
+                        let key = try parseExpression()
+                        try consume(.colon, "Expected ':' after dict key")
+                        let value = try parseExpression()
+                        keys.append(key)
+                        values.append(value)
+                    }
                 }
                 
                 try consume(.rightbrace, "Expected '}' after dict")
