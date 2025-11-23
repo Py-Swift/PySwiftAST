@@ -191,8 +191,34 @@ extension TryStar: PyCodeProtocol {
 
 extension TypeAlias: PyCodeProtocol {
     public func toPythonCode(context: CodeGenContext) -> String {
-        // TODO: Implement
-        return context.indent + "# type alias"
+        var code = context.indent + "type "
+        
+        // Name
+        code += name.toPythonCode(context: context)
+        
+        // Type parameters (if any)
+        if !typeParams.isEmpty {
+            let params = typeParams.map { param in
+                switch param {
+                case .typeVar(let typeVar):
+                    var paramStr = typeVar.name
+                    if let bound = typeVar.bound {
+                        paramStr += ": " + bound.toPythonCode(context: context)
+                    }
+                    return paramStr
+                case .paramSpec(let paramSpec):
+                    return "**" + paramSpec.name
+                case .typeVarTuple(let tuple):
+                    return "*" + tuple.name
+                }
+            }.joined(separator: ", ")
+            code += "[\(params)]"
+        }
+        
+        // Value
+        code += " = " + value.toPythonCode(context: context)
+        
+        return code
     }
 }
 

@@ -125,6 +125,9 @@ public class Parser {
         case .nonlocal:
             return try parseNonlocal()
             
+        case .type:
+            return try parseTypeAlias()
+            
         case .del:
             return try parseDel()
             
@@ -671,6 +674,59 @@ public class Parser {
             names: names,
             lineno: nonlocalToken.line,
             colOffset: nonlocalToken.column,
+            endLineno: nil,
+            endColOffset: nil
+        ))
+    }
+    
+    private func parseTypeAlias() throws -> Statement {
+        let typeToken = currentToken()
+        advance() // consume 'type'
+        
+        // Parse name
+        guard case .name(let name) = currentToken().type else {
+            throw ParseError.expected(message: "Expected name after 'type'", line: currentToken().line)
+        }
+        let nameExpr = Expression.name(Name(
+            id: name,
+            ctx: .store,
+            lineno: currentToken().line,
+            colOffset: currentToken().column,
+            endLineno: nil,
+            endColOffset: nil
+        ))
+        advance()
+        
+        // Parse optional type parameters [T], [T, U], etc.
+        var typeParams: [TypeParam] = []
+        if currentToken().type == .leftbracket {
+            advance() // consume '['
+            
+            typeParams = try parseTypeParameters()
+            
+            guard currentToken().type == .rightbracket else {
+                throw ParseError.expected(message: "Expected ']' after type parameters", line: currentToken().line)
+            }
+            advance() // consume ']'
+        }
+        
+        // Parse '='
+        guard currentToken().type == .assign else {
+            throw ParseError.expected(message: "Expected '=' after type alias name", line: currentToken().line)
+        }
+        advance() // consume '='
+        
+        // Parse type expression
+        let value = try parseExpression()
+        
+        consumeNewlineOrSemicolon()
+        
+        return .typeAlias(TypeAlias(
+            name: nameExpr,
+            typeParams: typeParams,
+            value: value,
+            lineno: typeToken.line,
+            colOffset: typeToken.column,
             endLineno: nil,
             endColOffset: nil
         ))
@@ -2588,6 +2644,47 @@ public class Parser {
         }
         
         return generators
+    }
+    
+    // Parse type parameters: [T], [T, U], [T: int], etc.
+    private func parseTypeParameters() throws -> [TypeParam] {
+        var params: [TypeParam] = []
+        
+        // Parse first parameter
+        guard case .name(let name) = currentToken().type else {
+            throw ParseError.expected(message: "Expected type parameter name", line: currentToken().line)
+        }
+        advance()
+        
+        // Check for bound (T: int)
+        var bound: Expression? = nil
+        if currentToken().type == .colon {
+            advance() // consume ':'
+            bound = try parseExpression()
+        }
+        
+        params.append(.typeVar(TypeVar(name: name, bound: bound, defaultValue: nil)))
+        
+        // Parse remaining parameters
+        while currentToken().type == .comma {
+            advance() // consume ','
+            
+            guard case .name(let name) = currentToken().type else {
+                throw ParseError.expected(message: "Expected type parameter name", line: currentToken().line)
+            }
+            advance()
+            
+            // Check for bound
+            var bound: Expression? = nil
+            if currentToken().type == .colon {
+                advance() // consume ':'
+                bound = try parseExpression()
+            }
+            
+            params.append(.typeVar(TypeVar(name: name, bound: bound, defaultValue: nil)))
+        }
+        
+        return params
     }
     
     // Strip quotes from string literals
