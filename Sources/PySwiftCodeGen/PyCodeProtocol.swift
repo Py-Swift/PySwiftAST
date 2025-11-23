@@ -23,18 +23,23 @@ public struct CodeGenContext {
     /// Whether to use single quotes for strings (vs double quotes)
     public var useSingleQuotes: Bool
     
+    /// Whether we're currently inside a subscript (affects tuple formatting)
+    public var inSubscript: Bool
+    
     public init(
         indentLevel: Int = 0,
         indentSize: Int = 4,
         useTrailingCommas: Bool = true,
         maxLineLength: Int = 88,  // Black's default
-        useSingleQuotes: Bool = false
+        useSingleQuotes: Bool = false,
+        inSubscript: Bool = false
     ) {
         self.indentLevel = indentLevel
         self.indentSize = indentSize
         self.useTrailingCommas = useTrailingCommas
         self.maxLineLength = maxLineLength
         self.useSingleQuotes = useSingleQuotes
+        self.inSubscript = inSubscript
     }
     
     /// Get the current indentation string

@@ -54,7 +54,9 @@ extension Attribute: PyCodeProtocol {
 extension Subscript: PyCodeProtocol {
     public func toPythonCode(context: CodeGenContext) -> String {
         let valueCode = value.toPythonCode(context: context)
-        let sliceCode = slice.toPythonCode(context: context)
+        var subscriptContext = context
+        subscriptContext.inSubscript = true
+        let sliceCode = slice.toPythonCode(context: subscriptContext)
         return valueCode + "[" + sliceCode + "]"
     }
 }

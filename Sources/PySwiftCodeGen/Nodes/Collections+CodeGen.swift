@@ -13,6 +13,11 @@ extension Tuple: PyCodeProtocol {
     public func toPythonCode(context: CodeGenContext) -> String {
         let elemsCode = elts.map { $0.toPythonCode(context: context) }.joined(separator: ", ")
         
+        // In subscript context, don't use parentheses for tuple (e.g., dict[str, int])
+        if context.inSubscript {
+            return elemsCode
+        }
+        
         // Single element tuple needs trailing comma
         if elts.count == 1 {
             return "(\(elemsCode),)"

@@ -133,7 +133,29 @@ public class Parser {
             
         default:
             // Try to parse as expression statement or assignment
-            let expr = try parseExpression()
+            var expr = try parseExpression()
+            
+            // Check for comma - could be tuple expression (e.g., a, b, c = 1, 2, 3)
+            if currentToken().type == .comma {
+                var elements = [expr]
+                while currentToken().type == .comma {
+                    advance() // consume ','
+                    // Check for trailing comma or end of statement
+                    if isNewlineOrSemicolon() || isAtEnd() {
+                        break
+                    }
+                    elements.append(try parseExpression())
+                }
+                
+                expr = .tuple(Tuple(
+                    elts: elements,
+                    ctx: .load,
+                    lineno: token.line,
+                    colOffset: token.column,
+                    endLineno: nil,
+                    endColOffset: nil
+                ))
+            }
             
             // Check for type annotation (annotated assignment) - only valid for names
             if currentToken().type == .colon {
@@ -178,18 +200,55 @@ public class Parser {
                     throw ParseError.expected(message: "Invalid assignment target", line: token.line)
                 }
                 
-                advance() // consume '='
-                let value = try parseExpression()
-                consumeNewlineOrSemicolon()
-                return .assign(Assign(
-                    targets: [expr],
-                    value: value,
-                    typeComment: nil,
-                    lineno: token.line,
-                    colOffset: token.column,
-                    endLineno: nil,
-                    endColOffset: nil
-                ))
+                // Collect all targets for chained assignment (e.g., a = b = c = 1)
+                var targets = [expr]
+                
+                while currentToken().type == .assign {
+                    advance() // consume '='
+                    
+                    // Parse next part - could be another target or the final value
+                    var nextExpr = try parseExpression()
+                    
+                    // Check if this is a tuple
+                    if currentToken().type == .comma {
+                        var elements = [nextExpr]
+                        while currentToken().type == .comma {
+                            advance()
+                            if isNewlineOrSemicolon() || isAtEnd() || currentToken().type == .assign {
+                                break
+                            }
+                            elements.append(try parseExpression())
+                        }
+                        nextExpr = .tuple(Tuple(
+                            elts: elements,
+                            ctx: .load,
+                            lineno: token.line,
+                            colOffset: token.column,
+                            endLineno: nil,
+                            endColOffset: nil
+                        ))
+                    }
+                    
+                    // If there's another '=', this is a target, not the value
+                    if currentToken().type == .assign {
+                        targets.append(nextExpr)
+                    } else {
+                        // This is the final value
+                        consumeNewlineOrSemicolon()
+                        return .assign(Assign(
+                            targets: targets,
+                            value: nextExpr,
+                            typeComment: nil,
+                            lineno: token.line,
+                            colOffset: token.column,
+                            endLineno: nil,
+                            endColOffset: nil
+                        ))
+                    }
+                }
+                
+                // Should not reach here
+                throw ParseError.expected(message: "Expected value in assignment", line: currentToken().line)
             }
             
             // Check for augmented assignment
@@ -237,7 +296,31 @@ public class Parser {
         let forToken = currentToken()
         advance() // consume 'for'
         
-        let target = try parseExpression()
+        // Parse target (can be a tuple like: i, j)
+        var targetExprs = [try parseBitwiseOrExpression()]
+        while currentToken().type == .comma {
+            advance()
+            // Check if we've hit 'in' (trailing comma case)
+            if currentToken().type == .in {
+                break
+            }
+            targetExprs.append(try parseBitwiseOrExpression())
+        }
+        
+        let target: Expression
+        if targetExprs.count == 1 {
+            target = targetExprs[0]
+        } else {
+            target = .tuple(Tuple(
+                elts: targetExprs,
+                ctx: .store,
+                lineno: forToken.line,
+                colOffset: forToken.column,
+                endLineno: nil,
+                endColOffset: nil
+            ))
+        }
+        
         try consume(.in, "Expected 'in' in for loop")
         let iter = try parseExpression()
         try consume(.colon, "Expected ':' after for clause")
@@ -1064,13 +1147,12 @@ public class Parser {
         // Handle relative imports (.module or ..module)
         while currentToken().type == .dot {
             level += 1
-            moduleName += "."
             advance()
         }
         
-        // Parse module name parts
+        // Parse module name parts (if present - can be just dots for current package)
         if case .name(let name) = currentToken().type {
-            moduleName += name
+            moduleName = name
             advance()
             
             // Handle dotted module names (e.g., typing.List)
@@ -1385,20 +1467,100 @@ public class Parser {
             let token = currentToken()
             advance()
             
-            // Parse lambda parameters (simplified)
-            var params: [String] = []
+            // Parse lambda arguments (similar to function arguments but inline)
+            var args: [Arg] = []
+            var defaults: [Expression] = []
+            var vararg: Arg? = nil
+            var kwonlyArgs: [Arg] = []
+            var kwDefaults: [Expression?] = []
+            var kwarg: Arg? = nil
+            
             if currentToken().type != .colon {
                 // Parse parameter list
-                if case .name(let param) = currentToken().type {
-                    params.append(param)
-                    advance()
-                    
-                    while currentToken().type == .comma {
+                while currentToken().type != .colon && !isAtEnd() {
+                    // Check for *args
+                    if currentToken().type == .star {
                         advance()
-                        if case .name(let p) = currentToken().type {
-                            params.append(p)
+                        if case .name(let name) = currentToken().type {
+                            vararg = Arg(arg: name, annotation: nil, typeComment: nil)
+                            advance()
+                            
+                            // After *args, we have keyword-only arguments
+                            if currentToken().type == .comma {
+                                advance()
+                                // Parse keyword-only args
+                                while currentToken().type != .colon && !isAtEnd() {
+                                    if currentToken().type == .doublestar {
+                                        advance()
+                                        if case .name(let name) = currentToken().type {
+                                            kwarg = Arg(arg: name, annotation: nil, typeComment: nil)
+                                            advance()
+                                        }
+                                        break
+                                    }
+                                    
+                                    if case .name(let name) = currentToken().type {
+                                        let arg = Arg(arg: name, annotation: nil, typeComment: nil)
+                                        advance()
+                                        
+                                        // Check for default value
+                                        if currentToken().type == .assign {
+                                            advance()
+                                            let defaultVal = try parseBitwiseOrExpression()
+                                            kwonlyArgs.append(arg)
+                                            kwDefaults.append(defaultVal)
+                                        } else {
+                                            kwonlyArgs.append(arg)
+                                            kwDefaults.append(nil)
+                                        }
+                                        
+                                        if currentToken().type == .comma {
+                                            advance()
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            // Bare * means keyword-only args follow
+                            if currentToken().type == .comma {
+                                advance()
+                            }
+                        }
+                        break
+                    }
+                    
+                    // Check for **kwargs
+                    if currentToken().type == .doublestar {
+                        advance()
+                        if case .name(let name) = currentToken().type {
+                            kwarg = Arg(arg: name, annotation: nil, typeComment: nil)
                             advance()
                         }
+                        break
+                    }
+                    
+                    // Regular parameter
+                    if case .name(let param) = currentToken().type {
+                        let arg = Arg(arg: param, annotation: nil, typeComment: nil)
+                        advance()
+                        
+                        // Check for default value
+                        if currentToken().type == .assign {
+                            advance()
+                            let defaultVal = try parseBitwiseOrExpression()
+                            args.append(arg)
+                            defaults.append(defaultVal)
+                        } else {
+                            args.append(arg)
+                        }
+                        
+                        if currentToken().type == .comma {
+                            advance()
+                        } else {
+                            break
+                        }
+                    } else {
+                        break
                     }
                 }
             }
@@ -1407,18 +1569,18 @@ public class Parser {
             let body = try parseExpression()
             
             // Convert params to Arguments structure
-            let args = Arguments(
+            let arguments = Arguments(
                 posonlyArgs: [],
-                args: params.map { Arg(arg: $0, annotation: nil, typeComment: nil) },
-                vararg: nil,
-                kwonlyArgs: [],
-                kwDefaults: [],
-                kwarg: nil,
-                defaults: []
+                args: args,
+                vararg: vararg,
+                kwonlyArgs: kwonlyArgs,
+                kwDefaults: kwDefaults,
+                kwarg: kwarg,
+                defaults: defaults
             )
             
             return .lambda(Lambda(
-                args: args,
+                args: arguments,
                 body: body,
                 lineno: token.line,
                 colOffset: token.column,
@@ -1806,22 +1968,35 @@ public class Parser {
     }
     
     private func parseSlice() throws -> Expression {
-        let start = currentToken().type != .colon && currentToken().type != .rightbracket
-            ? try parseExpression()
+        // Check for empty subscript
+        if currentToken().type == .rightbracket {
+            return .constant(Constant(
+                value: .none,
+                kind: nil,
+                lineno: currentToken().line,
+                colOffset: currentToken().column,
+                endLineno: nil,
+                endColOffset: nil
+            ))
+        }
+        
+        // Parse first element (could be start of slice or single expression)
+        let start = currentToken().type != .colon
+            ? try parseBitwiseOrExpression()
             : nil
         
         if currentToken().type == .colon {
-            // Slice
+            // Slice expression (e.g., [start:stop:step])
             advance()
             let stop = currentToken().type != .colon && currentToken().type != .rightbracket
-                ? try parseExpression()
+                ? try parseBitwiseOrExpression()
                 : nil
             
             var step: Expression? = nil
             if currentToken().type == .colon {
                 advance()
                 if currentToken().type != .rightbracket {
-                    step = try parseExpression()
+                    step = try parseBitwiseOrExpression()
                 }
             }
             
@@ -1831,6 +2006,29 @@ public class Parser {
                 step: step,
                 lineno: currentToken().line,
                 colOffset: currentToken().column,
+                endLineno: nil,
+                endColOffset: nil
+            ))
+        }
+        
+        // Check for tuple subscript (e.g., dict[str, int])
+        if currentToken().type == .comma {
+            var elements = [start!]
+            
+            while currentToken().type == .comma {
+                advance()
+                if currentToken().type == .rightbracket {
+                    break
+                }
+                elements.append(try parseBitwiseOrExpression())
+            }
+            
+            let token = currentToken()
+            return .tuple(Tuple(
+                elts: elements,
+                ctx: .load,
+                lineno: token.line,
+                colOffset: token.column,
                 endLineno: nil,
                 endColOffset: nil
             ))
@@ -2230,16 +2428,41 @@ public class Parser {
         var generators: [Comprehension] = []
         
         while currentToken().type == .for {
+            let forToken = currentToken()
             advance() // consume 'for'
             
-            let target = try parseExpression()
+            // Parse target (can be a tuple like: k, v)
+            var targetExprs = [try parseBitwiseOrExpression()]
+            while currentToken().type == .comma {
+                advance()
+                // Check if we've hit 'in' (trailing comma case)
+                if currentToken().type == .in {
+                    break
+                }
+                targetExprs.append(try parseBitwiseOrExpression())
+            }
+            
+            let target: Expression
+            if targetExprs.count == 1 {
+                target = targetExprs[0]
+            } else {
+                target = .tuple(Tuple(
+                    elts: targetExprs,
+                    ctx: .store,
+                    lineno: forToken.line,
+                    colOffset: forToken.column,
+                    endLineno: nil,
+                    endColOffset: nil
+                ))
+            }
+            
             try consume(.in, "Expected 'in' in comprehension")
-            let iter = try parseExpression()
+            let iter = try parseBitwiseOrExpression()
             
             var ifs: [Expression] = []
             while currentToken().type == .if {
                 advance()
-                ifs.append(try parseExpression())
+                ifs.append(try parseOrExpression())
             }
             
             generators.append(Comprehension(
