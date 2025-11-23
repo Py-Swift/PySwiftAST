@@ -94,6 +94,10 @@ public class Parser {
             // Decorator
             return try parseDecorated()
             
+        case .async:
+            // Async function or async for/with
+            return try parseAsync()
+            
         case .import:
             return try parseImport()
             
@@ -111,6 +115,21 @@ public class Parser {
             
         case .assert:
             return try parseAssert()
+            
+        case .match:
+            return try parseMatch()
+            
+        case .global:
+            return try parseGlobal()
+            
+        case .nonlocal:
+            return try parseNonlocal()
+            
+        case .del:
+            return try parseDel()
+            
+        case .yield:
+            return try parseYield()
             
         default:
             // Try to parse as expression statement or assignment
@@ -393,6 +412,217 @@ public class Parser {
         ))
     }
     
+    private func parseMatch() throws -> Statement {
+        let matchToken = currentToken()
+        advance() // consume 'match'
+        
+        let subject = try parseExpression()
+        try consume(.colon, "Expected ':' after match subject")
+        
+        try consume(.newline, "Expected newline before match cases")
+        try consume(.indent, "Expected indent for match cases")
+        
+        var cases: [MatchCase] = []
+        
+        while currentToken().type != .dedent && !isAtEnd() {
+            if currentToken().type == .newline {
+                advance()
+                continue
+            }
+            
+            guard currentToken().type == .case else {
+                throw ParseError.expected(message: "Expected 'case' in match statement", line: currentToken().line)
+            }
+            advance() // consume 'case'
+            
+            let pattern = try parsePattern()
+            
+            var guardExpr: Expression? = nil
+            if currentToken().type == .if {
+                advance()
+                guardExpr = try parseExpression()
+            }
+            
+            try consume(.colon, "Expected ':' after case pattern")
+            
+            let body = try parseBlock()
+            
+            cases.append(MatchCase(
+                pattern: pattern,
+                guardExpr: guardExpr,
+                body: body
+            ))
+        }
+        
+        try consume(.dedent, "Expected dedent after match cases")
+        
+        return .match(Match(
+            subject: subject,
+            cases: cases,
+            lineno: matchToken.line,
+            colOffset: matchToken.column,
+            endLineno: nil,
+            endColOffset: nil
+        ))
+    }
+    
+    private func parsePattern() throws -> Pattern {
+        let token = currentToken()
+        
+        // Wildcard pattern
+        if case .name(let name) = token.type, name == "_" {
+            advance()
+            return .matchAs(MatchAs(
+                pattern: nil,
+                name: nil
+            ))
+        }
+        
+        // For now, simple pattern matching - just parse as expression
+        // Full pattern syntax would need more sophisticated parsing
+        let expr = try parseExpression()
+        
+        // Convert expression to pattern (simplified)
+        return .matchValue(MatchValue(
+            value: expr
+        ))
+    }
+    
+    private func parseGlobal() throws -> Statement {
+        let globalToken = currentToken()
+        advance() // consume 'global'
+        
+        var names: [String] = []
+        
+        guard case .name(let first) = currentToken().type else {
+            throw ParseError.expected(message: "Expected name after 'global'", line: currentToken().line)
+        }
+        names.append(first)
+        advance()
+        
+        while currentToken().type == .comma {
+            advance()
+            guard case .name(let name) = currentToken().type else {
+                throw ParseError.expected(message: "Expected name after ','", line: currentToken().line)
+            }
+            names.append(name)
+            advance()
+        }
+        
+        consumeNewlineOrSemicolon()
+        
+        return .global(Global(
+            names: names,
+            lineno: globalToken.line,
+            colOffset: globalToken.column,
+            endLineno: nil,
+            endColOffset: nil
+        ))
+    }
+    
+    private func parseNonlocal() throws -> Statement {
+        let nonlocalToken = currentToken()
+        advance() // consume 'nonlocal'
+        
+        var names: [String] = []
+        
+        guard case .name(let first) = currentToken().type else {
+            throw ParseError.expected(message: "Expected name after 'nonlocal'", line: currentToken().line)
+        }
+        names.append(first)
+        advance()
+        
+        while currentToken().type == .comma {
+            advance()
+            guard case .name(let name) = currentToken().type else {
+                throw ParseError.expected(message: "Expected name after ','", line: currentToken().line)
+            }
+            names.append(name)
+            advance()
+        }
+        
+        consumeNewlineOrSemicolon()
+        
+        return .nonlocal(Nonlocal(
+            names: names,
+            lineno: nonlocalToken.line,
+            colOffset: nonlocalToken.column,
+            endLineno: nil,
+            endColOffset: nil
+        ))
+    }
+    
+    private func parseDel() throws -> Statement {
+        let delToken = currentToken()
+        advance() // consume 'del'
+        
+        var targets: [Expression] = []
+        
+        targets.append(try parseExpression())
+        
+        while currentToken().type == .comma {
+            advance()
+            targets.append(try parseExpression())
+        }
+        
+        consumeNewlineOrSemicolon()
+        
+        return .delete(Delete(
+            targets: targets,
+            lineno: delToken.line,
+            colOffset: delToken.column,
+            endLineno: nil,
+            endColOffset: nil
+        ))
+    }
+    
+    private func parseYield() throws -> Statement {
+        let yieldToken = currentToken()
+        advance() // consume 'yield'
+        
+        var value: Expression? = nil
+        
+        if currentToken().type == .from {
+            advance()
+            let fromValue = try parseExpression()
+            consumeNewlineOrSemicolon()
+            
+            return .expr(Expr(
+                value: .yieldFrom(YieldFrom(
+                    value: fromValue,
+                    lineno: yieldToken.line,
+                    colOffset: yieldToken.column,
+                    endLineno: nil,
+                    endColOffset: nil
+                )),
+                lineno: yieldToken.line,
+                colOffset: yieldToken.column,
+                endLineno: nil,
+                endColOffset: nil
+            ))
+        }
+        
+        if !isNewlineOrSemicolon() && !isAtEnd() {
+            value = try parseExpression()
+        }
+        
+        consumeNewlineOrSemicolon()
+        
+        return .expr(Expr(
+            value: .yield(Yield(
+                value: value,
+                lineno: yieldToken.line,
+                colOffset: yieldToken.column,
+                endLineno: nil,
+                endColOffset: nil
+            )),
+            lineno: yieldToken.line,
+            colOffset: yieldToken.column,
+            endLineno: nil,
+            endColOffset: nil
+        ))
+    }
+    
     private func isAugmentedAssignOp() -> Bool {
         switch currentToken().type {
         case .plusequal, .minusequal, .starequal, .slashequal, .doubleslashequal,
@@ -532,6 +762,130 @@ public class Parser {
         } else {
             throw ParseError.expected(message: "Expected 'def' or 'class' after decorator(s)", line: currentToken().line)
         }
+    }
+    
+    private func parseAsync() throws -> Statement {
+        let asyncToken = currentToken()
+        advance() // consume 'async'
+        
+        if currentToken().type == .def {
+            // Async function
+            return try parseAsyncFunctionDef(decorators: [])
+        } else if currentToken().type == .for {
+            // Async for
+            return try parseAsyncFor()
+        } else if currentToken().type == .with {
+            // Async with
+            return try parseAsyncWith()
+        } else {
+            throw ParseError.expected(message: "Expected 'def', 'for', or 'with' after 'async'", line: currentToken().line)
+        }
+    }
+    
+    private func parseAsyncFunctionDef(decorators: [Expression]) throws -> Statement {
+        let defToken = currentToken() // We're already on 'def' after consuming 'async'
+        advance()
+        
+        guard case .name(let name) = currentToken().type else {
+            throw ParseError.expectedName(line: currentToken().line)
+        }
+        advance()
+        
+        try consume(.leftparen, "Expected '(' after function name")
+        let args = try parseArguments()
+        try consume(.rightparen, "Expected ')' after function arguments")
+        
+        try consume(.colon, "Expected ':' after function signature")
+        
+        let body = try parseBlock()
+        
+        return .asyncFunctionDef(AsyncFunctionDef(
+            name: name,
+            args: args,
+            body: body,
+            decoratorList: decorators,
+            returns: nil,
+            typeComment: nil,
+            typeParams: [],
+            lineno: defToken.line,
+            colOffset: defToken.column,
+            endLineno: nil,
+            endColOffset: nil
+        ))
+    }
+    
+    private func parseAsyncFor() throws -> Statement {
+        let forToken = currentToken()
+        advance() // We're on 'for'
+        
+        let target = try parseExpression()
+        try consume(.in, "Expected 'in' in async for loop")
+        let iter = try parseExpression()
+        try consume(.colon, "Expected ':' after async for clause")
+        
+        let body = try parseBlock()
+        
+        var orElse: [Statement] = []
+        if currentToken().type == .else {
+            advance()
+            try consume(.colon, "Expected ':' after else")
+            orElse = try parseBlock()
+        }
+        
+        return .asyncFor(AsyncFor(
+            target: target,
+            iter: iter,
+            body: body,
+            orElse: orElse,
+            typeComment: nil,
+            lineno: forToken.line,
+            colOffset: forToken.column,
+            endLineno: nil,
+            endColOffset: nil
+        ))
+    }
+    
+    private func parseAsyncWith() throws -> Statement {
+        let withToken = currentToken()
+        advance() // We're on 'with'
+        
+        var items: [WithItem] = []
+        
+        // Parse first with item
+        let contextExpr = try parseExpression()
+        var optionalVars: Expression? = nil
+        
+        if currentToken().type == .as {
+            advance()
+            optionalVars = try parseExpression()
+        }
+        
+        items.append(WithItem(contextExpr: contextExpr, optionalVars: optionalVars))
+        
+        // Parse additional with items
+        while currentToken().type == .comma {
+            advance()
+            let expr = try parseExpression()
+            var vars: Expression? = nil
+            if currentToken().type == .as {
+                advance()
+                vars = try parseExpression()
+            }
+            items.append(WithItem(contextExpr: expr, optionalVars: vars))
+        }
+        
+        try consume(.colon, "Expected ':' after async with clause")
+        let body = try parseBlock()
+        
+        return .asyncWith(AsyncWith(
+            items: items,
+            body: body,
+            typeComment: nil,
+            lineno: withToken.line,
+            colOffset: withToken.column,
+            endLineno: nil,
+            endColOffset: nil
+        ))
     }
     
     private func parseImport() throws -> Statement {
@@ -689,24 +1043,91 @@ public class Parser {
     }
     
     private func parseArguments() throws -> Arguments {
+        var posonlyArgs: [Arg] = []
         var args: [Arg] = []
+        var vararg: Arg? = nil
+        var kwonlyArgs: [Arg] = []
+        var kwDefaults: [Expression?] = []
+        var kwarg: Arg? = nil
         var defaults: [Expression] = []
+        
+        var seenSlash = false
+        var seenStar = false
         
         // Parse parameters
         while currentToken().type != .rightparen && !isAtEnd() {
+            // Check for /  (positional-only marker)
+            if currentToken().type == .slash {
+                advance()
+                seenSlash = true
+                posonlyArgs = args
+                args = []
+                if currentToken().type == .comma {
+                    advance()
+                }
+                continue
+            }
+            
+            // Check for * (keyword-only marker) or *args
+            if currentToken().type == .star {
+                advance()
+                seenStar = true
+                
+                if case .name(let paramName) = currentToken().type {
+                    // *args
+                    vararg = Arg(arg: paramName, annotation: nil, typeComment: nil)
+                    advance()
+                }
+                
+                if currentToken().type == .comma {
+                    advance()
+                }
+                continue
+            }
+            
+            // Check for **kwargs
+            if currentToken().type == .doublestar {
+                advance()
+                guard case .name(let paramName) = currentToken().type else {
+                    throw ParseError.expected(message: "Expected parameter name after '**'", line: currentToken().line)
+                }
+                kwarg = Arg(arg: paramName, annotation: nil, typeComment: nil)
+                advance()
+                
+                if currentToken().type == .comma {
+                    advance()
+                }
+                continue
+            }
+            
+            // Regular parameter
             guard case .name(let paramName) = currentToken().type else {
                 break
             }
             advance()
             
+            let param = Arg(arg: paramName, annotation: nil, typeComment: nil)
+            
             // Check for default value
             if currentToken().type == .assign {
                 advance()
                 let defaultValue = try parseExpression()
-                defaults.append(defaultValue)
+                
+                if seenStar {
+                    kwonlyArgs.append(param)
+                    kwDefaults.append(defaultValue)
+                } else {
+                    args.append(param)
+                    defaults.append(defaultValue)
+                }
+            } else {
+                if seenStar {
+                    kwonlyArgs.append(param)
+                    kwDefaults.append(nil)
+                } else {
+                    args.append(param)
+                }
             }
-            
-            args.append(Arg(arg: paramName, annotation: nil, typeComment: nil))
             
             if currentToken().type == .comma {
                 advance()
@@ -716,12 +1137,12 @@ public class Parser {
         }
         
         return Arguments(
-            posonlyArgs: [],
+            posonlyArgs: posonlyArgs,
             args: args,
-            vararg: nil,
-            kwonlyArgs: [],
-            kwDefaults: [],
-            kwarg: nil,
+            vararg: vararg,
+            kwonlyArgs: kwonlyArgs,
+            kwDefaults: kwDefaults,
+            kwarg: kwarg,
             defaults: defaults
         )
     }
@@ -805,7 +1226,29 @@ public class Parser {
                 endColOffset: nil
             ))
         }
-        return try parseLambdaExpression()
+        return try parseWalrusExpression()
+    }
+    
+    private func parseWalrusExpression() throws -> Expression {
+        let left = try parseLambdaExpression()
+        
+        // Check for walrus operator :=
+        if currentToken().type == .colonequal {
+            let token = currentToken()
+            advance()
+            let value = try parseExpression()
+            
+            return .namedExpr(NamedExpr(
+                target: left,
+                value: value,
+                lineno: token.line,
+                colOffset: token.column,
+                endLineno: nil,
+                endColOffset: nil
+            ))
+        }
+        
+        return left
     }
     
     private func parseLambdaExpression() throws -> Expression {
@@ -1253,6 +1696,19 @@ public class Parser {
     
     private func parsePrimary() throws -> Expression {
         let token = currentToken()
+        
+        // Await expression
+        if token.type == .await {
+            advance()
+            let value = try parsePrimary()
+            return .await(Await(
+                value: value,
+                lineno: token.line,
+                colOffset: token.column,
+                endLineno: nil,
+                endColOffset: nil
+            ))
+        }
         
         switch token.type {
         case .name(let name):
