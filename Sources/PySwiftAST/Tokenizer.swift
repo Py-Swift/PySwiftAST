@@ -1,0 +1,532 @@
+import Foundation
+
+/// Python tokenizer that converts source code into tokens
+/// Handles Python's indentation-based syntax with INDENT/DEDENT tokens
+public class Tokenizer {
+    private let source: String
+    private var position: String.Index
+    private var line: Int = 1
+    private var column: Int = 1
+    private var indentStack: [Int] = [0]
+    private var pendingTokens: [Token] = []
+    private var atLineStart = true
+    
+    public init(source: String) {
+        self.source = source
+        self.position = source.startIndex
+    }
+    
+    /// Tokenize the entire source and return all tokens
+    public func tokenize() throws -> [Token] {
+        var tokens: [Token] = []
+        
+        while true {
+            let token = try nextToken()
+            tokens.append(token)
+            if token.type == .endmarker {
+                break
+            }
+        }
+        
+        return tokens
+    }
+    
+    /// Get the next token from the source
+    public func nextToken() throws -> Token {
+        // Return pending tokens first (DEDENT tokens)
+        if !pendingTokens.isEmpty {
+            return pendingTokens.removeFirst()
+        }
+        
+        // Handle end of file
+        if position >= source.endIndex {
+            // Emit DEDENT tokens for remaining indentation
+            if indentStack.count > 1 {
+                indentStack.removeLast()
+                return Token(type: .dedent, value: "", line: line, column: column, endLine: line, endColumn: column)
+            }
+            return Token(type: .endmarker, value: "", line: line, column: column, endLine: line, endColumn: column)
+        }
+        
+        // Handle indentation at start of line
+        if atLineStart {
+            return try handleIndentation()
+        }
+        
+        skipWhitespace()
+        
+        if position >= source.endIndex {
+            return Token(type: .endmarker, value: "", line: line, column: column, endLine: line, endColumn: column)
+        }
+        
+        let char = source[position]
+        
+        // Comments
+        if char == "#" {
+            return scanComment()
+        }
+        
+        // Newlines
+        if char == "\n" || char == "\r" {
+            return scanNewline()
+        }
+        
+        // String literals
+        if char == "\"" || char == "'" {
+            return try scanString()
+        }
+        
+        // Numbers
+        if char.isNumber {
+            return scanNumber()
+        }
+        
+        // Names and keywords
+        if char.isLetter || char == "_" {
+            return scanNameOrKeyword()
+        }
+        
+        // Operators and delimiters
+        return try scanOperatorOrDelimiter()
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func handleIndentation() throws -> Token {
+        atLineStart = false
+        
+        var indent = 0
+        while position < source.endIndex {
+            let char = source[position]
+            if char == " " {
+                indent += 1
+                advance()
+            } else if char == "\t" {
+                indent += 8
+                advance()
+            } else {
+                break
+            }
+        }
+        
+        // Skip blank lines and comments
+        if position < source.endIndex && (source[position] == "\n" || source[position] == "\r" || source[position] == "#") {
+            if source[position] == "#" {
+                return scanComment()
+            }
+            return scanNewline()
+        }
+        
+        // Check if end of file
+        if position >= source.endIndex {
+            if indentStack.count > 1 {
+                indentStack.removeLast()
+                return Token(type: .dedent, value: "", line: line, column: column, endLine: line, endColumn: column)
+            }
+            return Token(type: .endmarker, value: "", line: line, column: column, endLine: line, endColumn: column)
+        }
+        
+        let currentIndent = indentStack.last!
+        
+        if indent > currentIndent {
+            indentStack.append(indent)
+            return Token(type: .indent, value: "", line: line, column: 1, endLine: line, endColumn: indent + 1)
+        } else if indent < currentIndent {
+            // Generate DEDENT tokens
+            var dedents: [Token] = []
+            while indentStack.count > 1 && indentStack.last! > indent {
+                indentStack.removeLast()
+                dedents.append(Token(type: .dedent, value: "", line: line, column: column, endLine: line, endColumn: column))
+            }
+            
+            if indentStack.last! != indent {
+                throw TokenError.indentationError(line: line, column: column)
+            }
+            
+            if dedents.count > 1 {
+                pendingTokens.append(contentsOf: dedents.dropFirst())
+            }
+            return dedents[0]
+        }
+        
+        // Same indentation, continue parsing
+        return try nextToken()
+    }
+    
+    private func scanComment() -> Token {
+        let startLine = line
+        let startColumn = column
+        var value = ""
+        
+        advance() // skip '#'
+        
+        while position < source.endIndex && source[position] != "\n" && source[position] != "\r" {
+            value.append(source[position])
+            advance()
+        }
+        
+        return Token(type: .comment(value.trimmingCharacters(in: .whitespaces)), 
+                     value: "#\(value)", 
+                     line: startLine, 
+                     column: startColumn, 
+                     endLine: line, 
+                     endColumn: column)
+    }
+    
+    private func scanNewline() -> Token {
+        let startLine = line
+        let startColumn = column
+        
+        if source[position] == "\r" {
+            advance()
+            if position < source.endIndex && source[position] == "\n" {
+                advance()
+            }
+        } else {
+            advance()
+        }
+        
+        atLineStart = true
+        return Token(type: .newline, value: "", line: startLine, column: startColumn, endLine: line, endColumn: column)
+    }
+    
+    private func scanString() throws -> Token {
+        let startLine = line
+        let startColumn = column
+        let quote = source[position]
+        var value = ""
+        value.append(quote)
+        advance()
+        
+        // Check for triple-quoted strings
+        var tripleQuote = false
+        if position < source.endIndex && source[position] == quote {
+            value.append(quote)
+            advance()
+            if position < source.endIndex && source[position] == quote {
+                value.append(quote)
+                advance()
+                tripleQuote = true
+            } else {
+                // Empty string
+                return Token(type: .string(value), value: value, line: startLine, column: startColumn, endLine: line, endColumn: column)
+            }
+        }
+        
+        while position < source.endIndex {
+            let char = source[position]
+            
+            if char == "\\" && !tripleQuote {
+                value.append(char)
+                advance()
+                if position < source.endIndex {
+                    value.append(source[position])
+                    advance()
+                }
+            } else if char == quote {
+                value.append(char)
+                advance()
+                
+                if tripleQuote {
+                    if position < source.endIndex && source[position] == quote {
+                        value.append(quote)
+                        advance()
+                        if position < source.endIndex && source[position] == quote {
+                            value.append(quote)
+                            advance()
+                            break
+                        }
+                    }
+                } else {
+                    break
+                }
+            } else {
+                value.append(char)
+                advance()
+            }
+        }
+        
+        return Token(type: .string(value), value: value, line: startLine, column: startColumn, endLine: line, endColumn: column)
+    }
+    
+    private func scanNumber() -> Token {
+        let startLine = line
+        let startColumn = column
+        var value = ""
+        
+        // Handle hex, octal, binary
+        if source[position] == "0" && position < source.index(before: source.endIndex) {
+            let nextPos = source.index(after: position)
+            let nextChar = source[nextPos]
+            if nextChar == "x" || nextChar == "X" || nextChar == "o" || nextChar == "O" || nextChar == "b" || nextChar == "B" {
+                value.append(source[position])
+                advance()
+                value.append(source[position])
+                advance()
+                
+                while position < source.endIndex && (source[position].isHexDigit || source[position] == "_") {
+                    value.append(source[position])
+                    advance()
+                }
+                
+                return Token(type: .number(value), value: value, line: startLine, column: startColumn, endLine: line, endColumn: column)
+            }
+        }
+        
+        // Regular number
+        while position < source.endIndex && (source[position].isNumber || source[position] == "_") {
+            value.append(source[position])
+            advance()
+        }
+        
+        // Decimal point
+        if position < source.endIndex && source[position] == "." {
+            let nextPos = source.index(after: position)
+            if nextPos < source.endIndex && source[nextPos].isNumber {
+                value.append(source[position])
+                advance()
+                
+                while position < source.endIndex && (source[position].isNumber || source[position] == "_") {
+                    value.append(source[position])
+                    advance()
+                }
+            }
+        }
+        
+        // Exponent
+        if position < source.endIndex && (source[position] == "e" || source[position] == "E") {
+            value.append(source[position])
+            advance()
+            
+            if position < source.endIndex && (source[position] == "+" || source[position] == "-") {
+                value.append(source[position])
+                advance()
+            }
+            
+            while position < source.endIndex && (source[position].isNumber || source[position] == "_") {
+                value.append(source[position])
+                advance()
+            }
+        }
+        
+        // Imaginary suffix
+        if position < source.endIndex && (source[position] == "j" || source[position] == "J") {
+            value.append(source[position])
+            advance()
+        }
+        
+        return Token(type: .number(value), value: value, line: startLine, column: startColumn, endLine: line, endColumn: column)
+    }
+    
+    private func scanNameOrKeyword() -> Token {
+        let startLine = line
+        let startColumn = column
+        var value = ""
+        
+        while position < source.endIndex && (source[position].isLetter || source[position].isNumber || source[position] == "_") {
+            value.append(source[position])
+            advance()
+        }
+        
+        let type = keywordType(for: value) ?? .name(value)
+        return Token(type: type, value: value, line: startLine, column: startColumn, endLine: line, endColumn: column)
+    }
+    
+    private func scanOperatorOrDelimiter() throws -> Token {
+        let startLine = line
+        let startColumn = column
+        let char = source[position]
+        
+        // Two or three character operators
+        if let twoChar = peekString(2), let type = twoCharOperator(twoChar) {
+            advance()
+            advance()
+            return Token(type: type, value: twoChar, line: startLine, column: startColumn, endLine: line, endColumn: column)
+        }
+        
+        // Three character operators
+        if let threeChar = peekString(3), threeChar == "..." {
+            advance()
+            advance()
+            advance()
+            return Token(type: .ellipsis, value: "...", line: startLine, column: startColumn, endLine: line, endColumn: column)
+        }
+        
+        if let threeChar = peekString(3), let type = threeCharOperator(threeChar) {
+            advance()
+            advance()
+            advance()
+            return Token(type: type, value: threeChar, line: startLine, column: startColumn, endLine: line, endColumn: column)
+        }
+        
+        // Single character operators
+        let type = singleCharOperator(char)
+        let value = String(char)
+        advance()
+        
+        return Token(type: type, value: value, line: startLine, column: startColumn, endLine: line, endColumn: column)
+    }
+    
+    private func keywordType(for word: String) -> TokenType? {
+        switch word {
+        case "False": return .false
+        case "await": return .await
+        case "else": return .else
+        case "import": return .import
+        case "pass": return .pass
+        case "None": return TokenType.none
+        case "break": return .break
+        case "except": return .except
+        case "in": return .in
+        case "raise": return .raise
+        case "True": return .true
+        case "class": return .class
+        case "finally": return .finally
+        case "is": return .is
+        case "return": return .return
+        case "and": return .and
+        case "continue": return .continue
+        case "for": return .for
+        case "lambda": return .lambda
+        case "try": return .try
+        case "as": return .as
+        case "def": return .def
+        case "from": return .from
+        case "nonlocal": return .nonlocal
+        case "while": return .while
+        case "assert": return .assert
+        case "del": return .del
+        case "global": return .global
+        case "not": return .not
+        case "with": return .with
+        case "async": return .async
+        case "elif": return .elif
+        case "if": return .if
+        case "or": return .or
+        case "yield": return .yield
+        case "match": return .match
+        case "case": return .case
+        case "type": return .type
+        default: return nil
+        }
+    }
+    
+    private func twoCharOperator(_ str: String) -> TokenType? {
+        switch str {
+        case "==": return .equal
+        case "!=": return .notequal
+        case "<=": return .lessequal
+        case ">=": return .greaterequal
+        case "<<": return .leftshift
+        case ">>": return .rightshift
+        case "**": return .doublestar
+        case "//": return .doubleslash
+        case "->": return .arrow
+        case ":=": return .colonequal
+        case "+=": return .plusequal
+        case "-=": return .minusequal
+        case "*=": return .starequal
+        case "/=": return .slashequal
+        case "%=": return .percentequal
+        case "@=": return .atequal
+        case "&=": return .amperequal
+        case "|=": return .vbarequal
+        case "^=": return .circumflexequal
+        default: return nil
+        }
+    }
+    
+    private func threeCharOperator(_ str: String) -> TokenType? {
+        switch str {
+        case "<<=": return .leftshiftequal
+        case ">>=": return .rightshiftequal
+        case "**=": return .doublestarequal
+        case "//=": return .doubleslashequal
+        default: return nil
+        }
+    }
+    
+    private func singleCharOperator(_ char: Character) -> TokenType {
+        switch char {
+        case "+": return .plus
+        case "-": return .minus
+        case "*": return .star
+        case "/": return .slash
+        case "%": return .percent
+        case "@": return .at
+        case "&": return .amper
+        case "|": return .vbar
+        case "^": return .circumflex
+        case "~": return .tilde
+        case "<": return .less
+        case ">": return .greater
+        case "(": return .leftparen
+        case ")": return .rightparen
+        case "[": return .leftbracket
+        case "]": return .rightbracket
+        case "{": return .leftbrace
+        case "}": return .rightbrace
+        case ",": return .comma
+        case ":": return .colon
+        case ".": return .dot
+        case ";": return .semicolon
+        case "=": return .assign
+        default: return .errorToken(String(char))
+        }
+    }
+    
+    private func skipWhitespace() {
+        while position < source.endIndex {
+            let char = source[position]
+            if char == " " || char == "\t" {
+                advance()
+            } else {
+                break
+            }
+        }
+    }
+    
+    private func advance() {
+        if position < source.endIndex {
+            if source[position] == "\n" {
+                line += 1
+                column = 1
+            } else {
+                column += 1
+            }
+            position = source.index(after: position)
+        }
+    }
+    
+    private func peekString(_ count: Int) -> String? {
+        var result = ""
+        var pos = position
+        
+        for _ in 0..<count {
+            if pos >= source.endIndex {
+                return nil
+            }
+            result.append(source[pos])
+            pos = source.index(after: pos)
+        }
+        
+        return result
+    }
+}
+
+public enum TokenError: Error, CustomStringConvertible {
+    case indentationError(line: Int, column: Int)
+    case unterminatedString(line: Int, column: Int)
+    case invalidCharacter(char: Character, line: Int, column: Int)
+    
+    public var description: String {
+        switch self {
+        case .indentationError(let line, let column):
+            return "IndentationError at line \(line), column \(column)"
+        case .unterminatedString(let line, let column):
+            return "Unterminated string at line \(line), column \(column)"
+        case .invalidCharacter(let char, let line, let column):
+            return "Invalid character '\(char)' at line \(line), column \(column)"
+        }
+    }
+}

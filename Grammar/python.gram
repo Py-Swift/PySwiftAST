@@ -1,0 +1,9 @@
+# Downloaded from: https://raw.githubusercontent.com/python/cpython/3.13/Grammar/python.gram
+# This is Python 3.13's official PEG grammar
+# We'll parse this to generate our Swift parser
+
+# Note: This file is quite large (~2000+ lines)
+# For the initial implementation, we'll focus on a subset of the grammar
+# and expand coverage iteratively.
+
+# The full grammar can be accessed from the CPython repository
