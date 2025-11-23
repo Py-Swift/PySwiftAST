@@ -69,29 +69,16 @@ extension Starred: PyCodeProtocol {
 
 extension Slice: PyCodeProtocol {
     public func toPythonCode(context: CodeGenContext) -> String {
-        var parts: [String] = []
-        
-        if let lower = lower {
-            parts.append(lower.toPythonCode(context: context))
-        } else {
-            parts.append("")
-        }
-        
-        parts.append("")  // The colon
-        
-        if let upper = upper {
-            parts.append(upper.toPythonCode(context: context))
-        }
-        
-        if let step = step {
-            parts.append("")  // Second colon
-            parts.append(step.toPythonCode(context: context))
-        }
+        let lowerStr = lower?.toPythonCode(context: context) ?? ""
+        let upperStr = upper?.toPythonCode(context: context) ?? ""
+        let stepStr = step?.toPythonCode(context: context) ?? ""
         
         if step != nil {
-            return parts[0] + ":" + (parts.count > 2 ? parts[2] : "") + ":" + (parts.count > 4 ? parts[4] : "")
+            // Include step: lower:upper:step
+            return "\(lowerStr):\(upperStr):\(stepStr)"
         } else {
-            return parts[0] + ":" + (parts.count > 2 ? parts[2] : "")
+            // No step: lower:upper
+            return "\(lowerStr):\(upperStr)"
         }
     }
 }

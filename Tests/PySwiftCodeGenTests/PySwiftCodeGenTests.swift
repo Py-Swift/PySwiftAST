@@ -83,17 +83,20 @@ func normalizeWhitespace(_ code: String) -> String {
 }
 
 @Test func testDebugChainedAssignment() async throws {
-    let source = try loadResource("type_annotations.py")
-    print("Testing: type_annotations.py")
+    let source = """
+    numbers = [1, 2, 3, 4, 5]
+    sublist = numbers[1:4]
+    reversed_list = numbers[::-1]
+    every_other = numbers[::2]
+    middle = numbers[1:-1]
+    """
+    print("Testing slice code generation")
     do {
         let ast = try parsePython(source)
         print("✅ Parsed successfully")
         let generated = generatePythonCode(from: ast)
-        print("Generated code around lines 9-15:")
-        let lines = generated.split(separator: "\n", omittingEmptySubsequences: false)
-        for (i, line) in lines.enumerated() where i >= 8 && i < 15 {
-            print("\(i+1): \(line)")
-        }
+        print("Generated:")
+        print(generated)
         _ = try parsePython(generated)
         print("✅ Reparsed successfully")
     } catch {
