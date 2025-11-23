@@ -19,9 +19,9 @@ PySwiftCodeGen is the inverse of PySwiftAST - it converts AST back to Python sou
 
 ### ❌ Failing Tests (Known Issues)
 1. `functions.py` - **F-strings not supported**
-2. `collections.py` - **Dictionary unpacking (`**dict`) not supported**
+2. `collections.py` - **Dictionary literal unpacking (`{**dict}`) not supported**
 3. `operators.py` - **F-strings not supported**
-4. `async_await.py` - **Argument unpacking (`*args`) not supported**
+4. `async_await.py` - **Async comprehensions (`async for`) not supported**
 5. `type_annotations.py` - **Python 3.12+ `type` statement not implemented**
 6. `new_features.py` - **Class metaclass syntax not supported**
 
@@ -86,16 +86,26 @@ def function(
     pass
 ```
 
-### 3. Dictionary/Argument Unpacking Not Supported ❌  
-**Impact:** MEDIUM - affects 2 test files
+### 3. Dictionary Unpacking Not Supported ❌  
+**Impact:** LOW-MEDIUM - affects 1 test file
 
-Unpacking with `*` and `**` is not implemented:
+Dictionary unpacking with `**` is not implemented:
 ```python
 merged = {**dict1, **dict2}  # Dictionary unpacking
-results = await gather(*tasks)  # Argument unpacking
 ```
 
-**Resolution:** Requires parser support for Starred expressions in dict/call contexts
+**Note:** Argument unpacking (`*args`, `**kwargs`) in function calls IS now supported! ✅
+
+**Resolution:** Requires parser support for Starred expressions in dict literal contexts
+
+### 4. Async Comprehensions Not Supported ❌
+**Impact:** LOW - affects 1 test file
+
+```python
+results = [await fetch(url) async for url in urls]
+```
+
+**Resolution:** Parser needs to handle `async for` in comprehension contexts
 
 ### 4. Python 3.12+ Features Not Implemented ❌
 **Impact:** LOW - only affects cutting-edge Python code
@@ -127,6 +137,7 @@ class MyClass(BaseClass, metaclass=type):
 5. **Subscript parsing** - Added tuple subscript handling for type annotations
 6. **Statement tuples** - Added tuple detection after initial expression
 7. **Chained assignments** - Added support for `x = y = z = 1`
+8. **Starred expressions** - Added *args and **kwargs support in function calls
 
 ### Code Generation Bugs Fixed (Session 1) ✅  
 1. **Tuple in subscripts** - Skip parentheses when `inSubscript` context (e.g., `dict[str, int]` not `dict[(str, int)]`)
@@ -165,33 +176,40 @@ Implementing f-strings would fix 3 failing tests and greatly improve coverage.
 
 **Estimated effort:** 3-4 hours
 
-### Priority 2: Starred Expressions (Unpacking) ~~Multi-line Collections~~
-~~Implementing implicit line joining would fix 1 failing test and improve robustness.~~ **DONE!**
+### Priority 2: ~~Starred Expressions (Unpacking)~~ Dictionary Unpacking
+~~Implementing starred expressions would fix 2 failing tests.~~ **MOSTLY DONE!** Function call unpacking works.
 
-Implementing starred expressions would fix 2 failing tests.
+Implementing dictionary literal unpacking would fix 1 remaining test.
 
 **Tasks:**
-1. Add Starred expression node
-2. Handle `*args` in function calls
-3. Handle `**kwargs` in function calls and dict literals
-4. Update code generation
+1. ~~Add Starred expression node~~ ✅
+2. ~~Handle `*args` in function calls~~ ✅
+3. ~~Handle `**kwargs` in function calls~~ ✅
+4. Handle `**dict` in dictionary literals
+5. ~~Update code generation~~ ✅
 
-**Estimated effort:** 1-2 hours
+**Estimated effort:** 1 hour
 
-### Priority 3: Investigate Remaining Failures ~~Investigate Remaining Failures~~
-- ~~`async_await.py` - Likely related to multi-line collections or f-strings~~ - **Identified:** Argument unpacking
-- ~~`new_features.py` - Needs investigation~~ - **Identified:** Class metaclass syntax
+### Priority 3: Minor Features
+- Async comprehensions (`async for`) - 1 test
+- Class metaclass syntax - 1 test
+- Python 3.12+ `type` statement - 1 test
 
-**Estimated effort:** 1-2 hours for implementing remaining features
+**Estimated effort:** 2-3 hours for all three
 
 ## Conclusion
 
 **PySwiftCodeGen is 54% complete for comprehensive Python 3.13 support.**
 
-The core architecture is solid and working well. The main gaps are:
+The core architecture is solid and working well. **Major progress this session:**
+- ✅ Multi-line collections (implicit line joining)
+- ✅ Starred expressions (*args, **kwargs in function calls)
+
+**Remaining gaps:**
 1. F-strings (tokenization unimplemented) - **HIGH PRIORITY**
-2. ~~Multi-line collections (implicit line joining unimplemented)~~ - **FIXED!** ✅
-3. Starred expressions for unpacking - **MEDIUM PRIORITY**
+2. Dictionary literal unpacking (`{**dict}`) - **MEDIUM PRIORITY**
+3. Async comprehensions - **LOW PRIORITY**
 4. Minor edge cases (metaclass syntax, Python 3.12+ features)
 
-With f-string and starred expression support, the coverage would likely reach **85-90%**.
+With f-string support implemented, the coverage would likely reach **75-80%**.
+With all features, could reach **90%+**.
