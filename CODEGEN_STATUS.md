@@ -4,10 +4,10 @@
 PySwiftCodeGen is the inverse of PySwiftAST - it converts AST back to Python source code. This enables round-trip parsing: `Python source → AST → Python source → AST`.
 
 ## Test Results
-**Round-trip tests: 7/13 passing (54%)**
-**Total tests: 59 passing (up from 57 at session start!)**
+**Round-trip tests: 8/13 passing (62%)**
+**Total tests: 60 passing (up from 57 at session start!)**
 
-**Note:** Multi-line collections, function call unpacking, and dict literal unpacking all work now!
+**Note:** Multi-line collections, function call unpacking, dict literal unpacking, and starred expressions all work now!
 
 ### ✅ Passing Tests
 1. `simple_assignment.py` - Basic assignments and expressions
@@ -17,19 +17,19 @@ PySwiftCodeGen is the inverse of PySwiftAST - it converts AST back to Python sou
 5. `lambdas.py` - Lambda expressions with full argument support
 6. `decorators.py` - Function and class decorators
 7. `comprehensions.py` - List/dict/set comprehensions, generators
+8. `collections.py` - **NEW!** Lists, dicts, sets, starred expressions ✅
 
 ### ❌ Failing Tests (Known Issues)
 1. `functions.py` - **F-strings not supported**
-2. `collections.py` - **Starred expressions in assignment targets** (`first, *rest = [1,2,3]`)
-3. `operators.py` - **F-strings not supported**
-4. `async_await.py` - **Async comprehensions (`async for`) not supported**
-5. `type_annotations.py` - **Python 3.12+ `type` statement not implemented**
-6. `new_features.py` - **Class metaclass syntax not supported**
+2. `operators.py` - **F-strings not supported**
+3. `async_await.py` - **Async comprehensions (`async for`) not supported**
+4. `type_annotations.py` - **Python 3.12+ `type` statement not implemented**
+5. `new_features.py` - **F-strings and class metaclass syntax**
 
 ## Known Limitations
 
 ### 1. F-Strings Not Supported ❌
-**Impact:** HIGH - affects 6+ test files
+**Impact:** HIGH - affects 3 test files
 
 F-string parsing is completely unimplemented:
 - Tokenizer recognizes f-strings as regular strings
@@ -46,9 +46,7 @@ f"{x=}"  # Python 3.8+ debug syntax
 **Files affected:**
 - `functions.py`
 - `operators.py` 
-- `lambdas.py`
-- `type_annotations.py`
-- `exceptions.py`
+- `new_features.py`
 - `pattern_matching.py`
 - `complex_example.py`
 - `fstrings.py`
@@ -103,18 +101,27 @@ merged = {**dict1, **dict2}
 mixed = {"a": 1, **dict1, "b": 2, **dict2}
 ```
 
-### 4. Starred Expressions in Assignments Not Supported ❌
-**Impact:** LOW-MEDIUM - affects 1 test file
+### 4. Starred Expressions FIXED ✅
+**Impact:** LOW-MEDIUM - was affecting 1 test file
 
+~~Starred expressions in assignment targets and collection literals are not fully supported:~~
+
+**Status:** **FIXED** in commit 01d4bda!
+
+Starred expressions now work in all contexts:
 ```python
+# Assignment targets
 first, *rest = [1, 2, 3, 4, 5]
 *start, last = [1, 2, 3, 4, 5]
 a, *middle, b = [1, 2, 3, 4, 5]
+
+# Collection literals
+result = [1, *others, 5]
+my_set = {1, *items, 5}
+
+# Function calls (already worked)
+func(*args, **kwargs)
 ```
-
-**Note:** Starred expressions in function calls ARE supported! ✅
-
-**Resolution:** Parser needs to handle Starred expressions in assignment target positions
 
 ### 5. Async Comprehensions Not Supported ❌
 **Impact:** LOW - affects 1 test file
@@ -125,7 +132,7 @@ results = [await fetch(url) async for url in urls]
 
 **Resolution:** Parser needs to handle `async for` in comprehension contexts
 
-### 4. Python 3.12+ Features Not Implemented ❌
+### 6. Python 3.12+ Features Not Implemented ❌
 **Impact:** LOW - affects cutting-edge Python code
 
 The `type` statement (PEP 695) from Python 3.12 is not supported:
@@ -135,7 +142,7 @@ type Point = tuple[float, float]
 
 **Resolution:** Add `TypeAlias` statement node and parsing logic
 
-### 6. Class Metaclass Syntax Not Supported ❌
+### 7. Class Metaclass Syntax Not Supported ❌
 **Impact:** LOW - affects advanced class definitions
 
 ```python
@@ -197,43 +204,31 @@ Implementing f-strings would fix 3 failing tests and greatly improve coverage.
 
 **Estimated effort:** 3-4 hours
 
-### Priority 2: ~~Dictionary Unpacking~~ Starred Assignment Targets
-~~Implementing dictionary literal unpacking would fix 1 remaining test.~~ **DONE!**
-
-Implementing starred expressions in assignment targets would fix 1 test.
-
-**Tasks:**
-1. ~~Add Starred expression node~~ ✅
-2. ~~Handle `*args` in function calls~~ ✅
-3. ~~Handle `**kwargs` in function calls~~ ✅
-4. ~~Handle `**dict` in dictionary literals~~ ✅
-5. Handle `*rest` in assignment targets (e.g., `a, *b, c = [1,2,3,4,5]`)
-6. ~~Update code generation~~ ✅
-
-**Estimated effort:** 1-2 hours
-
-### Priority 3: Minor Features
-- Async comprehensions (`async for`) - 1 test
+### Priority 2: Minor Features ✅ PARTIALLY DONE
+- ~~Dictionary unpacking~~ ✅ FIXED
+- ~~Starred expressions~~ ✅ FIXED
+- Async comprehensions (`async for`) - 1 test remaining
 - Class metaclass syntax - 1 test
 - Python 3.12+ `type` statement - 1 test
 
-**Estimated effort:** 2-3 hours for all three
+**Estimated effort:** 2-3 hours for remaining three
 
 ## Conclusion
 
-**PySwiftCodeGen is 54% complete for comprehensive Python 3.13 support.**
-**Total: 59 passing tests (up from 57 at session start)**
+**PySwiftCodeGen is 62% complete for comprehensive Python 3.13 support.**
+**Total: 60 passing tests (up from 57 at session start!)**
 
 The core architecture is solid and working well. **Major progress this session:**
-- ✅ Multi-line collections (implicit line joining)
-- ✅ Starred expressions (*args, **kwargs in function calls)
+- ✅ Implicit line joining (multi-line collections)
+- ✅ Starred expressions in function calls (*args, **kwargs)
 - ✅ Dictionary literal unpacking (**dict)
+- ✅ Starred expressions in assignment targets (first, *rest = ...)
+- ✅ Starred expressions in collection literals ([1, *others, 5])
 
 **Remaining gaps:**
 1. F-strings (tokenization unimplemented) - **HIGH PRIORITY** - 3 tests
-2. Starred expressions in assignments - **MEDIUM PRIORITY** - 1 test
-3. Async comprehensions - **LOW PRIORITY** - 1 test
-4. Minor edge cases (metaclass syntax, Python 3.12+ features) - 2 tests
+2. Async comprehensions - **LOW PRIORITY** - 1 test
+3. Minor edge cases (metaclass syntax, Python 3.12+ features) - 1 test
 
-With f-string support implemented, the coverage would reach **75-80%**.
+With f-string support implemented, the coverage would reach **77-85%**.
 With all features, could reach **90%+**.
