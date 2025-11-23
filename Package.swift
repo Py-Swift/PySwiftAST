@@ -10,6 +10,9 @@ let package = Package(
         .library(
             name: "PySwiftAST",
             targets: ["PySwiftAST"]),
+        .library(
+            name: "PySwiftCodeGen",
+            targets: ["PySwiftCodeGen"]),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -20,12 +23,20 @@ let package = Package(
                 .copy("AST/README.md")
             ]
         ),
+        .target(
+            name: "PySwiftCodeGen",
+            dependencies: ["PySwiftAST"]
+        ),
         .testTarget(
             name: "PySwiftASTTests",
             dependencies: ["PySwiftAST"],
             resources: [
                 .copy("Resources")
             ]
+        ),
+        .testTarget(
+            name: "PySwiftCodeGenTests",
+            dependencies: ["PySwiftCodeGen", "PySwiftAST"]
         ),
     ]
 )
