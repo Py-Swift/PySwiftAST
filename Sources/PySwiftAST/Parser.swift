@@ -133,7 +133,7 @@ public class Parser {
             
         default:
             // Try to parse as expression statement or assignment
-            var expr = try parseExpression()
+            var expr = try parseStarExpression()
             
             // Check for comma - could be tuple expression (e.g., a, b, c = 1, 2, 3)
             if currentToken().type == .comma {
@@ -144,7 +144,7 @@ public class Parser {
                     if isNewlineOrSemicolon() || isAtEnd() {
                         break
                     }
-                    elements.append(try parseExpression())
+                    elements.append(try parseStarExpression())
                 }
                 
                 expr = .tuple(Tuple(
@@ -1381,6 +1381,24 @@ public class Parser {
         return try parseOrExpression()
     }
     
+    // Parse expression that may be starred (for assignment targets and unpacking)
+    private func parseStarExpression() throws -> Expression {
+        if currentToken().type == .star {
+            let token = currentToken()
+            advance() // consume '*'
+            let value = try parseOrExpression()
+            return .starred(Starred(
+                value: value,
+                ctx: .load,
+                lineno: token.line,
+                colOffset: token.column,
+                endLineno: token.endLine,
+                endColOffset: token.endColumn
+            ))
+        }
+        return try parseOrExpression()
+    }
+    
     // Operator precedence parsing (from lowest to highest)
     
     private func parseOrExpression() throws -> Expression {
@@ -2221,7 +2239,7 @@ public class Parser {
                 ))
             }
             
-            let first = try parseExpression()
+            let first = try parseStarExpression()
             
             // Check for generator expression
             if currentToken().type == .for {
@@ -2245,7 +2263,7 @@ public class Parser {
                     if currentToken().type == .rightparen {
                         break
                     }
-                    elts.append(try parseExpression())
+                    elts.append(try parseStarExpression())
                 }
                 try consume(.rightparen, "Expected ')' after tuple")
                 return .tuple(Tuple(
@@ -2278,7 +2296,7 @@ public class Parser {
                 ))
             }
             
-            let first = try parseExpression()
+            let first = try parseStarExpression()
             
             // Check for list comprehension
             if currentToken().type == .for {
@@ -2301,7 +2319,7 @@ public class Parser {
                 if currentToken().type == .rightbracket {
                     break
                 }
-                elts.append(try parseExpression())
+                elts.append(try parseStarExpression())
             }
             
             try consume(.rightbracket, "Expected ']' after list")
@@ -2372,7 +2390,7 @@ public class Parser {
                 ))
             }
             
-            let first = try parseExpression()
+            let first = try parseStarExpression()
             
             if currentToken().type == .colon {
                 // Dict or dict comprehension
@@ -2452,7 +2470,7 @@ public class Parser {
                     if currentToken().type == .rightbrace {
                         break
                     }
-                    elts.append(try parseExpression())
+                    elts.append(try parseStarExpression())
                 }
                 
                 try consume(.rightbrace, "Expected '}' after set")

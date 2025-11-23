@@ -84,7 +84,8 @@ func normalizeWhitespace(_ code: String) -> String {
 
 @Test func testDebugChainedAssignment() async throws {
     let source = """
-    merged = {"a": 1, **dict1, "b": 2, **dict2, "c": 3}
+    result = [1, *others, 5]
+    my_set = {1, *other_items, 5}
     """
     print("Original:", source)
     do {
