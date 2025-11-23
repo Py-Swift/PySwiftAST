@@ -11,6 +11,11 @@ public class Tokenizer {
     private var pendingTokens: [Token] = []
     private var atLineStart = true
     
+    // Track bracket depth for implicit line joining (PEP 8)
+    private var parenDepth: Int = 0
+    private var bracketDepth: Int = 0
+    private var braceDepth: Int = 0
+    
     public init(source: String) {
         self.source = source
         self.position = source.startIndex
@@ -66,8 +71,21 @@ public class Tokenizer {
             return scanComment()
         }
         
-        // Newlines
+        // Newlines (skip if inside brackets/parens - implicit line joining)
         if char == "\n" || char == "\r" {
+            if parenDepth > 0 || bracketDepth > 0 || braceDepth > 0 {
+                // Skip newline inside brackets
+                if source[position] == "\r" {
+                    advance()
+                    if position < source.endIndex && source[position] == "\n" {
+                        advance()
+                    }
+                } else {
+                    advance()
+                }
+                // Continue to next token without emitting NEWLINE
+                return try nextToken()
+            }
             return scanNewline()
         }
         
@@ -363,6 +381,24 @@ public class Tokenizer {
         let type = singleCharOperator(char)
         let value = String(char)
         advance()
+        
+        // Track bracket depth for implicit line joining
+        switch type {
+        case .leftparen:
+            parenDepth += 1
+        case .rightparen:
+            parenDepth = max(0, parenDepth - 1)
+        case .leftbracket:
+            bracketDepth += 1
+        case .rightbracket:
+            bracketDepth = max(0, bracketDepth - 1)
+        case .leftbrace:
+            braceDepth += 1
+        case .rightbrace:
+            braceDepth = max(0, braceDepth - 1)
+        default:
+            break
+        }
         
         return Token(type: type, value: value, line: startLine, column: startColumn, endLine: line, endColumn: column)
     }
