@@ -15,6 +15,25 @@ extension ClassDef: PyCodeProtocol {
         // Class signature
         var signature = context.indent + "class " + name
         
+        // Type parameters (Python 3.12+)
+        if !typeParams.isEmpty {
+            let params = typeParams.map { param in
+                switch param {
+                case .typeVar(let typeVar):
+                    var paramStr = typeVar.name
+                    if let bound = typeVar.bound {
+                        paramStr += ": " + bound.toPythonCode(context: context)
+                    }
+                    return paramStr
+                case .paramSpec(let paramSpec):
+                    return "**" + paramSpec.name
+                case .typeVarTuple(let tuple):
+                    return "*" + tuple.name
+                }
+            }.joined(separator: ", ")
+            signature += "[\(params)]"
+        }
+        
         if !bases.isEmpty || !keywords.isEmpty {
             signature += "("
             var parts: [String] = []

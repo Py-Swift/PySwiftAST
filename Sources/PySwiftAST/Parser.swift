@@ -879,6 +879,14 @@ public class Parser {
         }
         advance()
         
+        // Parse optional type parameters [T], [T, U], etc.
+        var typeParams: [TypeParam] = []
+        if currentToken().type == .leftbracket {
+            advance() // consume '['
+            typeParams = try parseTypeParameters()
+            try consume(.rightbracket, "Expected ']' after type parameters")
+        }
+        
         try consume(.leftparen, "Expected '(' after function name")
         let args = try parseArguments()
         try consume(.rightparen, "Expected ')' after function arguments")
@@ -901,7 +909,7 @@ public class Parser {
             decoratorList: decorators,
             returns: returns,
             typeComment: nil,
-            typeParams: [],
+            typeParams: typeParams,
             lineno: defToken.line,
             colOffset: defToken.column,
             endLineno: nil,
@@ -917,6 +925,14 @@ public class Parser {
             throw ParseError.expectedName(line: currentToken().line)
         }
         advance()
+        
+        // Parse optional type parameters [T], [T, U], etc.
+        var typeParams: [TypeParam] = []
+        if currentToken().type == .leftbracket {
+            advance() // consume '['
+            typeParams = try parseTypeParameters()
+            try consume(.rightbracket, "Expected ']' after type parameters")
+        }
         
         var bases: [Expression] = []
         var keywords: [Keyword] = []
@@ -977,7 +993,7 @@ public class Parser {
             keywords: keywords,
             body: body,
             decoratorList: decorators,
-            typeParams: [],
+            typeParams: typeParams,
             lineno: classToken.line,
             colOffset: classToken.column,
             endLineno: nil,
@@ -1032,6 +1048,14 @@ public class Parser {
         }
         advance()
         
+        // Parse optional type parameters [T], [T, U], etc.
+        var typeParams: [TypeParam] = []
+        if currentToken().type == .leftbracket {
+            advance() // consume '['
+            typeParams = try parseTypeParameters()
+            try consume(.rightbracket, "Expected ']' after type parameters")
+        }
+        
         try consume(.leftparen, "Expected '(' after function name")
         let args = try parseArguments()
         try consume(.rightparen, "Expected ')' after function arguments")
@@ -1054,7 +1078,7 @@ public class Parser {
             decoratorList: decorators,
             returns: returns,
             typeComment: nil,
-            typeParams: [],
+            typeParams: typeParams,
             lineno: defToken.line,
             colOffset: defToken.column,
             endLineno: nil,

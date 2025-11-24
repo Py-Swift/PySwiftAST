@@ -84,14 +84,14 @@ func normalizeWhitespace(_ code: String) -> String {
 
 @Test func testDebugChainedAssignment() async throws {
     let source = """
-    class Animal:
-        pass
+    def first[T](items: list[T]) -> T:
+        return items[0]
     
-    # Comment after class
-    x = 5
+    class Box[T]:
+        pass
     """
     
-    print("Testing comment after class")
+    print("Testing generic functions and classes")
     
     do {
         print("\nParsing...")
