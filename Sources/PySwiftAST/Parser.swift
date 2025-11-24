@@ -1090,7 +1090,32 @@ public class Parser {
         let forToken = currentToken()
         advance() // We're on 'for'
         
-        let target = try parseExpression()
+        // Parse target (can be a tuple like: i, j)
+        // Use parseBitwiseOrExpression to avoid consuming 'in' as an operator
+        var targetExprs = [try parseBitwiseOrExpression()]
+        while currentToken().type == .comma {
+            advance()
+            // Check if we've hit 'in' (trailing comma case)
+            if currentToken().type == .in {
+                break
+            }
+            targetExprs.append(try parseBitwiseOrExpression())
+        }
+        
+        let target: Expression
+        if targetExprs.count == 1 {
+            target = targetExprs[0]
+        } else {
+            target = .tuple(Tuple(
+                elts: targetExprs,
+                ctx: .store,
+                lineno: forToken.line,
+                colOffset: forToken.column,
+                endLineno: nil,
+                endColOffset: nil
+            ))
+        }
+        
         try consume(.in, "Expected 'in' in async for loop")
         let iter = try parseExpression()
         try consume(.colon, "Expected ':' after async for clause")
@@ -2400,10 +2425,17 @@ public class Parser {
             
         case .string(let str):
             advance()
-            // Strip quotes from string literal
-            let unquoted = stripQuotes(from: str)
+            // Handle implicit string concatenation: "str1" "str2" -> "str1str2"
+            var concatenated = stripQuotes(from: str)
+            
+            // Keep concatenating adjacent string literals
+            while case .string(let nextStr) = currentToken().type {
+                advance()
+                concatenated += stripQuotes(from: nextStr)
+            }
+            
             return .constant(Constant(
-                value: .string(unquoted),
+                value: .string(concatenated),
                 kind: nil,
                 lineno: token.line,
                 colOffset: token.column,
