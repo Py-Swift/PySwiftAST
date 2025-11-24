@@ -11,7 +11,7 @@ PySwiftAST now implements **100% of Python 3.13 syntax**, including all statemen
 PySwiftAST provides a complete toolkit for parsing Python code without requiring a Python runtime. It consists of:
 
 1. **Tokenizer** - Complete lexical analysis with full Python 3.13 token support (533 lines, 130+ token types)
-2. **Parser** - Full recursive descent parser with operator precedence (2,264 lines)
+2. **Parser** - Full recursive descent parser with operator precedence (2,904 lines)
 3. **AST Nodes** - Complete Swift types matching Python's `ast` module (28 modular files)
 
 ## Architecture
@@ -50,12 +50,13 @@ The complete implementation consists of:
    - Type parameters (Python 3.12+)
    - TreeDisplayable protocol for visualization
 
-4. **Parser.swift** (2,264 lines) - **Complete recursive descent parser** implementing:
+4. **Parser.swift** (2,904 lines) - **Complete recursive descent parser** implementing:
    - All statements (assignments, control flow, functions, classes, etc.)
    - All expressions (operators, calls, comprehensions, etc.)
    - Operator precedence climbing
    - Pattern matching
    - Type annotations
+   - F-strings with embedded expressions
    - Error recovery and reporting
 
 ## Usage
@@ -138,7 +139,8 @@ for token in tokens {
 - ✅ Integers (decimal, hex `0xFF`, binary `0b1010`, octal `0o777`)
 - ✅ Floats, scientific notation (`1.5e10`)
 - ✅ Complex numbers (`1+2j`)
-- ✅ Strings (all quote styles, raw, f-strings, bytes)
+- ✅ Strings (all quote styles, raw, bytes)
+- ✅ F-strings with embedded expressions (`f"Hello, {name}!"`)
 - ✅ None, True, False
 - ✅ Ellipsis (`...`)
 
@@ -180,7 +182,7 @@ swift test
 
 ### Test Results
 
-**40 tests, all passing (100% success rate)**
+**65 tests, all passing (100% success rate)** 🎉
 
 #### Test Categories:
 
@@ -192,9 +194,9 @@ swift test
 - ✅ Multiple statements
 - ✅ Indentation validation
 
-**2. Python Feature Coverage (24 tests)**
+**2. Python Feature Coverage (49 tests)**
 Real-world Python files covering every feature:
-- ✅ Functions (def, async def, decorators, type hints)
+- ✅ Functions (def, async def, decorators, type hints, f-strings)
 - ✅ Classes (inheritance, metaclass, methods)
 - ✅ Control flow (if/elif/else, for, while, match/case)
 - ✅ Imports (all forms)
@@ -206,7 +208,7 @@ Real-world Python files covering every feature:
 - ✅ Pattern matching (comprehensive)
 - ✅ Type annotations
 - ✅ Decorators
-- ✅ F-strings
+- ✅ **F-strings with embedded expressions**
 - ✅ All operators
 - ✅ All collections
 - ✅ Complex real-world examples
@@ -273,7 +275,7 @@ PySwiftAST/
 ├── Sources/PySwiftAST/
 │   ├── Token.swift           (130+ token types)
 │   ├── Tokenizer.swift       (533 lines)
-│   ├── Parser.swift          (2,264 lines)
+│   ├── Parser.swift          (2,904 lines)
 │   ├── PySwiftAST.swift      (Public API)
 │   └── AST/                  (28 files)
 │       ├── Module.swift
