@@ -1282,6 +1282,16 @@ public class Parser {
         
         var names: [Alias] = []
         
+        // Check for multi-line imports with parentheses
+        let hasParens = currentToken().type == .leftparen
+        if hasParens {
+            advance() // consume '('
+            // Skip any newlines after opening paren
+            while currentToken().type == .newline {
+                advance()
+            }
+        }
+        
         // Check for 'import *'
         if currentToken().type == .star {
             advance()
@@ -1309,6 +1319,18 @@ public class Parser {
             while currentToken().type == .comma {
                 advance() // consume ','
                 
+                // Skip newlines in multi-line imports
+                if hasParens {
+                    while currentToken().type == .newline {
+                        advance()
+                    }
+                }
+                
+                // Check for trailing comma (especially in multi-line imports)
+                if hasParens && currentToken().type == .rightparen {
+                    break
+                }
+                
                 guard case .name(let name) = currentToken().type else {
                     throw ParseError.expected(message: "Expected import name", line: currentToken().line)
                 }
@@ -1326,6 +1348,15 @@ public class Parser {
                 
                 names.append(Alias(name: name, asName: alias))
             }
+        }
+        
+        // Handle closing parenthesis for multi-line imports
+        if hasParens {
+            // Skip any newlines before closing paren
+            while currentToken().type == .newline {
+                advance()
+            }
+            try consume(.rightparen, "Expected ')' to close multi-line import")
         }
         
         consumeNewlineOrSemicolon()
@@ -1354,6 +1385,15 @@ public class Parser {
         
         // Parse parameters
         while currentToken().type != .rightparen && !isAtEnd() {
+            // Skip newlines in multi-line parameter lists
+            while currentToken().type == .newline {
+                advance()
+            }
+            
+            // Check if we've reached the closing paren after newlines
+            if currentToken().type == .rightparen {
+                break
+            }
             // Check for /  (positional-only marker)
             if currentToken().type == .slash {
                 advance()
@@ -1451,6 +1491,10 @@ public class Parser {
             
             if currentToken().type == .comma {
                 advance()
+                // Skip newlines after commas in multi-line parameter lists
+                while currentToken().type == .newline {
+                    advance()
+                }
             } else {
                 break
             }
@@ -1469,6 +1513,15 @@ public class Parser {
     
     private func parseBlock() throws -> [Statement] {
         try consume(.newline, "Expected newline before block")
+        
+        // Skip comments before indent
+        while case .comment = currentToken().type {
+            advance()
+            if currentToken().type == .newline {
+                advance()
+            }
+        }
+        
         try consume(.indent, "Expected indent")
         
         var statements: [Statement] = []

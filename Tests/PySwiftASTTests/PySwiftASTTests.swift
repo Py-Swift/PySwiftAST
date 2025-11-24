@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 @testable import PySwiftAST
+@testable import PySwiftCodeGen
 
 // MARK: - Helper Functions
 
@@ -321,6 +322,63 @@ enum TestError: Error {
         } else {
             Issue.record("Fifth statement should be a from-import")
         }
+    } else {
+        Issue.record("AST should be a module")
+    }
+}
+
+@Test func testMultiLineImports() async throws {
+    let source = """
+    from django.db import (
+        DJANGO_VERSION_PICKLE_KEY,
+        IntegrityError,
+        NotSupportedError,
+    )
+    
+    x = 1
+    """
+    
+    let ast = try parsePython(source)
+    
+    if case .module(let stmts) = ast {
+        #expect(stmts.count == 2, "Expected 2 statements (import and assignment)")
+        
+        // Test multi-line import
+        if case .importFrom(let fromImport) = stmts[0] {
+            #expect(fromImport.module == "django.db")
+            #expect(fromImport.names.count == 3)
+            #expect(fromImport.names[0].name == "DJANGO_VERSION_PICKLE_KEY")
+            #expect(fromImport.names[1].name == "IntegrityError")
+            #expect(fromImport.names[2].name == "NotSupportedError")
+        } else {
+            Issue.record("First statement should be a multi-line from-import")
+        }
+    } else {
+        Issue.record("AST should be a module")
+    }
+}
+
+@Test func testMultiLineFunctionDef() async throws {
+    let source = """
+    class BaseIterable:
+        def __init__(
+            self, queryset
+        ):
+            self.queryset = queryset
+    
+        async def other(self):
+            # Comment
+            pass
+    """
+    
+    print("\n=== Testing multi-line function def with async and comment ===")
+    let tokens = try tokenizePython(source)
+    print("Token count: \(tokens.count)")
+    
+    let ast = try parsePython(source)
+    
+    if case .module(let stmts) = ast {
+        #expect(stmts.count == 1, "Expected 1 class definition")
     } else {
         Issue.record("AST should be a module")
     }
@@ -994,4 +1052,25 @@ func loadRealWorldResource(_ filename: String) throws -> String {
         print("⚠️ Partial parsing (known limitation): \(error)")
         #expect(Bool(true), "Tokenization succeeded, parser has known limitation with 'type' as identifier")
     }
+}
+
+@Test func testDjangoQueryRoundTrip() async throws {
+    let source = try loadTestFileResource("django_query")
+    
+    print("\nTesting: django_query.py (2635 lines)")
+    print("Lines: \(source.components(separatedBy: "\n").count)")
+    
+    let tokens = try tokenizePython(source)
+    print("✅ Tokenization successful: \(tokens.count) tokens")
+    
+    let module = try parsePython(source)
+    print("✅ Parsing successful")
+    
+    let generatedCode = generatePythonCode(from: module)
+    print("✅ Code generation successful: \(generatedCode.components(separatedBy: "\n").count) lines")
+    
+    let reparsedModule = try parsePython(generatedCode)
+    print("✅ Reparsing successful - round-trip complete")
+    
+    #expect(Bool(true), "Django query.py round-trip successful")
 }
