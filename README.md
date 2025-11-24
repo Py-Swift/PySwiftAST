@@ -148,7 +148,7 @@ for token in tokens {
 - ✅ Exception handling (try/except/finally/else)
 - ✅ Context managers (with statements)
 - ✅ Async/await (async def, await, async for, async with)
-- ✅ Import statements (all forms)
+- ✅ Import statements (all forms, including dotted: `import urllib.request`)
 - ✅ Global/nonlocal declarations
 - ✅ Del statements
 - ✅ Assert and raise
@@ -182,24 +182,25 @@ swift test
 
 ### Test Results
 
-**65 tests, all passing (100% success rate)** 🎉
+**72 tests, all passing (100% success rate)** 🎉
 
 #### Test Categories:
 
-**1. Core Functionality (6 tests)**
+**1. Core Functionality (7 tests)**
 - ✅ Tokenizer with indentation tracking
 - ✅ Simple assignments and expressions
 - ✅ Function definitions
 - ✅ Control structures
 - ✅ Multiple statements
 - ✅ Indentation validation
+- ✅ **Dotted module imports** (urllib.request, xml.etree.ElementTree)
 
-**2. Python Feature Coverage (49 tests)**
+**2. Python Feature Coverage (50 tests)**
 Real-world Python files covering every feature:
 - ✅ Functions (def, async def, decorators, type hints, f-strings)
 - ✅ Classes (inheritance, metaclass, methods)
 - ✅ Control flow (if/elif/else, for, while, match/case)
-- ✅ Imports (all forms)
+- ✅ **Imports (all forms, including dotted modules)**
 - ✅ Exceptions (try/except/finally/else)
 - ✅ Context managers (with, async with)
 - ✅ Comprehensions (list, dict, set, generator)
