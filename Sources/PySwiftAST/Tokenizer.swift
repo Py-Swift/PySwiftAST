@@ -442,7 +442,7 @@ public class Tokenizer {
         case "yield": return .yield
         case "match": return .match
         case "case": return .case
-        case "type": return .type
+        // Note: "type" is a soft keyword in Python 3.12+, treated as name here
         default: return nil
         }
     }

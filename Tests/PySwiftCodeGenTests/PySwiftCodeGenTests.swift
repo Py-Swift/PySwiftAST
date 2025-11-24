@@ -86,9 +86,10 @@ func normalizeWhitespace(_ code: String) -> String {
     let source = """
     type Point = tuple[float, float]
     type Matrix[T] = list[list[T]]
+    x = type("MyClass", (), {})
     """
     
-    print("Testing type statement")
+    print("Testing type as soft keyword")
     
     do {
         print("\nParsing...")

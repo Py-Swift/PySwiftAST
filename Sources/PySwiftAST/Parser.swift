@@ -125,11 +125,12 @@ public class Parser {
         case .nonlocal:
             return try parseNonlocal()
             
-        case .type:
-            return try parseTypeAlias()
-            
         case .del:
             return try parseDel()
+            
+        case .name(let name) where name == "type":
+            // "type" is a soft keyword in Python 3.12+
+            return try parseTypeAlias()
             
         case .yield:
             return try parseYield()
