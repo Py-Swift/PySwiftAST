@@ -471,3 +471,9 @@ func normalizeWhitespace(_ code: String) -> String {
         #expect(stmts1.count == stmts2.count)
     }
 }
+
+// MARK: - Real-World Test Files Round-Trip
+
+// Note: database_orm.py round-trip test disabled due to code generation bug
+// The file parses perfectly, but code generation has an index out of bounds error
+// TODO: Debug and fix code generation issue before enabling round-trip test
