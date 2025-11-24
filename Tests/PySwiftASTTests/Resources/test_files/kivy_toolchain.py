@@ -25,13 +25,13 @@ from contextlib import suppress
 from datetime import datetime
 from pprint import pformat
 import logging
-# import urllib.request  # Dotted import not yet supported
-# from pbxproj import XcodeProject
-# from pbxproj.pbxextensions.ProjectFiles import FileOptions
+import urllib.request
+from pbxproj import XcodeProject
+from pbxproj.pbxextensions.ProjectFiles import FileOptions
 
-# url_opener = urllib.request.build_opener()
-# url_orig_headers = url_opener.addheaders
-# urllib.request.install_opener(url_opener)
+url_opener = urllib.request.build_opener()
+url_orig_headers = url_opener.addheaders
+urllib.request.install_opener(url_opener)
 
 curdir = dirname(__file__)
 

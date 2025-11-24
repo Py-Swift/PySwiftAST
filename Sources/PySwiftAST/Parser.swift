@@ -1166,11 +1166,25 @@ public class Parser {
         
         var names: [Alias] = []
         
-        // Parse first import name
-        guard case .name(let moduleName) = currentToken().type else {
+        // Parse first import name (with dotted module support)
+        guard case .name(let firstName) = currentToken().type else {
             throw ParseError.expected(message: "Expected module name after 'import'", line: currentToken().line)
         }
+        var moduleName = firstName
         advance()
+        
+        // Handle dotted module names (e.g., urllib.request)
+        while currentToken().type == .dot {
+            moduleName += "."
+            advance()
+            
+            if case .name(let part) = currentToken().type {
+                moduleName += part
+                advance()
+            } else {
+                throw ParseError.expected(message: "Expected name after '.' in module path", line: currentToken().line)
+            }
+        }
         
         var asName: String? = nil
         if currentToken().type == .as {
@@ -1188,10 +1202,24 @@ public class Parser {
         while currentToken().type == .comma {
             advance() // consume ','
             
-            guard case .name(let name) = currentToken().type else {
+            guard case .name(let firstName) = currentToken().type else {
                 throw ParseError.expected(message: "Expected module name", line: currentToken().line)
             }
+            var name = firstName
             advance()
+            
+            // Handle dotted module names for additional imports
+            while currentToken().type == .dot {
+                name += "."
+                advance()
+                
+                if case .name(let part) = currentToken().type {
+                    name += part
+                    advance()
+                } else {
+                    throw ParseError.expected(message: "Expected name after '.' in module path", line: currentToken().line)
+                }
+            }
             
             var alias: String? = nil
             if currentToken().type == .as {

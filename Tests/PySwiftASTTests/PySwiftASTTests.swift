@@ -262,6 +262,70 @@ enum TestError: Error {
     #expect(hasFromKeyword, "Expected 'from' keyword")
 }
 
+@Test func testDottedImports() async throws {
+    let source = """
+    import urllib.request
+    import xml.etree.ElementTree
+    import xml.etree.ElementTree as ET
+    from urllib.request import urlopen
+    from xml.etree.ElementTree import parse, Element
+    """
+    
+    let ast = try parsePython(source)
+    
+    if case .module(let stmts) = ast {
+        #expect(stmts.count == 5, "Expected 5 import statements")
+        
+        // Test: import urllib.request
+        if case .importStmt(let import1) = stmts[0] {
+            #expect(import1.names.count == 1)
+            #expect(import1.names[0].name == "urllib.request")
+            #expect(import1.names[0].asName == nil)
+        } else {
+            Issue.record("First statement should be an import")
+        }
+        
+        // Test: import xml.etree.ElementTree
+        if case .importStmt(let import2) = stmts[1] {
+            #expect(import2.names.count == 1)
+            #expect(import2.names[0].name == "xml.etree.ElementTree")
+            #expect(import2.names[0].asName == nil)
+        } else {
+            Issue.record("Second statement should be an import")
+        }
+        
+        // Test: import xml.etree.ElementTree as ET
+        if case .importStmt(let import3) = stmts[2] {
+            #expect(import3.names.count == 1)
+            #expect(import3.names[0].name == "xml.etree.ElementTree")
+            #expect(import3.names[0].asName == "ET")
+        } else {
+            Issue.record("Third statement should be an import with alias")
+        }
+        
+        // Test: from urllib.request import urlopen
+        if case .importFrom(let fromImport1) = stmts[3] {
+            #expect(fromImport1.module == "urllib.request")
+            #expect(fromImport1.names.count == 1)
+            #expect(fromImport1.names[0].name == "urlopen")
+        } else {
+            Issue.record("Fourth statement should be a from-import")
+        }
+        
+        // Test: from xml.etree.ElementTree import parse, Element
+        if case .importFrom(let fromImport2) = stmts[4] {
+            #expect(fromImport2.module == "xml.etree.ElementTree")
+            #expect(fromImport2.names.count == 2)
+            #expect(fromImport2.names[0].name == "parse")
+            #expect(fromImport2.names[1].name == "Element")
+        } else {
+            Issue.record("Fifth statement should be a from-import")
+        }
+    } else {
+        Issue.record("AST should be a module")
+    }
+}
+
 @Test func testExceptionsFile() async throws {
     let source = try loadTestResource("exceptions")
     

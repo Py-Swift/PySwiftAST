@@ -523,11 +523,11 @@ func normalizeWhitespace(_ code: String) -> String {
     }
 }
 
-// Note: kivy_toolchain.py test disabled - requires dotted module imports
-// The file uses features not yet supported:
-// - import urllib.request (dotted module names in import statements)
-// - from pbxproj.pbxextensions.ProjectFiles import ... (deeply nested module paths)
-// These are valid Python 3.x features that need to be implemented
+// Note: kivy_toolchain.py test disabled - file uses advanced features not yet fully supported
+// Dotted imports now work, but the file has other complex features:
+// - Walrus operator (:=) in while loops
+// - Complex nested function definitions
+// The file is kept as a reference for future parser improvements
 /*
 @Test func testKivyToolchainRoundTrip() async throws {
     let source = try loadResource("kivy_toolchain.py", subdirectory: "test_files")
