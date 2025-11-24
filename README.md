@@ -237,25 +237,6 @@ swift test --filter testPatternMatching
 swift test 2>&1 | less
 ```
 
-## Performance
-
-The parser handles large files efficiently:
-- **3,112 tokens** parsed successfully
-- **480+ line files** with complex nesting
-- Fast tokenization and parsing
-- Low memory footprint
-
-## Comparison with Other Parsers
-
-| Feature | Ruff (Rust) | PySwiftAST (Swift) | Python ast |
-|---------|-------------|-------------------|------------|
-| Language | Rust | Swift | Python |
-| Python Version | 3.12 | **3.13** | 3.13 |
-| Coverage | ~95% | **100%** | 100% |
-| Dependencies | None | None | CPython |
-| Speed | Very Fast | Fast | Baseline |
-| Use Case | Linting | AST Analysis | Standard Library |
-
 ## 🎯 Future Enhancements
 
 While the parser is feature-complete, potential additions include:

@@ -175,36 +175,196 @@ extension If: PyCodeProtocol {
 
 extension With: PyCodeProtocol {
     public func toPythonCode(context: CodeGenContext) -> String {
-        // TODO: Implement
-        return context.indent + "# with statement"
+        var lines: [String] = []
+        
+        // with item1 as var1, item2 as var2:
+        var withLine = context.indent + "with "
+        
+        let itemStrs = items.map { item -> String in
+            var itemStr = item.contextExpr.toPythonCode(context: context)
+            if let optionalVars = item.optionalVars {
+                itemStr += " as " + optionalVars.toPythonCode(context: context)
+            }
+            return itemStr
+        }
+        
+        withLine += itemStrs.joined(separator: ", ")
+        withLine += ":"
+        lines.append(withLine)
+        
+        // body
+        let bodyContext = context.indented()
+        for stmt in body {
+            lines.append(stmt.toPythonCode(context: bodyContext))
+        }
+        
+        return lines.joined(separator: "\n")
     }
 }
 
 extension AsyncWith: PyCodeProtocol {
     public func toPythonCode(context: CodeGenContext) -> String {
-        // TODO: Implement
-        return context.indent + "# async with statement"
+        var lines: [String] = []
+        
+        // async with item1 as var1, item2 as var2:
+        var withLine = context.indent + "async with "
+        
+        let itemStrs = items.map { item -> String in
+            var itemStr = item.contextExpr.toPythonCode(context: context)
+            if let optionalVars = item.optionalVars {
+                itemStr += " as " + optionalVars.toPythonCode(context: context)
+            }
+            return itemStr
+        }
+        
+        withLine += itemStrs.joined(separator: ", ")
+        withLine += ":"
+        lines.append(withLine)
+        
+        // body
+        let bodyContext = context.indented()
+        for stmt in body {
+            lines.append(stmt.toPythonCode(context: bodyContext))
+        }
+        
+        return lines.joined(separator: "\n")
     }
 }
 
 extension Match: PyCodeProtocol {
     public func toPythonCode(context: CodeGenContext) -> String {
-        // TODO: Implement
-        return context.indent + "# match statement"
+        var lines: [String] = []
+        
+        // match subject:
+        lines.append(context.indent + "match " + subject.toPythonCode(context: context) + ":")
+        
+        // cases
+        let bodyContext = context.indented()
+        for matchCase in cases {
+            var caseLine = bodyContext.indent + "case " + matchCase.pattern.toPythonCode(context: context)
+            
+            // guard
+            if let guardExpr = matchCase.guardExpr {
+                caseLine += " if " + guardExpr.toPythonCode(context: context)
+            }
+            
+            caseLine += ":"
+            lines.append(caseLine)
+            
+            // case body
+            let caseBodyContext = bodyContext.indented()
+            for stmt in matchCase.body {
+                lines.append(stmt.toPythonCode(context: caseBodyContext))
+            }
+        }
+        
+        return lines.joined(separator: "\n")
     }
 }
 
 extension Try: PyCodeProtocol {
     public func toPythonCode(context: CodeGenContext) -> String {
-        // TODO: Implement
-        return context.indent + "# try statement"
+        var lines: [String] = []
+        
+        // try:
+        lines.append(context.indent + "try:")
+        
+        // body
+        let bodyContext = context.indented()
+        for stmt in body {
+            lines.append(stmt.toPythonCode(context: bodyContext))
+        }
+        
+        // except handlers
+        for handler in handlers {
+            var handlerLine = context.indent + "except"
+            
+            if let type = handler.type {
+                handlerLine += " " + type.toPythonCode(context: context)
+                
+                if let name = handler.name {
+                    handlerLine += " as " + name
+                }
+            }
+            
+            handlerLine += ":"
+            lines.append(handlerLine)
+            
+            for stmt in handler.body {
+                lines.append(stmt.toPythonCode(context: bodyContext))
+            }
+        }
+        
+        // else clause
+        if !orElse.isEmpty {
+            lines.append(context.indent + "else:")
+            for stmt in orElse {
+                lines.append(stmt.toPythonCode(context: bodyContext))
+            }
+        }
+        
+        // finally clause
+        if !finalBody.isEmpty {
+            lines.append(context.indent + "finally:")
+            for stmt in finalBody {
+                lines.append(stmt.toPythonCode(context: bodyContext))
+            }
+        }
+        
+        return lines.joined(separator: "\n")
     }
 }
 
 extension TryStar: PyCodeProtocol {
     public func toPythonCode(context: CodeGenContext) -> String {
-        // TODO: Implement
-        return context.indent + "# try* statement"
+        var lines: [String] = []
+        
+        // try:
+        lines.append(context.indent + "try:")
+        
+        // body
+        let bodyContext = context.indented()
+        for stmt in body {
+            lines.append(stmt.toPythonCode(context: bodyContext))
+        }
+        
+        // except* handlers (note the asterisk)
+        for handler in handlers {
+            var handlerLine = context.indent + "except*"
+            
+            if let type = handler.type {
+                handlerLine += " " + type.toPythonCode(context: context)
+                
+                if let name = handler.name {
+                    handlerLine += " as " + name
+                }
+            }
+            
+            handlerLine += ":"
+            lines.append(handlerLine)
+            
+            for stmt in handler.body {
+                lines.append(stmt.toPythonCode(context: bodyContext))
+            }
+        }
+        
+        // else clause
+        if !orElse.isEmpty {
+            lines.append(context.indent + "else:")
+            for stmt in orElse {
+                lines.append(stmt.toPythonCode(context: bodyContext))
+            }
+        }
+        
+        // finally clause
+        if !finalBody.isEmpty {
+            lines.append(context.indent + "finally:")
+            for stmt in finalBody {
+                lines.append(stmt.toPythonCode(context: bodyContext))
+            }
+        }
+        
+        return lines.joined(separator: "\n")
     }
 }
 

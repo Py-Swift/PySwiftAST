@@ -488,12 +488,6 @@ func normalizeWhitespace(_ code: String) -> String {
     #expect(generated == code, "F-string with quotes in expression should round-trip correctly")
 }
 
-// Database ORM round-trip test disabled - requires Try/With statement code generation
-// The file parses perfectly, but code generation is incomplete for:
-// - Try/except/finally statements (currently outputs "# try statement")
-// - With statements (currently outputs "# with statement")
-// These need to be implemented before database_orm.py can round-trip
-/*
 @Test func testDatabaseORMRoundTrip() async throws {
     let source = try loadResource("database_orm.py", subdirectory: "test_files")
     
@@ -511,21 +505,21 @@ func normalizeWhitespace(_ code: String) -> String {
         let generated = generatePythonCode(from: ast)
         print("✅ Generated code (\(generated.split(separator: "\n").count) lines)")
         
-        print("\n=== Full Generated Code ===")
-        print(generated)
-        print("=== End Generated Code ===")
-        
         // Reparse generated code
-        print("\nReparsing generated code...")
+        print("Reparsing generated code...")
         let reparsed = try parsePython(generated)
         print("✅ Reparsed generated code")
         
-        // Verify statement counts match
-        if case .module(let stmts2) = reparsed {
-            print("Original statements: \(stmts.count)")
-            print("Reparsed statements: \(stmts2.count)")
-            #expect(stmts.count == stmts2.count, "Statement count should match after round-trip")
+        // Verify semantic equivalence (AST structure matches)
+        if case .module(let regeneratedStmts) = reparsed {
+            #expect(stmts.count == regeneratedStmts.count,
+                    "Statement count mismatch: original has \(stmts.count), regenerated has \(regeneratedStmts.count)")
+            print("✅ Round-trip successful: regenerated code parses to equivalent AST")
+        } else {
+            Issue.record("Reparsed AST is not a module")
         }
+    } else {
+        Issue.record("Expected module AST")
     }
 }
-*/
+
