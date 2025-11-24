@@ -118,7 +118,12 @@ extension JoinedStr: PyCodeProtocol {
 
 extension FormattedValue: PyCodeProtocol {
     public func toPythonCode(context: CodeGenContext) -> String {
-        var code = "{\(value.toPythonCode(context: context))"
+        // Inside f-strings, use opposite quote style for nested strings
+        var exprContext = context
+        exprContext.inFString = true
+        exprContext.useSingleQuotes = !context.useSingleQuotes
+        
+        var code = "{\(value.toPythonCode(context: exprContext))"
         
         if conversion != -1 {
             switch conversion {
