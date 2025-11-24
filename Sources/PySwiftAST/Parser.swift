@@ -2128,6 +2128,16 @@ public class Parser {
         var keywords: [Keyword] = []
         
         while currentToken().type != .rightparen && !isAtEnd() {
+            // Skip newlines in multi-line function calls (implicit line joining)
+            while currentToken().type == .newline {
+                advance()
+            }
+            
+            // Check if we've reached the closing paren after skipping newlines
+            if currentToken().type == .rightparen {
+                break
+            }
+            
             // Check for **kwargs (dictionary unpacking)
             if currentToken().type == .doublestar {
                 advance() // consume '**'
@@ -2137,6 +2147,10 @@ public class Parser {
                 
                 if currentToken().type == .comma {
                     advance()
+                    // Skip newlines after comma
+                    while currentToken().type == .newline {
+                        advance()
+                    }
                 }
                 continue
             }
@@ -2158,6 +2172,10 @@ public class Parser {
                 
                 if currentToken().type == .comma {
                     advance()
+                    // Skip newlines after comma
+                    while currentToken().type == .newline {
+                        advance()
+                    }
                 }
                 continue
             }
@@ -2174,6 +2192,10 @@ public class Parser {
                     
                     if currentToken().type == .comma {
                         advance()
+                        // Skip newlines after comma
+                        while currentToken().type == .newline {
+                            advance()
+                        }
                     }
                     continue
                 }
@@ -2181,12 +2203,40 @@ public class Parser {
             
             // Positional argument
             let arg = try parseExpression()
-            args.append(arg)
             
-            if currentToken().type == .comma {
-                advance()
-            } else if currentToken().type != .rightparen {
-                throw ParseError.expected(message: "Expected ',' or ')' in function call", line: currentToken().line)
+            // Check for generator expression (only valid as sole argument or first argument)
+            // e.g., any(x > 0 for x in items) or func(x for x in items, other_arg)
+            if currentToken().type == .for || currentToken().type == .async {
+                let generators = try parseComprehensionGenerators()
+                let genexp = Expression.generatorExp(GeneratorExp(
+                    elt: arg,
+                    generators: generators,
+                    lineno: currentToken().line,
+                    colOffset: currentToken().column,
+                    endLineno: nil,
+                    endColOffset: nil
+                ))
+                args.append(genexp)
+                
+                if currentToken().type == .comma {
+                    advance()
+                    // Skip newlines after comma
+                    while currentToken().type == .newline {
+                        advance()
+                    }
+                }
+            } else {
+                args.append(arg)
+                
+                if currentToken().type == .comma {
+                    advance()
+                    // Skip newlines after comma
+                    while currentToken().type == .newline {
+                        advance()
+                    }
+                } else if currentToken().type != .rightparen {
+                    throw ParseError.expected(message: "Expected ',' or ')' in function call", line: currentToken().line)
+                }
             }
         }
         
