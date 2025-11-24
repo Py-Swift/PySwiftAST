@@ -84,12 +84,14 @@ func normalizeWhitespace(_ code: String) -> String {
 
 @Test func testDebugChainedAssignment() async throws {
     let source = """
-    type Point = tuple[float, float]
-    type Matrix[T] = list[list[T]]
-    x = type("MyClass", (), {})
+    class Animal:
+        pass
+    
+    # Comment after class
+    x = 5
     """
     
-    print("Testing type as soft keyword")
+    print("Testing comment after class")
     
     do {
         print("\nParsing...")

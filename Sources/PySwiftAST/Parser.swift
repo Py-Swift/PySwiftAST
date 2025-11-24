@@ -1426,6 +1426,18 @@ public class Parser {
                 advance()
                 continue
             }
+            
+            // Skip comments
+            if case .comment = currentToken().type {
+                advance()
+                continue
+            }
+            
+            if case .typeComment = currentToken().type {
+                advance()
+                continue
+            }
+            
             statements.append(try parseStatement())
         }
         
