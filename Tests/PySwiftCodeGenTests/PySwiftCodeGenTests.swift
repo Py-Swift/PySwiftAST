@@ -83,15 +83,9 @@ func normalizeWhitespace(_ code: String) -> String {
 }
 
 @Test func testDebugChainedAssignment() async throws {
-    let source = """
-    def first[T](items: list[T]) -> T:
-        return items[0]
+    let source = "x = f\"Hello, {name}!\""
     
-    class Box[T]:
-        pass
-    """
-    
-    print("Testing generic functions and classes")
+    print("Testing f-string parsing")
     
     do {
         print("\nParsing...")
@@ -100,8 +94,7 @@ func normalizeWhitespace(_ code: String) -> String {
         
         print("\nGenerating...")
         let generated = generatePythonCode(from: ast)
-        print("Generated:")
-        print(generated)
+        print("Generated:", generated)
         
         print("\nReparsing...")
         _ = try parsePython(generated)

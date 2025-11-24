@@ -2208,6 +2208,12 @@ public class Parser {
         
         switch token.type {
         case .name(let name):
+            // Check for f-string: f"..." or f'...'
+            let nextPos = position + 1
+            if name == "f", nextPos < tokens.count, case .string = tokens[nextPos].type {
+                return try parseFString(startToken: token)
+            }
+            
             advance()
             return .name(Name(
                 id: name,
@@ -2722,6 +2728,131 @@ public class Parser {
         }
         
         return params
+    }
+    
+    // Parse f-string: f"text {expr} more text"
+    private func parseFString(startToken: Token) throws -> Expression {
+        advance() // consume 'f'
+        
+        guard case .string(let str) = currentToken().type else {
+            throw ParseError.expected(message: "Expected string after 'f'", line: currentToken().line)
+        }
+        
+        let stringToken = currentToken()
+        advance() // consume string
+        
+        // Strip quotes from the string
+        let content = stripQuotes(from: str)
+        
+        // Parse the f-string content to extract expressions
+        var values: [Expression] = []
+        var currentText = ""
+        var i = content.startIndex
+        
+        while i < content.endIndex {
+            let char = content[i]
+            
+            if char == "{" {
+                // Check for escaped {{
+                let nextIdx = content.index(after: i)
+                if nextIdx < content.endIndex && content[nextIdx] == "{" {
+                    currentText.append("{")
+                    i = content.index(after: nextIdx)
+                    continue
+                }
+                
+                // Save any text before the expression
+                if !currentText.isEmpty {
+                    values.append(.constant(Constant(
+                        value: .string(currentText),
+                        kind: nil,
+                        lineno: stringToken.line,
+                        colOffset: stringToken.column,
+                        endLineno: nil,
+                        endColOffset: nil
+                    )))
+                    currentText = ""
+                }
+                
+                // Find the closing }
+                i = content.index(after: i)
+                var exprStr = ""
+                var braceDepth = 1
+                
+                while i < content.endIndex && braceDepth > 0 {
+                    let c = content[i]
+                    if c == "{" {
+                        braceDepth += 1
+                    } else if c == "}" {
+                        braceDepth -= 1
+                        if braceDepth == 0 {
+                            break
+                        }
+                    }
+                    exprStr.append(c)
+                    i = content.index(after: i)
+                }
+                
+                // Parse the expression
+                if !exprStr.isEmpty {
+                    // Tokenize and parse the expression
+                    let tokenizer = Tokenizer(source: exprStr)
+                    let exprTokens = try tokenizer.tokenize()
+                    let exprParser = Parser(tokens: exprTokens)
+                    let expr = try exprParser.parseExpression()
+                    
+                    // Wrap in FormattedValue
+                    values.append(.formattedValue(FormattedValue(
+                        value: expr,
+                        conversion: -1,
+                        formatSpec: nil,
+                        lineno: stringToken.line,
+                        colOffset: stringToken.column,
+                        endLineno: nil,
+                        endColOffset: nil
+                    )))
+                }
+                
+                i = content.index(after: i) // skip closing }
+                
+            } else if char == "}" {
+                // Check for escaped }}
+                let nextIdx = content.index(after: i)
+                if nextIdx < content.endIndex && content[nextIdx] == "}" {
+                    currentText.append("}")
+                    i = content.index(after: nextIdx)
+                    continue
+                }
+                
+                // Unmatched }
+                currentText.append(char)
+                i = content.index(after: i)
+            } else {
+                currentText.append(char)
+                i = content.index(after: i)
+            }
+        }
+        
+        // Save any remaining text
+        if !currentText.isEmpty {
+            values.append(.constant(Constant(
+                value: .string(currentText),
+                kind: nil,
+                lineno: stringToken.line,
+                colOffset: stringToken.column,
+                endLineno: nil,
+                endColOffset: nil
+            )))
+        }
+        
+        // Return JoinedStr
+        return .joinedStr(JoinedStr(
+            values: values,
+            lineno: startToken.line,
+            colOffset: startToken.column,
+            endLineno: stringToken.endLine,
+            endColOffset: stringToken.endColumn
+        ))
     }
     
     // Strip quotes from string literals

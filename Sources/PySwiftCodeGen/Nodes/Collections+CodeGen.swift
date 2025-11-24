@@ -103,7 +103,15 @@ extension Comprehension: PyCodeProtocol {
 
 extension JoinedStr: PyCodeProtocol {
     public func toPythonCode(context: CodeGenContext) -> String {
-        let parts = values.map { $0.toPythonCode(context: context) }.joined()
+        let parts = values.map { value -> String in
+            if case .constant(let constant) = value, case .string(let s) = constant.value {
+                // For string constants in f-strings, use the raw string without quotes
+                return s
+            } else {
+                // For FormattedValue and other nodes, generate normally
+                return value.toPythonCode(context: context)
+            }
+        }.joined()
         return "f\"\(parts)\""
     }
 }
