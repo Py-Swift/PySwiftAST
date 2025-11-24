@@ -1,41 +1,47 @@
 # PySwiftAST
 
-A **complete** Python 3.13 AST parser written in pure Swift. Parse Python code without requiring a Python runtime!
-
-## 🎉 Status: 100% Feature Complete
-
-PySwiftAST now implements **100% of Python 3.13 syntax**, including all statements, expressions, operators, and modern features like pattern matching, type annotations, and async/await.
+A Python 3.13 AST parser and code generator written in pure Swift. Parse Python code without requiring a Python runtime!
 
 ## Overview
 
-PySwiftAST provides a complete toolkit for parsing Python code without requiring a Python runtime. It consists of:
+PySwiftAST provides a comprehensive toolkit for parsing and generating Python code in Swift. It consists of:
 
-1. **Tokenizer** - Complete lexical analysis with full Python 3.13 token support (533 lines, 130+ token types)
-2. **Parser** - Full recursive descent parser with operator precedence (2,904 lines)
+1. **Tokenizer** - Complete lexical analysis with full Python 3.13 token support
+2. **Parser** - Recursive descent parser handling complex real-world Python code
 3. **AST Nodes** - Complete Swift types matching Python's `ast` module (28 modular files)
+4. **Code Generator** - Generate Python source code from AST
+
+## Why Pure Swift?
+
+A pure Swift implementation offers:
+
+- **Speed**: No Python interpreter overhead, native performance
+- **Portability**: Works anywhere Swift runs (macOS, Linux, iOS, etc.)
+- **Integration**: Native Swift types and error handling
+- **Tooling**: Use with Swift projects directly, great for IDEs and tools
 
 ## Architecture
 
-### Implementation: Hand-Written Recursive Descent Parser
+### Hand-Written Recursive Descent Parser
 
-This parser is a **complete, hand-written recursive descent parser** that implements 100% of Python 3.13 syntax. While initially inspired by the goal of using Python's PEG grammar, the current implementation proves that a hand-written parser can achieve full coverage efficiently.
+PySwiftAST uses a hand-written recursive descent parser that efficiently handles Python 3.13 syntax:
 
 ```
-Python Source → Tokenizer → Parser → Complete AST
+Python Source → Tokenizer → Parser → Complete AST → Code Generator → Python Source
 ```
 
 This approach provides:
-- ✅ **Complete Coverage**: All Python 3.13 features implemented
-- ✅ **Performance**: Efficient recursive descent with operator precedence
+- ✅ **Performance**: Efficient parsing with operator precedence climbing
 - ✅ **Maintainability**: Clear, readable Swift code
 - ✅ **No Dependencies**: Pure Swift, no Python runtime required
+- ✅ **Round-Trip**: Parse and regenerate Python code
 
 ### Implementation Details
 
-The complete implementation consists of:
+The implementation consists of:
 
 1. **Token.swift** - All Python 3.13 token types (130+ tokens)
-2. **Tokenizer.swift** (533 lines) - Complete lexical analysis with:
+2. **Tokenizer.swift** - Complete lexical analysis with:
    - Indentation-aware tokenization (INDENT/DEDENT)
    - All string literal types (raw, f-strings, triple-quoted, bytes)
    - All number formats (int, float, complex, hex, octal, binary, scientific)
@@ -50,14 +56,20 @@ The complete implementation consists of:
    - Type parameters (Python 3.12+)
    - TreeDisplayable protocol for visualization
 
-4. **Parser.swift** (2,904 lines) - **Complete recursive descent parser** implementing:
+4. **Parser.swift** (3,200+ lines) - Recursive descent parser implementing:
    - All statements (assignments, control flow, functions, classes, etc.)
-   - All expressions (operators, calls, comprehensions, etc.)
-   - Operator precedence climbing
+   - All expressions with proper operator precedence
+   - Comprehensions (list, dict, set, generator)
    - Pattern matching
    - Type annotations
-   - F-strings with embedded expressions
+   - F-strings with embedded expressions and concatenation
+   - Complex real-world Python constructs
    - Error recovery and reporting
+
+5. **CodeGen.swift** - Python code generator with:
+   - AST to source code conversion
+   - Proper indentation and formatting
+   - Round-trip support (parse → generate → parse)
 
 ## Usage
 
@@ -96,16 +108,16 @@ for token in tokens {
 }
 ```
 
-## ✅ Complete Feature Coverage
+## Features
 
-### Core Language (100%)
+### Core Language
 - ✅ Variables, assignments, type annotations
 - ✅ All operators (arithmetic, comparison, logical, bitwise)
 - ✅ Assignment target validation
 - ✅ Walrus operator (`:=`)
 - ✅ Augmented assignments (`+=`, `-=`, etc.)
 
-### Control Flow (100%)
+### Control Flow
 - ✅ If/elif/else statements
 - ✅ If-expressions (ternary: `x if cond else y`)
 - ✅ For/while loops with else
@@ -113,7 +125,7 @@ for token in tokens {
 - ✅ Match/case statements (Python 3.10+)
 - ✅ Pattern matching with guards
 
-### Functions (100%)
+### Functions
 - ✅ Function definitions with decorators
 - ✅ Async functions
 - ✅ Lambda expressions
@@ -123,28 +135,29 @@ for token in tokens {
 - ✅ Positional-only (`/`) and keyword-only (`*`) parameters
 - ✅ Yield and yield from
 
-### Classes (100%)
+### Classes
 - ✅ Class definitions with decorators
 - ✅ Inheritance (single and multiple)
 - ✅ Metaclass specification
 - ✅ Methods and attributes
 
-### Data Structures (100%)
+### Data Structures
 - ✅ Lists, tuples, dictionaries, sets
-- ✅ List/dict/set comprehensions
+- ✅ List/dict/set comprehensions with conditions
 - ✅ Generator expressions
+- ✅ Starred expressions in comprehensions (`for *args, item in items`)
 - ✅ Subscripting and slicing
 
-### Literals (100%)
+### Literals
 - ✅ Integers (decimal, hex `0xFF`, binary `0b1010`, octal `0o777`)
 - ✅ Floats, scientific notation (`1.5e10`)
 - ✅ Complex numbers (`1+2j`)
 - ✅ Strings (all quote styles, raw, bytes)
-- ✅ F-strings with embedded expressions (`f"Hello, {name}!"`)
+- ✅ F-strings with embedded expressions and concatenation
 - ✅ None, True, False
 - ✅ Ellipsis (`...`)
 
-### Advanced Features (100%)
+### Advanced Features
 - ✅ Exception handling (try/except/finally/else)
 - ✅ Context managers (with statements)
 - ✅ Async/await (async def, await, async for, async with)
@@ -152,13 +165,14 @@ for token in tokens {
 - ✅ Global/nonlocal declarations
 - ✅ Del statements
 - ✅ Assert and raise
-- ✅ Starred expressions
+- ✅ Implicit tuple returns (`return a, b, c`)
+- ✅ Comments in expressions and blocks
 
 See [FEATURES.md](FEATURES.md) for a comprehensive feature list.
 
 ## Why Pure Swift?
 
-Like Ruff (Python linter in Rust), a pure Swift implementation offers:
+A pure Swift implementation offers:
 
 - **Speed**: No Python interpreter overhead, native performance
 - **Portability**: Works anywhere Swift runs (macOS, Linux, iOS, etc.)
@@ -238,17 +252,17 @@ swift test --filter testPatternMatching
 swift test 2>&1 | less
 ```
 
-## 🎯 Future Enhancements
+## 🎯 Future Work
 
-While the parser is feature-complete, potential additions include:
+Potential enhancements include:
 
 1. **Performance Optimization** - Benchmark and optimize hot paths
 2. **Visitor Pattern** - AST traversal and transformation utilities
-3. **Pretty Printer** - Convert AST back to Python source
-4. **Error Recovery** - Better error messages, suggest fixes
-5. **Source Maps** - Preserve exact formatting information
-6. **LSP Support** - Language Server Protocol integration
-7. **Linting Tools** - Build Ruff-style linters in Swift
+3. **Error Recovery** - Better error messages, suggest fixes
+4. **Source Maps** - Preserve exact formatting information
+5. **LSP Support** - Language Server Protocol integration
+6. **Additional Testing** - More edge cases and Python constructs
+7. **Documentation** - More examples and use cases
 
 ## Project Structure
 
