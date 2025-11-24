@@ -1572,11 +1572,20 @@ public class Parser {
         
         try consume(.newline, "Expected newline before block")
         
-        // Skip comments between newline and indent
-        while case .comment = currentToken().type {
-            advance()
-            if currentToken().type == .newline {
+        // Skip comments and blank lines between newline and indent
+        while true {
+            if case .comment = currentToken().type {
                 advance()
+                // Skip newline after comment
+                if currentToken().type == .newline {
+                    advance()
+                }
+            } else if currentToken().type == .newline {
+                // Skip blank lines
+                advance()
+            } else {
+                // Not a comment or blank line, must be indent
+                break
             }
         }
         
