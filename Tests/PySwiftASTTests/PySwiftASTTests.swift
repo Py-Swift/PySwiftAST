@@ -384,6 +384,138 @@ enum TestError: Error {
     }
 }
 
+@Test func testStarredListComprehension() async throws {
+    // Test starred list comprehension in function call
+    // This is from Django query.py line 117-125
+    let source = """
+    result = func(*[x if condition else y for x in items])
+    """
+    
+    let ast = try parsePython(source)
+    
+    if case .module(let stmts) = ast {
+        #expect(stmts.count == 1, "Expected 1 assignment statement")
+        
+        if case .assign(let assign) = stmts[0] {
+            if case .call(let call) = assign.value {
+                #expect(call.args.count == 1, "Expected 1 starred argument")
+                if case .starred = call.args[0] {
+                    // Success - starred argument parsed correctly
+                } else {
+                    Issue.record("Argument should be a starred expression")
+                }
+            } else {
+                Issue.record("Assignment value should be a function call")
+            }
+        } else {
+            Issue.record("Statement should be an assignment")
+        }
+    } else {
+        Issue.record("AST should be a module")
+    }
+}
+
+@Test func testMultiLineStarredListComprehension() async throws {
+    // Test multi-line starred list comprehension
+    let source = """
+    result = func(
+        *[
+            x if cond else y
+            for x in items
+        ]
+    )
+    """
+    
+    let ast = try parsePython(source)
+    
+    if case .module(let stmts) = ast {
+        #expect(stmts.count == 1, "Expected 1 assignment statement")
+    } else {
+        Issue.record("AST should be a module")
+    }
+}
+
+@Test func testConditionalExpressionInTuple() async throws {
+    // Test conditional expression in multi-line tuple
+    let source = """
+    x = (
+        a,
+        b if cond else c,
+    )
+    """
+    
+    let ast = try parsePython(source)
+    
+    if case .module(let stmts) = ast {
+        #expect(stmts.count == 1, "Expected 1 assignment statement")
+        
+        if case .assign(let assign) = stmts[0] {
+            if case .tuple(let tuple) = assign.value {
+                #expect(tuple.elts.count == 2, "Expected 2 tuple elements")
+                // Second element should be a conditional expression
+                if case .ifExp = tuple.elts[1] {
+                    // Success!
+                } else {
+                    Issue.record("Second element should be an if-expression")
+                }
+            } else {
+                Issue.record("Value should be a tuple")
+            }
+        } else {
+            Issue.record("Statement should be an assignment")
+        }
+    } else {
+        Issue.record("AST should be a module")
+    }
+}
+
+@Test func testNotInOperator() async throws {
+    // Test 'not in' comparison operator across multiple lines
+    let source = """
+    x = (
+        value
+        not in collection
+    )
+    """
+    
+    let ast = try parsePython(source)
+    
+    if case .module(let stmts) = ast {
+        #expect(stmts.count == 1, "Expected 1 assignment statement")
+        
+        if case .assign(let assign) = stmts[0] {
+            if case .compare(let compare) = assign.value {
+                #expect(compare.ops.count == 1, "Expected 1 comparison operator")
+                #expect(compare.ops[0] == .notIn, "Expected notIn operator")
+            } else {
+                Issue.record("Value should be a comparison expression")
+            }
+        } else {
+            Issue.record("Statement should be an assignment")
+        }
+    } else {
+        Issue.record("AST should be a module")
+    }
+}
+
+@Test func testMultiLineFStringConcat() async throws {
+    // Test implicit f-string concatenation across lines
+    let source = """
+    x = (
+        f"first "
+        f"second"
+    )
+    """
+    
+    let ast = try parsePython(source)
+    
+    if case .module(let stmts) = ast {
+        #expect(stmts.count == 1, "Expected 1 assignment statement")
+    } else {
+        Issue.record("AST should be a module")
+    }
+}
+
 @Test func testExceptionsFile() async throws {
     let source = try loadTestResource("exceptions")
     

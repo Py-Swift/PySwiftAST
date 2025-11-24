@@ -280,9 +280,37 @@ public class Parser {
         let returnToken = currentToken()
         advance() // consume 'return'
         
+        // Skip comments after 'return' keyword
+        skipComments()
+        
         var value: Expression? = nil
         if !isNewlineOrSemicolon() && !isAtEnd() {
-            value = try parseExpression()
+            // Parse the first expression
+            let first = try parseExpression()
+            
+            // Check if this is an implicit tuple: return a, b, c
+            if currentToken().type == .comma {
+                var elts = [first]
+                while currentToken().type == .comma {
+                    advance()
+                    // Check for trailing comma before newline
+                    if isNewlineOrSemicolon() || isAtEnd() {
+                        break
+                    }
+                    elts.append(try parseExpression())
+                }
+                // Create implicit tuple
+                value = .tuple(Tuple(
+                    elts: elts,
+                    ctx: .load,
+                    lineno: returnToken.line,
+                    colOffset: returnToken.column,
+                    endLineno: nil,
+                    endColOffset: nil
+                ))
+            } else {
+                value = first
+            }
         }
         
         consumeNewlineOrSemicolon()
@@ -1537,9 +1565,14 @@ public class Parser {
     }
     
     private func parseBlock() throws -> [Statement] {
+        // Skip inline comments before the newline (e.g., def foo():  # comment)
+        while case .comment = currentToken().type {
+            advance()
+        }
+        
         try consume(.newline, "Expected newline before block")
         
-        // Skip comments before indent
+        // Skip comments between newline and indent
         while case .comment = currentToken().type {
             advance()
             if currentToken().type == .newline {
@@ -1577,7 +1610,33 @@ public class Parser {
     }
     
     private func parseExpression() throws -> Expression {
-        return try parseOrExpression()
+        // Try lambda first
+        if currentToken().type == .lambda {
+            return try parseLambdaExpression()
+        }
+        
+        // Otherwise parse disjunction (or/and/not/comparison chain)
+        let expr = try parseOrExpression()
+        
+        // Check for if-expression (ternary): x if condition else y
+        if currentToken().type == .if {
+            advance() // consume 'if'
+            let test = try parseOrExpression()  // Condition
+            try consume(.else, "Expected 'else' in if-expression")
+            let orElse = try parseExpression()  // Else part (recursive for nesting)
+            
+            return .ifExp(IfExp(
+                test: test,
+                body: expr,
+                orElse: orElse,
+                lineno: currentToken().line,
+                colOffset: currentToken().column,
+                endLineno: nil,
+                endColOffset: nil
+            ))
+        }
+        
+        return expr
     }
     
     // Parse expression that may be starred (for assignment targets and unpacking)
@@ -1603,9 +1662,13 @@ public class Parser {
     private func parseOrExpression() throws -> Expression {
         var left = try parseAndExpression()
         
+        // Skip comments before checking for 'or' operator
+        skipComments()
+        
         while currentToken().type == .or {
             let token = currentToken()
             advance()
+            skipComments() // Skip comments after 'or' operator
             let right = try parseAndExpression()
             left = .boolOp(BoolOp(
                 op: .or,
@@ -1615,6 +1678,8 @@ public class Parser {
                 endLineno: nil,
                 endColOffset: nil
             ))
+            // Skip comments before checking for next 'or'
+            skipComments()
         }
         
         return left
@@ -1623,9 +1688,13 @@ public class Parser {
     private func parseAndExpression() throws -> Expression {
         var left = try parseNotExpression()
         
+        // Skip comments before checking for 'and' operator
+        skipComments()
+        
         while currentToken().type == .and {
             let token = currentToken()
             advance()
+            skipComments() // Skip comments after 'and' operator
             let right = try parseNotExpression()
             left = .boolOp(BoolOp(
                 op: .and,
@@ -1635,6 +1704,8 @@ public class Parser {
                 endLineno: nil,
                 endColOffset: nil
             ))
+            // Skip comments before checking for next 'and'
+            skipComments()
         }
         
         return left
@@ -1642,8 +1713,32 @@ public class Parser {
     
     private func parseNotExpression() throws -> Expression {
         if currentToken().type == .not {
+            // Check if this is 'not in' (comparison operator) vs 'not' (unary operator)
+            // Peek ahead to see if next token is 'in', skipping comments and newlines
+            var peekPos = position + 1
+            while peekPos < tokens.count {
+                let peekType = tokens[peekPos].type
+                // Skip comments and newlines
+                if case .comment = peekType {
+                    peekPos += 1
+                    continue
+                }
+                if peekType == .newline {
+                    peekPos += 1
+                    continue
+                }
+                // Found a non-comment, non-newline token
+                if peekType == .in {
+                    // This is 'not in' - don't consume 'not', let comparison handle it
+                    return try parseWalrusExpression()
+                }
+                break
+            }
+            
+            // This is unary 'not'
             let token = currentToken()
             advance()
+            skipComments() // Skip comments after 'not' operator
             let operand = try parseNotExpression()
             return .unaryOp(UnaryOp(
                 op: .not,
@@ -1805,31 +1900,8 @@ public class Parser {
                 endColOffset: nil
             ))
         }
-        return try parseIfExpression()
-    }
-    
-    private func parseIfExpression() throws -> Expression {
-        let expr = try parseComparisonExpression()
-        
-        // Check for if-expression (ternary): x if condition else y
-        if currentToken().type == .if {
-            advance()
-            let test = try parseComparisonExpression()
-            try consume(.else, "Expected 'else' in if-expression")
-            let orElse = try parseExpression()
-            
-            return .ifExp(IfExp(
-                test: test,
-                body: expr,
-                orElse: orElse,
-                lineno: currentToken().line,
-                colOffset: currentToken().column,
-                endLineno: nil,
-                endColOffset: nil
-            ))
-        }
-        
-        return expr
+        // This should never be reached since parseExpression checks for lambda first
+        return try parseComparisonExpression()
     }
     
     private func parseComparisonExpression() throws -> Expression {
@@ -2170,6 +2242,11 @@ public class Parser {
                 // Use None as arg name to indicate **kwargs
                 keywords.append(Keyword(arg: nil, value: value))
                 
+                // Skip newlines after **kwargs (implicit line joining)
+                while currentToken().type == .newline {
+                    advance()
+                }
+                
                 if currentToken().type == .comma {
                     advance()
                     // Skip newlines after comma
@@ -2195,6 +2272,11 @@ public class Parser {
                 ))
                 args.append(starred)
                 
+                // Skip newlines after starred expression (implicit line joining)
+                while currentToken().type == .newline {
+                    advance()
+                }
+                
                 if currentToken().type == .comma {
                     advance()
                     // Skip newlines after comma
@@ -2214,6 +2296,11 @@ public class Parser {
                     advance() // consume '='
                     let value = try parseExpression()
                     keywords.append(Keyword(arg: name, value: value))
+                    
+                    // Skip newlines after keyword argument (implicit line joining)
+                    while currentToken().type == .newline {
+                        advance()
+                    }
                     
                     if currentToken().type == .comma {
                         advance()
@@ -2243,6 +2330,11 @@ public class Parser {
                 ))
                 args.append(genexp)
                 
+                // Skip newlines after generator expression (implicit line joining)
+                while currentToken().type == .newline {
+                    advance()
+                }
+                
                 if currentToken().type == .comma {
                     advance()
                     // Skip newlines after comma
@@ -2252,6 +2344,11 @@ public class Parser {
                 }
             } else {
                 args.append(arg)
+                
+                // Skip newlines after positional argument (implicit line joining)
+                while currentToken().type == .newline {
+                    advance()
+                }
                 
                 if currentToken().type == .comma {
                     advance()
@@ -2367,7 +2464,42 @@ public class Parser {
             // Check for f-string: f"..." or f'...'
             let nextPos = position + 1
             if name == "f", nextPos < tokens.count, case .string = tokens[nextPos].type {
-                return try parseFString(startToken: token)
+                // Parse first f-string
+                var fstring = try parseFString(startToken: token)
+                
+                // Handle implicit f-string concatenation: f"str1" f"str2"
+                while true {
+                    // Check if next token is another f-string
+                    if case .name(let nextName) = currentToken().type, nextName == "f" {
+                        let peekPos = position + 1
+                        if peekPos < tokens.count, case .string = tokens[peekPos].type {
+                            // Parse and concatenate next f-string
+                            let nextFString = try parseFString(startToken: currentToken())
+                            
+                            // Concatenate the f-strings by merging their values
+                            if case .joinedStr(let joined1) = fstring,
+                               case .joinedStr(let joined2) = nextFString {
+                                // Merge the values arrays
+                                fstring = .joinedStr(JoinedStr(
+                                    values: joined1.values + joined2.values,
+                                    lineno: joined1.lineno,
+                                    colOffset: joined1.colOffset,
+                                    endLineno: nil,
+                                    endColOffset: nil
+                                ))
+                            } else {
+                                // If one isn't a joinedStr, just use the second one
+                                fstring = nextFString
+                            }
+                        } else {
+                            break
+                        }
+                    } else {
+                        break
+                    }
+                }
+                
+                return fstring
             }
             
             advance()
@@ -2490,6 +2622,12 @@ public class Parser {
         case .leftparen:
             // Tuple, parenthesized expression, or generator expression
             advance()
+            
+            // Skip newlines after opening paren (implicit line joining)
+            while currentToken().type == .newline {
+                advance()
+            }
+            
             if currentToken().type == .rightparen {
                 // Empty tuple
                 advance()
@@ -2503,7 +2641,23 @@ public class Parser {
                 ))
             }
             
-            let first = try parseStarExpression()
+            // For tuples and generator expressions, we need to use parseExpression()
+            // to handle conditional expressions like: (x if cond else y, ...)
+            // But we also need to handle starred expressions: (*items, x)
+            let first: Expression
+            if currentToken().type == .star {
+                // Starred expression in a tuple: (*items, ...)
+                first = try parseStarExpression()
+            } else {
+                // Could be regular element or generator expression element
+                // Use parseExpression() to support: (x if cond else y for ...)
+                first = try parseExpression()
+            }
+            
+            // Skip newlines after first element (implicit line joining)
+            while currentToken().type == .newline {
+                advance()
+            }
             
             // Check for generator expression (including async)
             if currentToken().type == .for || currentToken().type == .async {
@@ -2524,10 +2678,27 @@ public class Parser {
                 var elts = [first]
                 while currentToken().type == .comma {
                     advance()
+                    // Skip newlines after comma (implicit line joining)
+                    while currentToken().type == .newline {
+                        advance()
+                    }
                     if currentToken().type == .rightparen {
                         break
                     }
-                    elts.append(try parseStarExpression())
+                    // Parse tuple elements - support both starred and conditional expressions
+                    let element: Expression
+                    if currentToken().type == .star {
+                        // Starred expression: (1, *items, 2)
+                        element = try parseStarExpression()
+                    } else {
+                        // Regular or conditional expression: (a, b if c else d, e)
+                        element = try parseExpression()
+                    }
+                    elts.append(element)
+                    // Skip newlines after element (implicit line joining)
+                    while currentToken().type == .newline {
+                        advance()
+                    }
                 }
                 try consume(.rightparen, "Expected ')' after tuple")
                 return .tuple(Tuple(
@@ -2560,7 +2731,21 @@ public class Parser {
                 ))
             }
             
-            let first = try parseStarExpression()
+            // For list comprehensions, we need to use parseExpression() to handle
+            // conditional expressions like: [x if cond else y for x in items]
+            // But we also need to handle starred expressions in regular lists: [*items, x]
+            // Strategy: Try parseStarExpression first, but if we see 'for'/'async', 
+            // we know it's a comprehension and the expression can include if-expressions
+            
+            let first: Expression
+            if currentToken().type == .star {
+                // Starred expression in a list: [*items, ...]
+                first = try parseStarExpression()
+            } else {
+                // Could be regular element or comprehension element
+                // Use parseExpression() to support: [x if cond else y for ...]
+                first = try parseExpression()
+            }
             
             // Check for list comprehension (including async comprehension)
             if currentToken().type == .for || currentToken().type == .async {
@@ -2583,7 +2768,16 @@ public class Parser {
                 if currentToken().type == .rightbracket {
                     break
                 }
-                elts.append(try parseStarExpression())
+                // Parse list elements - support both starred and conditional expressions
+                let element: Expression
+                if currentToken().type == .star {
+                    // Starred expression: [1, *items, 2]
+                    element = try parseStarExpression()
+                } else {
+                    // Regular or conditional expression: [a, b if c else d, e]
+                    element = try parseExpression()
+                }
+                elts.append(element)
             }
             
             try consume(.rightbracket, "Expected ']' after list")
@@ -2771,6 +2965,12 @@ public class Parser {
         return position >= tokens.count || currentToken().type == .endmarker
     }
     
+    private func skipComments() {
+        while case .comment = currentToken().type {
+            advance()
+        }
+    }
+    
     private func consume(_ type: TokenType, _ message: String) throws {
         if currentToken().type == type {
             advance()
@@ -2807,15 +3007,30 @@ public class Parser {
             
             let forToken = currentToken()
             
-            // Parse target (can be a tuple like: k, v)
-            var targetExprs = [try parseBitwiseOrExpression()]
+            // Parse target (can be a tuple like: k, v or with starred: *k, v)
+            // We need to handle starred expressions in comprehensions
+            var targetExprs: [Expression] = []
+            
+            // Parse first target element (may be starred)
+            if currentToken().type == .star {
+                targetExprs.append(try parseStarExpression())
+            } else {
+                targetExprs.append(try parseBitwiseOrExpression())
+            }
+            
+            // Parse additional elements if comma-separated
             while currentToken().type == .comma {
                 advance()
                 // Check if we've hit 'in' (trailing comma case)
                 if currentToken().type == .in {
                     break
                 }
-                targetExprs.append(try parseBitwiseOrExpression())
+                // Parse next element (may also be starred)
+                if currentToken().type == .star {
+                    targetExprs.append(try parseStarExpression())
+                } else {
+                    targetExprs.append(try parseBitwiseOrExpression())
+                }
             }
             
             let target: Expression
@@ -2836,9 +3051,14 @@ public class Parser {
             let iter = try parseBitwiseOrExpression()
             
             var ifs: [Expression] = []
+            // Skip comments before checking for 'if' clauses
+            skipComments()
             while currentToken().type == .if {
                 advance()
+                skipComments() // Skip comments after 'if'
                 ifs.append(try parseOrExpression())
+                // Skip comments before checking for next 'if'
+                skipComments()
             }
             
             generators.append(Comprehension(
