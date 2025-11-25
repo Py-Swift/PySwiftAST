@@ -221,6 +221,21 @@ python3 benchmark.py
 
 *Benchmark: 100 iterations with 10 warmup runs, release build, macOS*
 
+### Performance Test Suite
+
+PySwiftAST includes a comprehensive performance test suite to track optimization progress:
+
+```bash
+# Run performance tests (must use release mode!)
+swift test -c release --filter PerformanceTests
+```
+
+**Optimization Goals:**
+- 🎯 **Parsing**: Target 2.0x+ speedup (currently 1.35x)
+- 🎯 **Round-trip**: Target 1.5x+ speedup (currently 1.04x)
+
+The test suite automatically tracks performance metrics and detects regressions. See [Tests/PySwiftASTTests/PERFORMANCE.md](Tests/PySwiftASTTests/PERFORMANCE.md) for the optimization roadmap.
+
 ## Testing
 
 ```bash
