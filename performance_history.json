@@ -1,0 +1,29 @@
+{
+  "baseline": {
+    "date": "2025-11-25",
+    "commit": "5748452",
+    "description": "Initial performance baseline after implementing performance test suite",
+    "parsing_median_ms": 6.426,
+    "roundtrip_median_ms": 29.551,
+    "tokenization_median_ms": 89.266,
+    "codegen_median_ms": 4.865,
+    "speedup_vs_python_parsing": 1.35,
+    "speedup_vs_python_roundtrip": 1.04,
+    "python_parsing_baseline_ms": 8.679,
+    "python_roundtrip_baseline_ms": 30.229,
+    "test_file": "django_query.py (2,886 lines, 111,746 bytes)",
+    "iterations": 100,
+    "warmup_runs": 10,
+    "build_mode": "release",
+    "platform": "macOS",
+    "swift_version": "6.1"
+  },
+  "goals": {
+    "parsing_speedup_target": 2.0,
+    "roundtrip_speedup_target": 1.5,
+    "parsing_target_ms": 4.34,
+    "roundtrip_target_ms": 20.15,
+    "notes": "Target is 2x+ faster than Python for parsing, 1.5x+ for round-trip"
+  },
+  "history": []
+}
