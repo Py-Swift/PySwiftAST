@@ -145,6 +145,112 @@ public class MonacoAnalyzer {
         return hints
     }
     
+    // MARK: - Navigation Features
+    
+    /// Get definition location for symbol at position
+    public func getDefinition(at position: Position) -> [Location] {
+        guard let ast = ast else { return [] }
+        
+        // Find symbol at position
+        guard let symbol = findSymbolAt(position: position, in: ast) else {
+            return []
+        }
+        
+        // Find the definition of this symbol
+        if let location = findDefinitionOf(symbol: symbol, in: ast) {
+            return [location]
+        }
+        
+        return []
+    }
+    
+    /// Find all references to symbol at position
+    public func getReferences(at position: Position, includeDeclaration: Bool = true) -> [Location] {
+        guard let ast = ast else { return [] }
+        
+        // Find symbol at position
+        guard let symbol = findSymbolAt(position: position, in: ast) else {
+            return []
+        }
+        
+        // Find all references
+        var locations: [Location] = []
+        locations.append(contentsOf: findReferencesOf(symbol: symbol, in: ast, includeDeclaration: includeDeclaration))
+        
+        return locations
+    }
+    
+    /// Get edits to rename symbol at position
+    public func getRenameEdits(at position: Position, newName: String) -> WorkspaceEdit? {
+        guard let ast = ast else { return nil }
+        
+        // Find symbol at position
+        guard let symbol = findSymbolAt(position: position, in: ast) else {
+            return nil
+        }
+        
+        // Find all references including declaration
+        let locations = findReferencesOf(symbol: symbol, in: ast, includeDeclaration: true)
+        
+        // Create text edits for each location
+        let edits = locations.map { location in
+            TextEdit(range: location.range, newText: newName)
+        }
+        
+        // Group by URI (all in same document for now)
+        return WorkspaceEdit(changes: ["document": edits])
+    }
+    
+    /// Get document highlights for symbol at position
+    public func getDocumentHighlights(at position: Position) -> [DocumentHighlight] {
+        guard let ast = ast else { return [] }
+        
+        // Find symbol at position
+        guard let symbol = findSymbolAt(position: position, in: ast) else {
+            return []
+        }
+        
+        // Find all references
+        let locations = findReferencesOf(symbol: symbol, in: ast, includeDeclaration: true)
+        
+        // Convert to document highlights
+        return locations.map { location in
+            // Determine if this is read or write access
+            let kind = determineAccessKind(for: symbol, at: location)
+            return DocumentHighlight(range: location.range, kind: kind)
+        }
+    }
+    
+    /// Get selection range at position (for smart expand/shrink selection)
+    public func getSelectionRange(at position: Position) -> SelectionRange? {
+        guard let ast = ast else { return nil }
+        
+        // Build hierarchy from innermost to outermost
+        var ranges: [IDERange] = []
+        
+        // Start with word at position
+        if let wordRange = getWordRangeAt(position: position) {
+            ranges.append(wordRange)
+        }
+        
+        // Add expression range if inside expression
+        if let exprRange = getExpressionRangeAt(position: position, in: ast) {
+            ranges.append(exprRange)
+        }
+        
+        // Add statement range
+        if let stmtRange = getStatementRangeAt(position: position, in: ast) {
+            ranges.append(stmtRange)
+        }
+        
+        // Add function/class range if inside one
+        if let blockRange = getBlockRangeAt(position: position, in: ast) {
+            ranges.append(blockRange)
+        }
+        
+        return SelectionRange.hierarchy(ranges)
+    }
+    
     // MARK: - Private Helpers - Node Finding
     
     private func findNodeAt(position: Position, in module: Module) -> Statement? {
@@ -406,6 +512,223 @@ public class MonacoAnalyzer {
     private func findTypeHints(in module: Module, range: IDERange) -> [InlayHint] {
         // Placeholder - would infer types and add type hints
         return []
+    }
+    
+    // MARK: - Private Helpers - Symbol Finding
+    
+    /// Symbol information for navigation
+    private struct SymbolInfo {
+        let name: String
+        let kind: SymbolKind
+        let range: IDERange
+    }
+    
+    private enum SymbolKind {
+        case function
+        case `class`
+        case variable
+        case parameter
+    }
+    
+    private func findSymbolAt(position: Position, in module: Module) -> SymbolInfo? {
+        let statements = getStatements(from: module)
+        
+        // Find which statement contains this position
+        for statement in statements {
+            if let symbol = findSymbolInStatement(statement, at: position) {
+                return symbol
+            }
+        }
+        
+        return nil
+    }
+    
+    private func findSymbolInStatement(_ statement: Statement, at position: Position) -> SymbolInfo? {
+        // Check if this is a function definition
+        if case .functionDef(let funcDef) = statement {
+            if isPositionInRange(position, funcDef.lineno, funcDef.name.count) {
+                return SymbolInfo(
+                    name: funcDef.name,
+                    kind: .function,
+                    range: IDERange.from(line: funcDef.lineno, column: 5, length: funcDef.name.count)
+                )
+            }
+        }
+        
+        // Check if this is a class definition
+        if case .classDef(let classDef) = statement {
+            if isPositionInRange(position, classDef.lineno, classDef.name.count) {
+                return SymbolInfo(
+                    name: classDef.name,
+                    kind: .class,
+                    range: IDERange.from(line: classDef.lineno, column: 7, length: classDef.name.count)
+                )
+            }
+        }
+        
+        // TODO: Check for variable references, parameters, etc.
+        
+        return nil
+    }
+    
+    private func isPositionInRange(_ position: Position, _ line: Int, _ length: Int) -> Bool {
+        return position.lineNumber == line
+    }
+    
+    // MARK: - Private Helpers - Definition Finding
+    
+    private func findDefinitionOf(symbol: SymbolInfo, in module: Module) -> Location? {
+        let statements = getStatements(from: module)
+        
+        for statement in statements {
+            // Check for function definition
+            if case .functionDef(let funcDef) = statement, funcDef.name == symbol.name {
+                return Location(
+                    uri: "document",
+                    range: IDERange.from(line: funcDef.lineno, column: 5, length: funcDef.name.count)
+                )
+            }
+            
+            // Check for class definition
+            if case .classDef(let classDef) = statement, classDef.name == symbol.name {
+                return Location(
+                    uri: "document",
+                    range: IDERange.from(line: classDef.lineno, column: 7, length: classDef.name.count)
+                )
+            }
+        }
+        
+        return nil
+    }
+    
+    // MARK: - Private Helpers - Reference Finding
+    
+    private func findReferencesOf(symbol: SymbolInfo, in module: Module, includeDeclaration: Bool) -> [Location] {
+        var locations: [Location] = []
+        let statements = getStatements(from: module)
+        
+        // Add declaration if requested
+        if includeDeclaration {
+            if let defLocation = findDefinitionOf(symbol: symbol, in: module) {
+                locations.append(defLocation)
+            }
+        }
+        
+        // Find all references in statements
+        for statement in statements {
+            locations.append(contentsOf: findReferencesInStatement(statement, symbol: symbol))
+        }
+        
+        return locations
+    }
+    
+    private func findReferencesInStatement(_ statement: Statement, symbol: SymbolInfo) -> [Location] {
+        var locations: [Location] = []
+        
+        // TODO: Traverse AST to find all name references matching symbol.name
+        // This would need proper expression traversal to find all Name nodes
+        
+        return locations
+    }
+    
+    // MARK: - Private Helpers - Access Kind
+    
+    private func determineAccessKind(for symbol: SymbolInfo, at location: Location) -> DocumentHighlightKind {
+        // Simple heuristic: function/class definitions are text, variables could be read/write
+        switch symbol.kind {
+        case .function, .class:
+            return .text
+        case .variable, .parameter:
+            // TODO: Analyze context to determine if read or write
+            return .read
+        }
+    }
+    
+    // MARK: - Private Helpers - Selection Ranges
+    
+    private func getWordRangeAt(position: Position) -> IDERange? {
+        // Get the word at the current position
+        let line = position.lineNumber
+        guard line > 0 && line <= sourceLines.count else { return nil }
+        
+        let lineText = sourceLines[line - 1]
+        let column = position.column - 1
+        
+        guard column >= 0 && column < lineText.count else { return nil }
+        
+        // Find word boundaries
+        let chars = Array(lineText)
+        var start = column
+        var end = column
+        
+        while start > 0 && isWordChar(chars[start - 1]) {
+            start -= 1
+        }
+        
+        while end < chars.count && isWordChar(chars[end]) {
+            end += 1
+        }
+        
+        return IDERange(
+            startLineNumber: line,
+            startColumn: start + 1,
+            endLineNumber: line,
+            endColumn: end + 1
+        )
+    }
+    
+    private func isWordChar(_ char: Character) -> Bool {
+        return char.isLetter || char.isNumber || char == "_"
+    }
+    
+    private func getExpressionRangeAt(position: Position, in module: Module) -> IDERange? {
+        // Placeholder - would find the expression containing this position
+        return nil
+    }
+    
+    private func getStatementRangeAt(position: Position, in module: Module) -> IDERange? {
+        let statements = getStatements(from: module)
+        
+        for statement in statements {
+            if statement.lineno == position.lineNumber {
+                // Return range for this statement
+                return IDERange.from(line: statement.lineno, column: 1, length: 50)
+            }
+        }
+        
+        return nil
+    }
+    
+    private func getBlockRangeAt(position: Position, in module: Module) -> IDERange? {
+        let statements = getStatements(from: module)
+        
+        for statement in statements {
+            // Check if inside a function
+            if case .functionDef(let funcDef) = statement {
+                if position.lineNumber >= funcDef.lineno {
+                    return IDERange(
+                        startLineNumber: funcDef.lineno,
+                        startColumn: 1,
+                        endLineNumber: funcDef.lineno + funcDef.body.count,
+                        endColumn: 1
+                    )
+                }
+            }
+            
+            // Check if inside a class
+            if case .classDef(let classDef) = statement {
+                if position.lineNumber >= classDef.lineno {
+                    return IDERange(
+                        startLineNumber: classDef.lineno,
+                        startColumn: 1,
+                        endLineNumber: classDef.lineno + classDef.body.count,
+                        endColumn: 1
+                    )
+                }
+            }
+        }
+        
+        return nil
     }
     
     // MARK: - AST Helpers

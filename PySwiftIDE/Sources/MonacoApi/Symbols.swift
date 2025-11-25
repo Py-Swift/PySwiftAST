@@ -140,6 +140,58 @@ public struct ReferenceContext: Codable, Sendable {
     }
 }
 
+// MARK: - Document Highlights Provider Types
+
+/// A document highlight is a range inside a text document which deserves
+/// special attention. Usually a document highlight is visualized by changing
+/// the background color of its range.
+/// Corresponds to Monaco's `monaco.languages.DocumentHighlight`
+public struct DocumentHighlight: Codable, Sendable {
+    /// The range this highlight applies to
+    public let range: IDERange
+    
+    /// The highlight kind, default is text
+    public let kind: DocumentHighlightKind?
+    
+    public init(range: IDERange, kind: DocumentHighlightKind? = nil) {
+        self.range = range
+        self.kind = kind
+    }
+}
+
+/// A document highlight kind
+/// Corresponds to Monaco's `monaco.languages.DocumentHighlightKind`
+public enum DocumentHighlightKind: Int, Codable, Sendable {
+    /// A textual occurrence
+    case text = 0
+    /// Read-access of a symbol, like reading a variable
+    case read = 1
+    /// Write-access of a symbol, like writing to a variable
+    case write = 2
+}
+
+// MARK: - Selection Range Provider Types
+
+/// A selection range represents a range around the cursor that the user
+/// might be interested in selecting.
+/// Corresponds to Monaco's `monaco.languages.SelectionRange`
+public final class SelectionRange: Codable, Sendable {
+    /// The range of this selection range
+    public let range: IDERange
+    
+    /// The parent selection range containing this range
+    public let parent: SelectionRange?
+    
+    private enum CodingKeys: String, CodingKey {
+        case range, parent
+    }
+    
+    public init(range: IDERange, parent: SelectionRange? = nil) {
+        self.range = range
+        self.parent = parent
+    }
+}
+
 // MARK: - Helper Extensions
 
 extension DocumentSymbol {
@@ -217,5 +269,35 @@ extension Location {
     /// Create a location in the current document
     public static func current(range: IDERange) -> Location {
         Location(uri: "file:///current", range: range)
+    }
+}
+
+extension DocumentHighlight {
+    /// Create a text highlight
+    public static func text(at range: IDERange) -> DocumentHighlight {
+        DocumentHighlight(range: range, kind: .text)
+    }
+    
+    /// Create a read highlight
+    public static func read(at range: IDERange) -> DocumentHighlight {
+        DocumentHighlight(range: range, kind: .read)
+    }
+    
+    /// Create a write highlight
+    public static func write(at range: IDERange) -> DocumentHighlight {
+        DocumentHighlight(range: range, kind: .write)
+    }
+}
+
+extension SelectionRange {
+    /// Create a selection range hierarchy from ranges (innermost to outermost)
+    public static func hierarchy(_ ranges: [IDERange]) -> SelectionRange? {
+        guard !ranges.isEmpty else { return nil }
+        
+        var result: SelectionRange?
+        for range in ranges.reversed() {
+            result = SelectionRange(range: range, parent: result)
+        }
+        return result
     }
 }
