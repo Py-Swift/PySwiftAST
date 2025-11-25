@@ -29,6 +29,15 @@ public struct CodeGenContext {
     /// Whether we're currently inside an f-string (affects quote choice)
     public var inFString: Bool
     
+    /// Pre-computed indentation strings for common levels (0-10)
+    private static let precomputedIndents: [String] = {
+        var indents: [String] = []
+        for level in 0...10 {
+            indents.append(String(repeating: " ", count: level * 4))
+        }
+        return indents
+    }()
+    
     public init(
         indentLevel: Int = 0,
         indentSize: Int = 4,
@@ -47,12 +56,19 @@ public struct CodeGenContext {
         self.inFString = inFString
     }
     
-    /// Get the current indentation string
+    /// Get the current indentation string (uses precomputed string for common levels)
+    @inline(__always)
     public var indent: String {
-        String(repeating: " ", count: indentLevel * indentSize)
+        // Use precomputed indent for common levels (0-10) and indentSize=4
+        if indentSize == 4 && indentLevel < Self.precomputedIndents.count {
+            return Self.precomputedIndents[indentLevel]
+        }
+        // Fall back to computed indent for uncommon cases
+        return String(repeating: " ", count: indentLevel * indentSize)
     }
     
     /// Create a new context with increased indentation
+    @inline(__always)
     public func indented() -> CodeGenContext {
         var ctx = self
         ctx.indentLevel += 1
@@ -60,6 +76,7 @@ public struct CodeGenContext {
     }
     
     /// Create a new context with decreased indentation
+    @inline(__always)
     public func dedented() -> CodeGenContext {
         var ctx = self
         ctx.indentLevel = max(0, indentLevel - 1)
