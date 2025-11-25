@@ -2982,6 +2982,7 @@ public class Parser {
     
     // MARK: - Helper Methods
     
+    @inline(__always)
     private func currentToken() -> Token {
         guard position < tokens.count else {
             return Token(type: .endmarker, value: "", line: 0, column: 0, endLine: 0, endColumn: 0)
@@ -2989,16 +2990,19 @@ public class Parser {
         return tokens[position]
     }
     
+    @inline(__always)
     private func advance() {
         if position < tokens.count {
             position += 1
         }
     }
     
+    @inline(__always)
     private func isAtEnd() -> Bool {
         return position >= tokens.count || currentToken().type == .endmarker
     }
     
+    @inline(__always)
     private func skipComments() {
         while case .comment = currentToken().type {
             advance()
