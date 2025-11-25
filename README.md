@@ -183,10 +183,30 @@ A pure Swift implementation offers:
 
 PySwiftAST successfully parses complex real-world Python code:
 
+- **Django query.py** (2,886 lines, 111 KB) - Django ORM query module, full parse + round-trip
 - **Data Pipeline** (311 lines, 1,994 tokens) - Complex data processing with pandas
 - **Web Framework** (412 lines, 2,515 tokens) - FastAPI-style web framework
 - **ML Pipeline** (482 lines, 3,112 tokens) - Machine learning with PyTorch patterns
 - **Pattern Matching** (480 lines, 2,794 tokens) - Comprehensive match/case examples
+
+## ⚡ Performance
+
+PySwiftAST is **faster than Python's built-in `ast` module**:
+
+```bash
+python3 benchmark.py
+```
+
+**Benchmark Results** (Django query.py, 2,886 lines):
+
+| Parser | Median | Mean | P95 | Speedup |
+|--------|--------|------|-----|---------|
+| Python ast | 8.943 ms | 9.017 ms | 9.527 ms | 1.00x |
+| **PySwiftAST** | **6.537 ms** | **6.564 ms** | **6.967 ms** | **1.37x** |
+
+✨ **PySwiftAST is 1.37x faster than Python's ast module**
+
+*Benchmark: 100 iterations with 10 warmup runs, release build, macOS*
 
 ## Testing
 

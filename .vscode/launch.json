@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:PySwiftAST}",
+            "name": "Debug pyswift-benchmark",
+            "target": "pyswift-benchmark",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug pyswift-benchmark"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:PySwiftAST}",
+            "name": "Release pyswift-benchmark",
+            "target": "pyswift-benchmark",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release pyswift-benchmark"
+        }
+    ]
+}
