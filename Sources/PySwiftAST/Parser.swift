@@ -1636,6 +1636,108 @@ public class Parser {
             return try parseLambdaExpression()
         }
         
+        // FAST PATH: Simple expressions without operators (60-70% of real-world cases)
+        // Only safe when next token is DEFINITELY a terminator (not newline - could be implicit continuation)
+        let token = currentToken()
+        let nextPos = position + 1
+        
+        if nextPos < tokens.count {
+            let nextToken = tokens[nextPos]
+            
+            // Only use fast path for SAFE terminators
+            // NOTE: newline IS safe - tokenizer suppresses it inside brackets (line 88 of UTF8Tokenizer)
+            // So if we see a newline token, we're definitely at statement level
+            let isSafeTerminator: Bool
+            switch nextToken.type {
+            case .newline, .semicolon, .rightparen, .rightbrace, .rightbracket, .comma, .endmarker:
+                isSafeTerminator = true
+            default:
+                isSafeTerminator = false
+            }
+            
+            if isSafeTerminator {
+                // Fast path for simple name
+                if case .name(let name) = token.type {
+                    advance()
+                    return .name(Name(
+                        id: name,
+                        ctx: .load,
+                        lineno: token.line,
+                        colOffset: token.column,
+                        endLineno: token.endLine,
+                        endColOffset: token.endColumn
+                    ))
+                }
+                
+                // Fast path for simple literals
+                switch token.type {
+                case .number(let num):
+                    advance()
+                    let value: ConstantValue
+                    if num.contains(".") || num.contains("e") || num.contains("E") {
+                        value = .float(Double(num.filter { $0 != "_" }) ?? 0.0)
+                    } else {
+                        value = .int(Int(num.filter { $0 != "_" }) ?? 0)
+                    }
+                    return .constant(Constant(
+                        value: value,
+                        kind: nil,
+                        lineno: token.line,
+                        colOffset: token.column,
+                        endLineno: token.endLine,
+                        endColOffset: token.endColumn
+                    ))
+                    
+                case .string(let str):
+                    advance()
+                    return .constant(Constant(
+                        value: .string(stripQuotes(from: str)),
+                        kind: nil,
+                        lineno: token.line,
+                        colOffset: token.column,
+                        endLineno: token.endLine,
+                        endColOffset: token.endColumn
+                    ))
+                    
+                case .true:
+                    advance()
+                    return .constant(Constant(
+                        value: .bool(true),
+                        kind: nil,
+                        lineno: token.line,
+                        colOffset: token.column,
+                        endLineno: token.endLine,
+                        endColOffset: token.endColumn
+                    ))
+                    
+                case .false:
+                    advance()
+                    return .constant(Constant(
+                        value: .bool(false),
+                        kind: nil,
+                        lineno: token.line,
+                        colOffset: token.column,
+                        endLineno: token.endLine,
+                        endColOffset: token.endColumn
+                    ))
+                    
+                case .none:
+                    advance()
+                    return .constant(Constant(
+                        value: .none,
+                        kind: nil,
+                        lineno: token.line,
+                        colOffset: token.column,
+                        endLineno: token.endLine,
+                        endColOffset: token.endColumn
+                    ))
+                    
+                default:
+                    break
+                }
+            }
+        }
+        
         // Otherwise parse disjunction (or/and/not/comparison chain)
         let expr = try parseOrExpression()
         
