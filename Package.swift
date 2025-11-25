@@ -15,7 +15,7 @@ let package = Package(
             targets: ["PySwiftCodeGen"]),
         .executable(
             name: "pyswift-benchmark",
-            targets: ["PySwiftBenchmark"]),
+            targets: ["pyswift-benchmark"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-algorithms", from: "1.2.0"),
@@ -40,7 +40,7 @@ let package = Package(
             ]
         ),
         .executableTarget(
-            name: "PySwiftBenchmark",
+            name: "pyswift-benchmark",
             dependencies: ["PySwiftAST", "PySwiftCodeGen"]
         ),
         .testTarget(
