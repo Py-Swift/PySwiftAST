@@ -42,6 +42,23 @@
       "status": "reverted",
       "tests_passing": true,
       "notes": "Inline hints provided minimal parsing improvement (<1%) but caused round-trip regression. Reverted per guidelines."
+    },
+    {
+      "date": "2025-11-25T11:12:00Z",
+      "commit": "in-progress",
+      "optimization": "Convert Tokenizer to use [Character] array for O(1) indexing",
+      "parsing_median_ms": 6.185,
+      "roundtrip_median_ms": 25.609,
+      "tokenization_median_ms": 43.834,
+      "codegen_median_ms": 4.939,
+      "speedup_vs_python_parsing": 1.40,
+      "speedup_vs_python_roundtrip": 1.18,
+      "delta_parsing_percent": -3.2,
+      "delta_roundtrip_percent": -12.1,
+      "delta_tokenization_percent": -49.4,
+      "status": "improved",
+      "tests_passing": true,
+      "notes": "MAJOR WIN: Converted String.Index (O(n)) to Int indexing on character array. Tokenization improved 49.4% (86.6ms → 43.8ms, nearly 2x faster!). Parsing improved 3.2%, round-trip improved 12.1%. All 80 tests passing. This addresses the primary bottleneck identified in profiling."
     }
   ]
 }

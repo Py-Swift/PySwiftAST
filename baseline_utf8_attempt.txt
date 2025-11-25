@@ -1,0 +1,130 @@
+warning: 'pyswiftast': found 1 file(s) which are unhandled; explicitly declare them as resources or exclude from the target
+    /Volumes/CodeSSD/GitHub/PySwiftAST/Tests/PySwiftASTTests/PERFORMANCE.md
+[0/1] Planning build
+Building for production...
+[0/6] Write sources
+[3/9] Write swift-version--72D690B0967815CF.txt
+[4/9] Compiling _NumericsShims _NumericsShims.c
+[6/10] Compiling RealModule AlgebraicField.swift
+[7/11] Compiling Algorithms AdjacentPairs.swift
+[8/12] Compiling PySwiftAST ASTNode.swift
+[9/14] Compiling PySwiftCodeGen Assignments+CodeGen.swift
+[10/16] Compiling PySwiftBenchmark main.swift
+[10/16] Write Objects.LinkFileList
+[11/16] Linking pyswift-benchmark
+[13/16] Compiling PySwiftCodeGenTests PySwiftCodeGenTests.swift
+[14/16] Compiling PySwiftASTTests PerformanceTests.swift
+/Volumes/CodeSSD/GitHub/PySwiftAST/Tests/PySwiftASTTests/PySwiftASTTests.swift:1204:9: warning: initialization of immutable value 'reparsedModule' was never used; consider replacing with assignment to '_' or removing it [#no-usage]
+1202 |     print("✅ Code generation successful: \(generatedCode.components(separatedBy: "\n").count) lines")
+1203 |     
+1204 |     let reparsedModule = try parsePython(generatedCode)
+     |         `- warning: initialization of immutable value 'reparsedModule' was never used; consider replacing with assignment to '_' or removing it [#no-usage]
+1205 |     print("✅ Reparsing successful - round-trip complete")
+1206 |     
+[15/17] Compiling PySwiftASTPackageTests runner.swift
+[15/17] Write Objects.LinkFileList
+[16/17] Linking PySwiftASTPackageTests
+Build complete! (23.83s)
+Test Suite 'Selected tests' started at 2025-11-25 11:06:44.467.
+Test Suite 'PySwiftASTPackageTests.xctest' started at 2025-11-25 11:06:44.474.
+Test Suite 'PerformanceTests' started at 2025-11-25 11:06:44.474.
+Test Case '-[PySwiftASTTests.PerformanceTests testCodeGenerationPerformance]' started.
+Test Case '-[PySwiftASTTests.PerformanceTests testCodeGenerationPerformance]' passed (0.655 seconds).
+Test Case '-[PySwiftASTTests.PerformanceTests testParsingPerformance_Django]' started.
+Test Case '-[PySwiftASTTests.PerformanceTests testParsingPerformance_Django]' passed (0.840 seconds).
+Test Case '-[PySwiftASTTests.PerformanceTests testRoundtripPerformance_Django]' started.
+Test Case '-[PySwiftASTTests.PerformanceTests testRoundtripPerformance_Django]' passed (3.438 seconds).
+Test Case '-[PySwiftASTTests.PerformanceTests testTokenizationPerformance]' started.
+Test Case '-[PySwiftASTTests.PerformanceTests testTokenizationPerformance]' passed (9.663 seconds).
+Test Suite 'PerformanceTests' passed at 2025-11-25 11:06:59.071.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 14.596 (14.597) seconds
+Test Suite 'PySwiftASTPackageTests.xctest' passed at 2025-11-25 11:06:59.071.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 14.596 (14.597) seconds
+Test Suite 'Selected tests' passed at 2025-11-25 11:06:59.071.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 14.596 (14.604) seconds
+
+======================================================================
+CODE GENERATION PERFORMANCE TEST
+======================================================================
+
+Code Generation (100 iterations):
+  Min:       4.630 ms
+  Median:    4.954 ms
+  Mean:      5.039 ms
+  P95:       5.644 ms
+  P99:       7.385 ms
+  Max:       7.385 ms
+
+💡 Optimization opportunities:
+   - String concatenation vs String builder
+   - Indentation caching
+   - Reduce allocations in hot paths
+======================================================================
+
+
+======================================================================
+PARSING PERFORMANCE TEST - Django query.py
+Build mode: RELEASE ✅
+File size: 111746 bytes, 2578 lines
+======================================================================
+
+PySwiftAST Parsing (100 iterations):
+  Min:       5.999 ms
+  Median:    6.391 ms
+  Mean:      6.418 ms
+  P95:       6.862 ms
+  P99:       7.106 ms
+  Max:       7.106 ms
+
+Performance vs Python ast.parse():
+  Current speedup: 1.36x
+  Target speedup:  1.35x
+  ✅ PASS: Meeting current target
+  🎯 Room for optimization: Target is 2.0x+
+======================================================================
+
+
+======================================================================
+ROUND-TRIP PERFORMANCE TEST - Django query.py
+Build mode: RELEASE ✅
+Operation: parse → generate → reparse
+======================================================================
+
+PySwiftAST Round-trip (100 iterations):
+  Min:      27.864 ms
+  Median:   29.141 ms
+  Mean:     29.447 ms
+  P95:      30.152 ms
+  P99:      63.260 ms
+  Max:      63.260 ms
+
+Performance vs Python (parse + unparse + reparse):
+  Current speedup: 1.04x
+  Target speedup:  1.04x
+  Goal speedup:    1.50x+
+  ⚠️  REGRESSION: Below baseline performance
+======================================================================
+
+
+======================================================================
+TOKENIZATION PERFORMANCE TEST
+======================================================================
+
+Tokenization (100 iterations):
+  Min:      84.793 ms
+  Median:   86.557 ms
+  Mean:     87.804 ms
+  P95:      92.314 ms
+  P99:     145.299 ms
+  Max:     145.299 ms
+
+💡 Optimization opportunities:
+   - Character processing (UTF-8 vs UTF-16)
+   - String scanning efficiency
+   - Token array allocation strategies
+======================================================================
+
+◇ Test run started.
+↳ Testing Library Version: 6.2 (3fdabe5392108d8)
+↳ Target Platform: x86_64-apple-macosx
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

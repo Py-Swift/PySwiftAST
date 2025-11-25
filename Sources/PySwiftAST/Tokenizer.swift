@@ -1,10 +1,11 @@
 import Foundation
 
 /// Python tokenizer that converts source code into tokens
-/// Handles Python's indentation-based syntax with INDENT/DEDENT tokens
+/// Handles Python's indentation-based syntax with INDENT/DEDENT tokens  
 public class Tokenizer {
     private let source: String
-    private var position: String.Index
+    private let chars: [Character]     // O(1) indexed character array
+    private var position: Int           // Integer index for O(1) access
     private var line: Int = 1
     private var column: Int = 1
     private var indentStack: [Int] = [0]
@@ -18,7 +19,8 @@ public class Tokenizer {
     
     public init(source: String) {
         self.source = source
-        self.position = source.startIndex
+        self.chars = Array(source)     // Convert once at init for O(1) access
+        self.position = 0
     }
     
     /// Tokenize the entire source and return all tokens
@@ -44,7 +46,7 @@ public class Tokenizer {
         }
         
         // Handle end of file
-        if position >= source.endIndex {
+        if position >= chars.count {
             // Emit DEDENT tokens for remaining indentation
             if indentStack.count > 1 {
                 indentStack.removeLast()
@@ -60,11 +62,11 @@ public class Tokenizer {
         
         skipWhitespace()
         
-        if position >= source.endIndex {
+        if position >= chars.count {
             return Token(type: .endmarker, value: "", line: line, column: column, endLine: line, endColumn: column)
         }
         
-        let char = source[position]
+        let char = chars[position]
         
         // Comments
         if char == "#" {
@@ -75,9 +77,9 @@ public class Tokenizer {
         if char == "\n" || char == "\r" {
             if parenDepth > 0 || bracketDepth > 0 || braceDepth > 0 {
                 // Skip newline inside brackets
-                if source[position] == "\r" {
+                if chars[position] == "\r" {
                     advance()
-                    if position < source.endIndex && source[position] == "\n" {
+                    if position < chars.count && chars[position] == "\n" {
                         advance()
                     }
                 } else {
@@ -114,8 +116,8 @@ public class Tokenizer {
         atLineStart = false
         
         var indent = 0
-        while position < source.endIndex {
-            let char = source[position]
+        while position < chars.count {
+            let char = chars[position]
             if char == " " {
                 indent += 1
                 advance()
@@ -128,15 +130,15 @@ public class Tokenizer {
         }
         
         // Skip blank lines and comments
-        if position < source.endIndex && (source[position] == "\n" || source[position] == "\r" || source[position] == "#") {
-            if source[position] == "#" {
+        if position < chars.count && (chars[position] == "\n" || chars[position] == "\r" || chars[position] == "#") {
+            if chars[position] == "#" {
                 return scanComment()
             }
             return scanNewline()
         }
         
         // Check if end of file
-        if position >= source.endIndex {
+        if position >= chars.count {
             if indentStack.count > 1 {
                 indentStack.removeLast()
                 return Token(type: .dedent, value: "", line: line, column: column, endLine: line, endColumn: column)
@@ -178,8 +180,8 @@ public class Tokenizer {
         
         advance() // skip '#'
         
-        while position < source.endIndex && source[position] != "\n" && source[position] != "\r" {
-            value.append(source[position])
+        while position < chars.count && chars[position] != "\n" && chars[position] != "\r" {
+            value.append(chars[position])
             advance()
         }
         
@@ -195,9 +197,9 @@ public class Tokenizer {
         let startLine = line
         let startColumn = column
         
-        if source[position] == "\r" {
+        if chars[position] == "\r" {
             advance()
-            if position < source.endIndex && source[position] == "\n" {
+            if position < chars.count && chars[position] == "\n" {
                 advance()
             }
         } else {
@@ -211,17 +213,17 @@ public class Tokenizer {
     private func scanString() throws -> Token {
         let startLine = line
         let startColumn = column
-        let quote = source[position]
+        let quote = chars[position]
         var value = ""
         value.append(quote)
         advance()
         
         // Check for triple-quoted strings
         var tripleQuote = false
-        if position < source.endIndex && source[position] == quote {
+        if position < chars.count && chars[position] == quote {
             value.append(quote)
             advance()
-            if position < source.endIndex && source[position] == quote {
+            if position < chars.count && chars[position] == quote {
                 value.append(quote)
                 advance()
                 tripleQuote = true
@@ -231,14 +233,14 @@ public class Tokenizer {
             }
         }
         
-        while position < source.endIndex {
-            let char = source[position]
+        while position < chars.count {
+            let char = chars[position]
             
             if char == "\\" && !tripleQuote {
                 value.append(char)
                 advance()
-                if position < source.endIndex {
-                    value.append(source[position])
+                if position < chars.count {
+                    value.append(chars[position])
                     advance()
                 }
             } else if char == quote {
@@ -246,10 +248,10 @@ public class Tokenizer {
                 advance()
                 
                 if tripleQuote {
-                    if position < source.endIndex && source[position] == quote {
+                    if position < chars.count && chars[position] == quote {
                         value.append(quote)
                         advance()
-                        if position < source.endIndex && source[position] == quote {
+                        if position < chars.count && chars[position] == quote {
                             value.append(quote)
                             advance()
                             break
@@ -273,17 +275,17 @@ public class Tokenizer {
         var value = ""
         
         // Handle hex, octal, binary
-        if source[position] == "0" && position < source.index(before: source.endIndex) {
-            let nextPos = source.index(after: position)
-            let nextChar = source[nextPos]
+        if chars[position] == "0" && position < (chars.count - 1) {
+            let nextPos = position + 1
+            let nextChar = chars[nextPos]
             if nextChar == "x" || nextChar == "X" || nextChar == "o" || nextChar == "O" || nextChar == "b" || nextChar == "B" {
-                value.append(source[position])
+                value.append(chars[position])
                 advance()
-                value.append(source[position])
+                value.append(chars[position])
                 advance()
                 
-                while position < source.endIndex && (source[position].isHexDigit || source[position] == "_") {
-                    value.append(source[position])
+                while position < chars.count && (chars[position].isHexDigit || chars[position] == "_") {
+                    value.append(chars[position])
                     advance()
                 }
                 
@@ -292,44 +294,44 @@ public class Tokenizer {
         }
         
         // Regular number
-        while position < source.endIndex && (source[position].isNumber || source[position] == "_") {
-            value.append(source[position])
+        while position < chars.count && (chars[position].isNumber || chars[position] == "_") {
+            value.append(chars[position])
             advance()
         }
         
         // Decimal point
-        if position < source.endIndex && source[position] == "." {
-            let nextPos = source.index(after: position)
-            if nextPos < source.endIndex && source[nextPos].isNumber {
-                value.append(source[position])
+        if position < chars.count && chars[position] == "." {
+            let nextPos = position + 1
+            if nextPos < chars.count && chars[nextPos].isNumber {
+                value.append(chars[position])
                 advance()
                 
-                while position < source.endIndex && (source[position].isNumber || source[position] == "_") {
-                    value.append(source[position])
+                while position < chars.count && (chars[position].isNumber || chars[position] == "_") {
+                    value.append(chars[position])
                     advance()
                 }
             }
         }
         
         // Exponent
-        if position < source.endIndex && (source[position] == "e" || source[position] == "E") {
-            value.append(source[position])
+        if position < chars.count && (chars[position] == "e" || chars[position] == "E") {
+            value.append(chars[position])
             advance()
             
-            if position < source.endIndex && (source[position] == "+" || source[position] == "-") {
-                value.append(source[position])
+            if position < chars.count && (chars[position] == "+" || chars[position] == "-") {
+                value.append(chars[position])
                 advance()
             }
             
-            while position < source.endIndex && (source[position].isNumber || source[position] == "_") {
-                value.append(source[position])
+            while position < chars.count && (chars[position].isNumber || chars[position] == "_") {
+                value.append(chars[position])
                 advance()
             }
         }
         
         // Imaginary suffix
-        if position < source.endIndex && (source[position] == "j" || source[position] == "J") {
-            value.append(source[position])
+        if position < chars.count && (chars[position] == "j" || chars[position] == "J") {
+            value.append(chars[position])
             advance()
         }
         
@@ -341,8 +343,8 @@ public class Tokenizer {
         let startColumn = column
         var value = ""
         
-        while position < source.endIndex && (source[position].isLetter || source[position].isNumber || source[position] == "_") {
-            value.append(source[position])
+        while position < chars.count && (chars[position].isLetter || chars[position].isNumber || chars[position] == "_") {
+            value.append(chars[position])
             advance()
         }
         
@@ -353,7 +355,7 @@ public class Tokenizer {
     private func scanOperatorOrDelimiter() throws -> Token {
         let startLine = line
         let startColumn = column
-        let char = source[position]
+        let char = chars[position]
         
         // Three character operators (check first - they're longer!)
         if let threeChar = peekString(3), let type = threeCharOperator(threeChar) {
@@ -512,8 +514,8 @@ public class Tokenizer {
     }
     
     private func skipWhitespace() {
-        while position < source.endIndex {
-            let char = source[position]
+        while position < chars.count {
+            let char = chars[position]
             if char == " " || char == "\t" {
                 advance()
             } else {
@@ -522,15 +524,16 @@ public class Tokenizer {
         }
     }
     
+    @inline(__always)
     private func advance() {
-        if position < source.endIndex {
-            if source[position] == "\n" {
+        if position < chars.count {
+            if chars[position] == "\n" {
                 line += 1
                 column = 1
             } else {
                 column += 1
             }
-            position = source.index(after: position)
+            position += 1  // Simple integer increment - O(1)
         }
     }
     
@@ -539,11 +542,11 @@ public class Tokenizer {
         var pos = position
         
         for _ in 0..<count {
-            if pos >= source.endIndex {
+            if pos >= chars.count {
                 return nil
             }
-            result.append(source[pos])
-            pos = source.index(after: pos)
+            result.append(chars[pos])
+            pos += 1  // Simple integer increment
         }
         
         return result

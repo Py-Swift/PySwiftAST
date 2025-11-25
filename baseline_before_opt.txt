@@ -1,0 +1,107 @@
+Building for production...
+[0/3] Write swift-version--72D690B0967815CF.txt
+Build complete! (0.14s)
+Test Suite 'Selected tests' started at 2025-11-25 10:52:30.072.
+Test Suite 'PySwiftASTPackageTests.xctest' started at 2025-11-25 10:52:30.079.
+Test Suite 'PerformanceTests' started at 2025-11-25 10:52:30.079.
+Test Case '-[PySwiftASTTests.PerformanceTests testCodeGenerationPerformance]' started.
+Test Case '-[PySwiftASTTests.PerformanceTests testCodeGenerationPerformance]' passed (0.673 seconds).
+Test Case '-[PySwiftASTTests.PerformanceTests testParsingPerformance_Django]' started.
+Test Case '-[PySwiftASTTests.PerformanceTests testParsingPerformance_Django]' passed (0.862 seconds).
+Test Case '-[PySwiftASTTests.PerformanceTests testRoundtripPerformance_Django]' started.
+Test Case '-[PySwiftASTTests.PerformanceTests testRoundtripPerformance_Django]' passed (3.433 seconds).
+Test Case '-[PySwiftASTTests.PerformanceTests testTokenizationPerformance]' started.
+Test Case '-[PySwiftASTTests.PerformanceTests testTokenizationPerformance]' passed (9.778 seconds).
+Test Suite 'PerformanceTests' passed at 2025-11-25 10:52:44.825.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 14.746 (14.747) seconds
+Test Suite 'PySwiftASTPackageTests.xctest' passed at 2025-11-25 10:52:44.825.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 14.746 (14.747) seconds
+Test Suite 'Selected tests' passed at 2025-11-25 10:52:44.825.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 14.746 (14.754) seconds
+
+======================================================================
+CODE GENERATION PERFORMANCE TEST
+======================================================================
+
+Code Generation (100 iterations):
+  Min:       4.495 ms
+  Median:    4.876 ms
+  Mean:      5.232 ms
+  P95:       5.315 ms
+  P99:      26.294 ms
+  Max:      26.294 ms
+
+💡 Optimization opportunities:
+   - String concatenation vs String builder
+   - Indentation caching
+   - Reduce allocations in hot paths
+======================================================================
+
+
+======================================================================
+PARSING PERFORMANCE TEST - Django query.py
+Build mode: RELEASE ✅
+File size: 111746 bytes, 2578 lines
+======================================================================
+
+PySwiftAST Parsing (100 iterations):
+  Min:       5.822 ms
+  Median:    6.365 ms
+  Mean:      6.657 ms
+  P95:       6.952 ms
+  P99:      28.591 ms
+  Max:      28.591 ms
+
+Performance vs Python ast.parse():
+  Current speedup: 1.36x
+  Target speedup:  1.35x
+  ✅ PASS: Meeting current target
+  🎯 Room for optimization: Target is 2.0x+
+======================================================================
+
+
+======================================================================
+ROUND-TRIP PERFORMANCE TEST - Django query.py
+Build mode: RELEASE ✅
+Operation: parse → generate → reparse
+======================================================================
+
+PySwiftAST Round-trip (100 iterations):
+  Min:      27.803 ms
+  Median:   28.759 ms
+  Mean:     29.103 ms
+  P95:      29.987 ms
+  P99:      40.014 ms
+  Max:      40.014 ms
+
+Performance vs Python (parse + unparse + reparse):
+  Current speedup: 1.05x
+  Target speedup:  1.04x
+  Goal speedup:    1.50x+
+  ✅ PASS: Meeting current target
+  🎯 Room for optimization: Target is 1.5x+
+======================================================================
+
+
+======================================================================
+TOKENIZATION PERFORMANCE TEST
+======================================================================
+
+Tokenization (100 iterations):
+  Min:      85.925 ms
+  Median:   88.201 ms
+  Mean:     89.008 ms
+  P95:      90.679 ms
+  P99:     126.606 ms
+  Max:     126.606 ms
+
+💡 Optimization opportunities:
+   - Character processing (UTF-8 vs UTF-16)
+   - String scanning efficiency
+   - Token array allocation strategies
+======================================================================
+
+◇ Test run started.
+↳ Testing Library Version: 6.2 (3fdabe5392108d8)
+↳ Target Platform: x86_64-apple-macosx
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.
