@@ -1,5 +1,5 @@
 /// Python expression types
-public indirect enum Expression: ASTNode {
+public indirect enum Expression: ASTNode, Sendable {
     case boolOp(BoolOp)
     case namedExpr(NamedExpr)
     case binOp(BinOp)

@@ -1,5 +1,5 @@
 /// Constant value
-public struct Constant: ASTNode {
+public struct Constant: ASTNode, Sendable {
     public var value: ConstantValue
     public var kind: String?
     public var lineno: Int
@@ -26,7 +26,7 @@ public struct Constant: ASTNode {
 }
 
 /// Constant value types
-public enum ConstantValue {
+public enum ConstantValue: Sendable {
     case none
     case bool(Bool)
     case int(Int)
@@ -38,7 +38,7 @@ public enum ConstantValue {
 }
 
 /// Variable name
-public struct Name: ASTNode {
+public struct Name: ASTNode, Sendable {
     public var id: String
     public var ctx: ExprContext
     public var lineno: Int

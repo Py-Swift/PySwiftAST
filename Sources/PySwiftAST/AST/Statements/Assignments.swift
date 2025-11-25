@@ -1,5 +1,5 @@
 /// Assignment statement
-public struct Assign: ASTNode {
+public struct Assign: ASTNode, Sendable {
     public var targets: [Expression]
     public var value: Expression
     public var typeComment: String?
@@ -29,7 +29,7 @@ public struct Assign: ASTNode {
 }
 
 /// Augmented assignment (+=, -=, etc.)
-public struct AugAssign: ASTNode {
+public struct AugAssign: ASTNode, Sendable {
     public var target: Expression
     public var op: Operator
     public var value: Expression
@@ -59,7 +59,7 @@ public struct AugAssign: ASTNode {
 }
 
 /// Annotated assignment
-public struct AnnAssign: ASTNode {
+public struct AnnAssign: ASTNode, Sendable {
     public var target: Expression
     public var annotation: Expression
     public var value: Expression?
@@ -92,7 +92,7 @@ public struct AnnAssign: ASTNode {
 }
 
 /// Delete statement
-public struct Delete: ASTNode {
+public struct Delete: ASTNode, Sendable {
     public var targets: [Expression]
     public var lineno: Int
     public var colOffset: Int

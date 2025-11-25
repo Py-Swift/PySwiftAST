@@ -1,5 +1,5 @@
 /// Named expression (walrus operator :=)
-public struct NamedExpr: ASTNode {
+public struct NamedExpr: ASTNode, Sendable {
     public var target: Expression
     public var value: Expression
     public var lineno: Int
@@ -26,7 +26,7 @@ public struct NamedExpr: ASTNode {
 }
 
 /// Starred expression (*args)
-public struct Starred: ASTNode {
+public struct Starred: ASTNode, Sendable {
     public var value: Expression
     public var ctx: ExprContext
     public var lineno: Int

@@ -1,5 +1,5 @@
 /// List comprehension
-public struct ListComp: ASTNode {
+public struct ListComp: ASTNode, Sendable {
     public var elt: Expression
     public var generators: [Comprehension]
     public var lineno: Int
@@ -26,7 +26,7 @@ public struct ListComp: ASTNode {
 }
 
 /// Set comprehension
-public struct SetComp: ASTNode {
+public struct SetComp: ASTNode, Sendable {
     public var elt: Expression
     public var generators: [Comprehension]
     public var lineno: Int
@@ -53,7 +53,7 @@ public struct SetComp: ASTNode {
 }
 
 /// Dictionary comprehension
-public struct DictComp: ASTNode {
+public struct DictComp: ASTNode, Sendable {
     public var key: Expression
     public var value: Expression
     public var generators: [Comprehension]
@@ -83,7 +83,7 @@ public struct DictComp: ASTNode {
 }
 
 /// Generator expression
-public struct GeneratorExp: ASTNode {
+public struct GeneratorExp: ASTNode, Sendable {
     public var elt: Expression
     public var generators: [Comprehension]
     public var lineno: Int

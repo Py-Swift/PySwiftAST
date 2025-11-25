@@ -1,5 +1,5 @@
 /// Lambda expression
-public struct Lambda: ASTNode {
+public struct Lambda: ASTNode, Sendable {
     public var args: Arguments
     public var body: Expression
     public var lineno: Int

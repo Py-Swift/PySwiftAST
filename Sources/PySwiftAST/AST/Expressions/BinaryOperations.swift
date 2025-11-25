@@ -1,5 +1,5 @@
 /// Boolean operation (and, or)
-public struct BoolOp: ASTNode {
+public struct BoolOp: ASTNode, Sendable {
     public var op: BoolOperator
     public var values: [Expression]
     public var lineno: Int
@@ -26,7 +26,7 @@ public struct BoolOp: ASTNode {
 }
 
 /// Binary operation (+, -, *, etc.)
-public struct BinOp: ASTNode {
+public struct BinOp: ASTNode, Sendable {
     public var left: Expression
     public var op: Operator
     public var right: Expression
@@ -56,7 +56,7 @@ public struct BinOp: ASTNode {
 }
 
 /// Unary operation (-, ~, not)
-public struct UnaryOp: ASTNode {
+public struct UnaryOp: ASTNode, Sendable {
     public var op: UnaryOperator
     public var operand: Expression
     public var lineno: Int
@@ -83,7 +83,7 @@ public struct UnaryOp: ASTNode {
 }
 
 /// Comparison operation
-public struct Compare: ASTNode {
+public struct Compare: ASTNode, Sendable {
     public var left: Expression
     public var ops: [CmpOp]
     public var comparators: [Expression]

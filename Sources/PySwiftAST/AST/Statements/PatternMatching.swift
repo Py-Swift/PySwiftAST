@@ -1,5 +1,5 @@
 /// Match statement (Python 3.10+)
-public struct Match: ASTNode {
+public struct Match: ASTNode, Sendable {
     public var subject: Expression
     public var cases: [MatchCase]
     public var lineno: Int

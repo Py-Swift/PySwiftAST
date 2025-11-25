@@ -1,5 +1,5 @@
 /// Pattern matching patterns (Python 3.10+)
-public indirect enum Pattern {
+public indirect enum Pattern: Sendable {
     case matchValue(MatchValue)
     case matchSingleton(MatchSingleton)
     case matchSequence(MatchSequence)
@@ -11,7 +11,7 @@ public indirect enum Pattern {
 }
 
 /// Match value pattern
-public struct MatchValue {
+public struct MatchValue: Sendable {
     public var value: Expression
     
     public init(value: Expression) {
@@ -20,7 +20,7 @@ public struct MatchValue {
 }
 
 /// Match singleton pattern
-public struct MatchSingleton {
+public struct MatchSingleton: Sendable {
     public var value: ConstantValue
     
     public init(value: ConstantValue) {
@@ -29,7 +29,7 @@ public struct MatchSingleton {
 }
 
 /// Match sequence pattern
-public struct MatchSequence {
+public struct MatchSequence: Sendable {
     public var patterns: [Pattern]
     
     public init(patterns: [Pattern]) {
@@ -38,7 +38,7 @@ public struct MatchSequence {
 }
 
 /// Match mapping pattern
-public struct MatchMapping {
+public struct MatchMapping: Sendable {
     public var keys: [Expression]
     public var patterns: [Pattern]
     public var rest: String?
@@ -55,7 +55,7 @@ public struct MatchMapping {
 }
 
 /// Match class pattern
-public struct MatchClass {
+public struct MatchClass: Sendable {
     public var cls: Expression
     public var patterns: [Pattern]
     public var kwdAttrs: [String]
@@ -75,7 +75,7 @@ public struct MatchClass {
 }
 
 /// Match star pattern
-public struct MatchStar {
+public struct MatchStar: Sendable {
     public var name: String?
     
     public init(name: String?) {
@@ -84,7 +84,7 @@ public struct MatchStar {
 }
 
 /// Match as pattern
-public struct MatchAs {
+public struct MatchAs: Sendable {
     public var pattern: Pattern?
     public var name: String?
     
@@ -98,7 +98,7 @@ public struct MatchAs {
 }
 
 /// Match or pattern
-public struct MatchOr {
+public struct MatchOr: Sendable {
     public var patterns: [Pattern]
     
     public init(patterns: [Pattern]) {

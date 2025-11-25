@@ -1,5 +1,5 @@
 /// With statement
-public struct With: ASTNode {
+public struct With: ASTNode, Sendable {
     public var items: [WithItem]
     public var body: [Statement]
     public var typeComment: String?
@@ -29,7 +29,7 @@ public struct With: ASTNode {
 }
 
 /// Async with statement
-public struct AsyncWith: ASTNode {
+public struct AsyncWith: ASTNode, Sendable {
     public var items: [WithItem]
     public var body: [Statement]
     public var typeComment: String?

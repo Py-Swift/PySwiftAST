@@ -1,5 +1,5 @@
 /// Function/method call
-public struct Call: ASTNode {
+public struct Call: ASTNode, Sendable {
     public var fun: Expression
     public var args: [Expression]
     public var keywords: [Keyword]
@@ -29,7 +29,7 @@ public struct Call: ASTNode {
 }
 
 /// Attribute access (obj.attr)
-public struct Attribute: ASTNode {
+public struct Attribute: ASTNode, Sendable {
     public var value: Expression
     public var attr: String
     public var ctx: ExprContext
@@ -59,7 +59,7 @@ public struct Attribute: ASTNode {
 }
 
 /// Subscript access (obj[key])
-public struct Subscript: ASTNode {
+public struct Subscript: ASTNode, Sendable {
     public var value: Expression
     public var slice: Expression
     public var ctx: ExprContext
@@ -89,7 +89,7 @@ public struct Subscript: ASTNode {
 }
 
 /// Slice expression
-public struct Slice: ASTNode {
+public struct Slice: ASTNode, Sendable {
     public var lower: Expression?
     public var upper: Expression?
     public var step: Expression?

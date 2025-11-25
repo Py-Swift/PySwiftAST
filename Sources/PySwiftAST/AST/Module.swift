@@ -1,5 +1,5 @@
 /// Python module types
-public enum Module {
+public enum Module: Sendable {
     case module([Statement])
     case interactive([Statement])
     case expression(Expression)

@@ -1,5 +1,5 @@
 /// Await expression
-public struct Await: ASTNode {
+public struct Await: ASTNode, Sendable {
     public var value: Expression
     public var lineno: Int
     public var colOffset: Int
@@ -23,7 +23,7 @@ public struct Await: ASTNode {
 }
 
 /// Yield expression
-public struct Yield: ASTNode {
+public struct Yield: ASTNode, Sendable {
     public var value: Expression?
     public var lineno: Int
     public var colOffset: Int
@@ -47,7 +47,7 @@ public struct Yield: ASTNode {
 }
 
 /// Yield from expression
-public struct YieldFrom: ASTNode {
+public struct YieldFrom: ASTNode, Sendable {
     public var value: Expression
     public var lineno: Int
     public var colOffset: Int

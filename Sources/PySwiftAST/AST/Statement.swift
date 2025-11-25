@@ -1,5 +1,5 @@
 /// Python statement types
-public indirect enum Statement: ASTNode {
+public indirect enum Statement: ASTNode, Sendable {
     case functionDef(FunctionDef)
     case asyncFunctionDef(AsyncFunctionDef)
     case classDef(ClassDef)

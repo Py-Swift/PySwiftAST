@@ -1,5 +1,5 @@
 /// Dictionary literal
-public struct Dict: ASTNode {
+public struct Dict: ASTNode, Sendable {
     public var keys: [Expression?]
     public var values: [Expression]
     public var lineno: Int
@@ -26,7 +26,7 @@ public struct Dict: ASTNode {
 }
 
 /// Set literal
-public struct Set: ASTNode {
+public struct Set: ASTNode, Sendable {
     public var elts: [Expression]
     public var lineno: Int
     public var colOffset: Int
@@ -50,7 +50,7 @@ public struct Set: ASTNode {
 }
 
 /// List literal
-public struct List: ASTNode {
+public struct List: ASTNode, Sendable {
     public var elts: [Expression]
     public var ctx: ExprContext
     public var lineno: Int
@@ -77,7 +77,7 @@ public struct List: ASTNode {
 }
 
 /// Tuple literal
-public struct Tuple: ASTNode {
+public struct Tuple: ASTNode, Sendable {
     public var elts: [Expression]
     public var ctx: ExprContext
     public var lineno: Int

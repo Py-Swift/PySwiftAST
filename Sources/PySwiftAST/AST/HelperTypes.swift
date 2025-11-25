@@ -1,5 +1,5 @@
 /// Function arguments
-public struct Arguments {
+public struct Arguments: Sendable {
     public var posonlyArgs: [Arg]
     public var args: [Arg]
     public var vararg: Arg?
@@ -28,7 +28,7 @@ public struct Arguments {
 }
 
 /// Function argument
-public struct Arg {
+public struct Arg: Sendable {
     public var arg: String
     public var annotation: Expression?
     public var typeComment: String?
@@ -45,7 +45,7 @@ public struct Arg {
 }
 
 /// Keyword argument
-public struct Keyword {
+public struct Keyword: Sendable {
     public var arg: String?
     public var value: Expression
     
@@ -59,7 +59,7 @@ public struct Keyword {
 }
 
 /// Import alias
-public struct Alias {
+public struct Alias: Sendable {
     public var name: String
     public var asName: String?
     
@@ -73,7 +73,7 @@ public struct Alias {
 }
 
 /// With statement item
-public struct WithItem {
+public struct WithItem: Sendable {
     public var contextExpr: Expression
     public var optionalVars: Expression?
     
@@ -87,7 +87,7 @@ public struct WithItem {
 }
 
 /// Match case
-public struct MatchCase {
+public struct MatchCase: Sendable {
     public var pattern: Pattern
     public var guardExpr: Expression?
     public var body: [Statement]
@@ -104,7 +104,7 @@ public struct MatchCase {
 }
 
 /// Exception handler
-public struct ExceptHandler {
+public struct ExceptHandler: Sendable {
     public var type: Expression?
     public var name: String?
     public var body: [Statement]
@@ -121,7 +121,7 @@ public struct ExceptHandler {
 }
 
 /// Comprehension clause
-public struct Comprehension {
+public struct Comprehension: Sendable {
     public var target: Expression
     public var iter: Expression
     public var ifs: [Expression]

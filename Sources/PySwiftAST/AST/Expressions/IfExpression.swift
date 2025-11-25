@@ -1,5 +1,5 @@
 /// Conditional expression (ternary operator)
-public struct IfExp: ASTNode {
+public struct IfExp: ASTNode, Sendable {
     public var test: Expression
     public var body: Expression
     public var orElse: Expression

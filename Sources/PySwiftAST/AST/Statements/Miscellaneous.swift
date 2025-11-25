@@ -1,5 +1,5 @@
 /// Global statement
-public struct Global: ASTNode {
+public struct Global: ASTNode, Sendable {
     public var names: [String]
     public var lineno: Int
     public var colOffset: Int
@@ -23,7 +23,7 @@ public struct Global: ASTNode {
 }
 
 /// Nonlocal statement
-public struct Nonlocal: ASTNode {
+public struct Nonlocal: ASTNode, Sendable {
     public var names: [String]
     public var lineno: Int
     public var colOffset: Int
@@ -47,7 +47,7 @@ public struct Nonlocal: ASTNode {
 }
 
 /// Expression statement
-public struct Expr: ASTNode {
+public struct Expr: ASTNode, Sendable {
     public var value: Expression
     public var lineno: Int
     public var colOffset: Int
@@ -71,7 +71,7 @@ public struct Expr: ASTNode {
 }
 
 /// Type alias statement (Python 3.12+)
-public struct TypeAlias: ASTNode {
+public struct TypeAlias: ASTNode, Sendable {
     public var name: Expression
     public var typeParams: [TypeParam]
     public var value: Expression

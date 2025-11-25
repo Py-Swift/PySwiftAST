@@ -1,5 +1,5 @@
 /// Function definition
-public struct FunctionDef: ASTNode {
+public struct FunctionDef: ASTNode, Sendable {
     public var name: String
     public var args: Arguments
     public var body: [Statement]
@@ -41,7 +41,7 @@ public struct FunctionDef: ASTNode {
 }
 
 /// Async function definition
-public struct AsyncFunctionDef: ASTNode {
+public struct AsyncFunctionDef: ASTNode, Sendable {
     public var name: String
     public var args: Arguments
     public var body: [Statement]

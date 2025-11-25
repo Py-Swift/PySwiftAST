@@ -1,5 +1,5 @@
 /// Raise statement
-public struct Raise: ASTNode {
+public struct Raise: ASTNode, Sendable {
     public var exc: Expression?
     public var cause: Expression?
     public var lineno: Int
@@ -26,7 +26,7 @@ public struct Raise: ASTNode {
 }
 
 /// Try statement
-public struct Try: ASTNode {
+public struct Try: ASTNode, Sendable {
     public var body: [Statement]
     public var handlers: [ExceptHandler]
     public var orElse: [Statement]
@@ -59,7 +59,7 @@ public struct Try: ASTNode {
 }
 
 /// Try-star statement (Python 3.11+)
-public struct TryStar: ASTNode {
+public struct TryStar: ASTNode, Sendable {
     public var body: [Statement]
     public var handlers: [ExceptHandler]
     public var orElse: [Statement]
@@ -92,7 +92,7 @@ public struct TryStar: ASTNode {
 }
 
 /// Assert statement
-public struct Assert: ASTNode {
+public struct Assert: ASTNode, Sendable {
     public var test: Expression
     public var msg: Expression?
     public var lineno: Int

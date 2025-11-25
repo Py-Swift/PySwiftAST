@@ -1,18 +1,18 @@
 /// Expression context for loading, storing, or deleting
-public enum ExprContext {
+public enum ExprContext: Sendable {
     case load
     case store
     case del
 }
 
 /// Boolean operators
-public enum BoolOperator {
+public enum BoolOperator: Sendable {
     case and
     case or
 }
 
 /// Binary operators
-public enum Operator {
+public enum Operator: Sendable {
     case add
     case sub
     case mult
@@ -29,7 +29,7 @@ public enum Operator {
 }
 
 /// Unary operators
-public enum UnaryOperator {
+public enum UnaryOperator: Sendable {
     case invert
     case not
     case uAdd
@@ -37,7 +37,7 @@ public enum UnaryOperator {
 }
 
 /// Comparison operators
-public enum CmpOp {
+public enum CmpOp: Sendable {
     case eq
     case notEq
     case lt

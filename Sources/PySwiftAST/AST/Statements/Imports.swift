@@ -1,5 +1,5 @@
 /// Import statement
-public struct Import: ASTNode {
+public struct Import: ASTNode, Sendable {
     public var names: [Alias]
     public var lineno: Int
     public var colOffset: Int
@@ -23,7 +23,7 @@ public struct Import: ASTNode {
 }
 
 /// Import from statement
-public struct ImportFrom: ASTNode {
+public struct ImportFrom: ASTNode, Sendable {
     public var module: String?
     public var names: [Alias]
     public var level: Int

@@ -1,5 +1,5 @@
 /// Class definition
-public struct ClassDef: ASTNode {
+public struct ClassDef: ASTNode, Sendable {
     public var name: String
     public var bases: [Expression]
     public var keywords: [Keyword]

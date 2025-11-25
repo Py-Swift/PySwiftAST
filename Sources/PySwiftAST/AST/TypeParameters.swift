@@ -1,12 +1,12 @@
 /// Type parameter (Python 3.12+)
-public indirect enum TypeParam {
+public indirect enum TypeParam: Sendable {
     case typeVar(TypeVar)
     case paramSpec(ParamSpec)
     case typeVarTuple(TypeVarTuple)
 }
 
 /// Type variable
-public struct TypeVar {
+public struct TypeVar: Sendable {
     public var name: String
     public var bound: Expression?
     public var defaultValue: Expression?
@@ -23,7 +23,7 @@ public struct TypeVar {
 }
 
 /// Parameter specification
-public struct ParamSpec {
+public struct ParamSpec: Sendable {
     public var name: String
     public var defaultValue: Expression?
     
@@ -37,7 +37,7 @@ public struct ParamSpec {
 }
 
 /// Type variable tuple
-public struct TypeVarTuple {
+public struct TypeVarTuple: Sendable {
     public var name: String
     public var defaultValue: Expression?
     

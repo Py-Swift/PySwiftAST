@@ -15,6 +15,7 @@ extension AugAssign: PyCodeProtocol {
         let targetCode = target.toPythonCode(context: context)
         let opCode = op.toPythonCode(context: context)
         let valueCode = value.toPythonCode(context: context)
+        // Format as: target += value (space before and after the compound operator)
         return context.indent + targetCode + " " + opCode + "= " + valueCode
     }
 }

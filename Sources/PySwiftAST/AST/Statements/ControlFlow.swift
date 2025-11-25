@@ -1,5 +1,5 @@
 /// Return statement
-public struct Return: ASTNode {
+public struct Return: ASTNode, Sendable {
     public var value: Expression?
     public var lineno: Int
     public var colOffset: Int
@@ -23,7 +23,7 @@ public struct Return: ASTNode {
 }
 
 /// If statement
-public struct If: ASTNode {
+public struct If: ASTNode, Sendable {
     public var test: Expression
     public var body: [Statement]
     public var orElse: [Statement]
@@ -53,7 +53,7 @@ public struct If: ASTNode {
 }
 
 /// While loop
-public struct While: ASTNode {
+public struct While: ASTNode, Sendable {
     public var test: Expression
     public var body: [Statement]
     public var orElse: [Statement]
@@ -83,7 +83,7 @@ public struct While: ASTNode {
 }
 
 /// For loop
-public struct For: ASTNode {
+public struct For: ASTNode, Sendable {
     public var target: Expression
     public var iter: Expression
     public var body: [Statement]
@@ -119,7 +119,7 @@ public struct For: ASTNode {
 }
 
 /// Async for loop
-public struct AsyncFor: ASTNode {
+public struct AsyncFor: ASTNode, Sendable {
     public var target: Expression
     public var iter: Expression
     public var body: [Statement]
@@ -155,7 +155,7 @@ public struct AsyncFor: ASTNode {
 }
 
 /// Break statement
-public struct Break: ASTNode {
+public struct Break: ASTNode, Sendable {
     public var lineno: Int
     public var colOffset: Int
     public var endLineno: Int?
@@ -176,7 +176,7 @@ public struct Break: ASTNode {
 }
 
 /// Continue statement
-public struct Continue: ASTNode {
+public struct Continue: ASTNode, Sendable {
     public var lineno: Int
     public var colOffset: Int
     public var endLineno: Int?
@@ -197,7 +197,7 @@ public struct Continue: ASTNode {
 }
 
 /// Pass statement
-public struct Pass: ASTNode {
+public struct Pass: ASTNode, Sendable {
     public var lineno: Int
     public var colOffset: Int
     public var endLineno: Int?
