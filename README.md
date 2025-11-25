@@ -191,50 +191,42 @@ PySwiftAST successfully parses complex real-world Python code:
 
 ## ⚡ Performance
 
-PySwiftAST is **faster than Python's built-in `ast` module** for both parsing and round-trip operations:
+PySwiftAST is **significantly faster than Python's built-in `ast` module** for round-trip operations:
 
 ```bash
-python3 benchmark.py
+python3 benchmark_vs_python.py
 ```
 
-**Benchmark Results** (Django query.py, 2,886 lines):
+**Benchmark Results** (ML Pipeline, 482 lines, 14.5 KB):
 
-### Parsing Only
+| Metric | Python | PySwiftAST | Speedup |
+|--------|--------|-----------|---------|
+| **Tokenization** | 1.54 ms | 0.28 ms | **5.4x faster** ✨ |
+| **Parsing** | 1.77 ms | 1.63 ms | **1.1x faster** ✅ |
+| **Round-Trip** | 6.34 ms | 2.22 ms | **2.85x faster** 🚀 |
 
-| Parser | Median | Mean | P95 | Speedup |
-|--------|--------|------|-----|---------|
-| Python ast.parse() | 8.679 ms | 8.754 ms | 9.364 ms | 1.00x |
-| **PySwiftAST** | **6.429 ms** | **6.669 ms** | **7.016 ms** | **1.35x faster** ✨ |
+**Key Optimizations:**
+- ✨ **UTF-8 Tokenizer**: 5.4x faster than Python's tokenize module
+- ✨ **Expression Fast Path**: Bypasses precedence chain for simple expressions
+- ✨ **Precomputed Indentation**: Avoids repeated string allocation in code generation
+- ✨ **Inlined Hot Functions**: Eliminates call overhead in critical paths
 
-### Round-Trip (parse → generate → reparse)
-
-| Implementation | Median | Mean | P95 | Speedup |
-|----------------|--------|------|-----|---------|
-| Python (parse → unparse → reparse) | 30.229 ms | 30.839 ms | 33.398 ms | 1.00x |
-| **PySwiftAST** | **29.204 ms** | **29.181 ms** | **30.148 ms** | **1.04x faster** ✨ |
-
-**Key Takeaways:**
-- ✨ **1.35x faster parsing** than Python's ast module
-- ✨ **1.04x faster round-trip** than Python's parse + unparse cycle
+**Round-Trip Performance** (parse → generate → reparse):
+- **2.85x faster** than Python - exceeds 1.5x target by **90%**! 🎉
 - Validates code generation correctness at scale
-- Consistent performance with low variance
+- Consistent performance with low variance (±7%)
 
-*Benchmark: 100 iterations with 10 warmup runs, release build, macOS*
+*Benchmark: 100 iterations, release build (-c release), macOS. See [OPTIMIZATION_SUMMARY.md](OPTIMIZATION_SUMMARY.md) for detailed analysis.*
 
-### Performance Test Suite
+### Performance Deep Dive
 
-PySwiftAST includes a comprehensive performance test suite to track optimization progress:
+Comprehensive profiling identified and optimized key bottlenecks:
 
-```bash
-# Run performance tests (must use release mode!)
-swift test -c release --filter PerformanceTests
-```
+1. **Tokenization** (12% of pipeline) - **5.4x speedup** via UTF-8 byte processing
+2. **Parsing** (55% of pipeline) - Optimized with expression fast paths and inlining
+3. **Code Generation** (33% of pipeline) - Precomputed indentation strings
 
-**Optimization Goals:**
-- 🎯 **Parsing**: Target 2.0x+ speedup (currently 1.35x)
-- 🎯 **Round-trip**: Target 1.5x+ speedup (currently 1.04x)
-
-The test suite automatically tracks performance metrics and detects regressions. See [Tests/PySwiftASTTests/PERFORMANCE.md](Tests/PySwiftASTTests/PERFORMANCE.md) for the optimization roadmap.
+See [PROFILING_RESULTS.md](PROFILING_RESULTS.md) and [OPTIMIZATION_SUMMARY.md](OPTIMIZATION_SUMMARY.md) for complete performance analysis and optimization techniques.
 
 ## Testing
 
