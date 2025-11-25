@@ -191,7 +191,7 @@ PySwiftAST successfully parses complex real-world Python code:
 
 ## ⚡ Performance
 
-PySwiftAST is **faster than Python's built-in `ast` module**:
+PySwiftAST is **faster than Python's built-in `ast` module** for both parsing and round-trip operations:
 
 ```bash
 python3 benchmark.py
@@ -199,18 +199,25 @@ python3 benchmark.py
 
 **Benchmark Results** (Django query.py, 2,886 lines):
 
-| Operation | Median | Mean | P95 | vs Python ast |
-|-----------|--------|------|-----|---------------|
-| Python ast (parse) | 9.304 ms | 9.432 ms | 10.779 ms | 1.00x |
-| **PySwiftAST (parse)** | **6.811 ms** | **7.537 ms** | **9.688 ms** | **1.37x faster** |
-| PySwiftAST (round-trip) | 30.770 ms | 30.850 ms | 31.951 ms | - |
+### Parsing Only
 
-✨ **PySwiftAST is 1.37x faster than Python's ast module for parsing**
+| Parser | Median | Mean | P95 | Speedup |
+|--------|--------|------|-----|---------|
+| Python ast.parse() | 8.679 ms | 8.754 ms | 9.364 ms | 1.00x |
+| **PySwiftAST** | **6.429 ms** | **6.669 ms** | **7.016 ms** | **1.35x faster** ✨ |
 
-**Round-trip Performance** (parse → generate → reparse):
-- Full round-trip: **~30ms median** for 2,886 lines
-- 4.52x overhead vs parsing alone
-- Validates code generation correctness
+### Round-Trip (parse → generate → reparse)
+
+| Implementation | Median | Mean | P95 | Speedup |
+|----------------|--------|------|-----|---------|
+| Python (parse → unparse → reparse) | 30.229 ms | 30.839 ms | 33.398 ms | 1.00x |
+| **PySwiftAST** | **29.204 ms** | **29.181 ms** | **30.148 ms** | **1.04x faster** ✨ |
+
+**Key Takeaways:**
+- ✨ **1.35x faster parsing** than Python's ast module
+- ✨ **1.04x faster round-trip** than Python's parse + unparse cycle
+- Validates code generation correctness at scale
+- Consistent performance with low variance
 
 *Benchmark: 100 iterations with 10 warmup runs, release build, macOS*
 

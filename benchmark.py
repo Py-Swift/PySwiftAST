@@ -29,6 +29,28 @@ def benchmark_python_ast(file_path: Path, iterations: int = 100):
     
     return times
 
+def benchmark_python_roundtrip(file_path: Path, iterations: int = 100):
+    """Benchmark Python's ast.parse + ast.unparse round-trip"""
+    source = file_path.read_text()
+    
+    # Warmup
+    for _ in range(10):
+        tree = ast.parse(source)
+        regenerated = ast.unparse(tree)
+        ast.parse(regenerated)
+    
+    # Benchmark
+    times = []
+    for _ in range(iterations):
+        start = time.perf_counter()
+        tree = ast.parse(source)
+        regenerated = ast.unparse(tree)
+        ast.parse(regenerated)
+        end = time.perf_counter()
+        times.append(end - start)
+    
+    return times
+
 def benchmark_pyswift_ast(file_path: Path, iterations: int = 100):
     """Benchmark PySwiftAST parser"""
     # Use the built executable
@@ -142,10 +164,15 @@ def main():
     print(f"Running {iterations} iterations (with 10 warmup runs)...")
     print()
     
-    # Benchmark Python ast
-    print("Benchmarking Python's ast module...")
+    # Benchmark Python ast (parsing only)
+    print("Benchmarking Python ast.parse()...")
     python_times = benchmark_python_ast(django_file, iterations)
     python_stats = calculate_stats(python_times)
+    
+    # Benchmark Python round-trip
+    print("Benchmarking Python round-trip (parse → unparse → reparse)...")
+    python_roundtrip_times = benchmark_python_roundtrip(django_file, iterations)
+    python_roundtrip_stats = calculate_stats(python_roundtrip_times)
     
     # Benchmark PySwiftAST parsing
     print("Benchmarking PySwiftAST (parsing only)...")
@@ -164,7 +191,7 @@ def main():
     print("=" * 70)
     print()
     
-    print("Python ast module (parsing only):")
+    print("Python ast.parse() (parsing only):")
     if python_stats:
         print(f"  Min:    {python_stats['min']:8.3f} ms")
         print(f"  Median: {python_stats['median']:8.3f} ms")
@@ -194,7 +221,22 @@ def main():
         print("  [Benchmark failed]")
     
     print()
-    print("PySwiftAST (full round-trip: parse → generate → reparse):")
+    print("-" * 70)
+    print("ROUND-TRIP COMPARISON (parse → generate → reparse)")
+    print("-" * 70)
+    print()
+    
+    print("Python (parse → unparse → reparse):")
+    if python_roundtrip_stats:
+        print(f"  Min:    {python_roundtrip_stats['min']:8.3f} ms")
+        print(f"  Median: {python_roundtrip_stats['median']:8.3f} ms")
+        print(f"  Mean:   {python_roundtrip_stats['mean']:8.3f} ms")
+        print(f"  P95:    {python_roundtrip_stats['p95']:8.3f} ms")
+        print(f"  P99:    {python_roundtrip_stats['p99']:8.3f} ms")
+        print(f"  Max:    {python_roundtrip_stats['max']:8.3f} ms")
+    print()
+    
+    print("PySwiftAST (parse → generate → reparse):")
     if roundtrip_stats:
         print(f"  Min:    {roundtrip_stats['min']:8.3f} ms")
         print(f"  Median: {roundtrip_stats['median']:8.3f} ms")
@@ -204,10 +246,12 @@ def main():
         print(f"  Max:    {roundtrip_stats['max']:8.3f} ms")
         print()
         
-        # Compare round-trip to parsing only
-        ratio = roundtrip_stats['median'] / swift_stats['median']
-        print(f"Round-trip is {ratio:.2f}x slower than parsing alone")
-        print(f"(includes code generation + reparsing)")
+        # Compare round-trip performance
+        ratio = python_roundtrip_stats['median'] / roundtrip_stats['median']
+        if ratio > 1:
+            print(f"✨ PySwiftAST round-trip is {ratio:.2f}x FASTER than Python")
+        else:
+            print(f"PySwiftAST round-trip is {1/ratio:.2f}x slower than Python")
     else:
         print("  [Benchmark failed]")
     
