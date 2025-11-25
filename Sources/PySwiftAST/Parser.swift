@@ -3459,9 +3459,11 @@ public enum ParseError: Error, CustomStringConvertible {
             var message = "Expected '\(expected)' but got \(gotDesc) at line \(got.line), column \(got.column)"
             if let ctx = context, !ctx.isEmpty {
                 message += "\n\n  \(ctx)"
-                // Add caret pointing to error location (accounting for the 2-space prefix)
+                // Add caret pointing to error location
+                // Column is 1-indexed, so column value already points to the position after the last character
+                // We need 2 spaces for prefix, plus (column - 1) spaces to reach the position
                 let spaces = String(repeating: " ", count: got.column + 1)
-                message += "\n  \(spaces)^"
+                message += "\n\(spaces)^"
                 // Show suggestion with the fix
                 // Insert the expected character at the error position
                 let insertPos = ctx.index(ctx.startIndex, offsetBy: min(got.column, ctx.count))
