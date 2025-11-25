@@ -25,7 +25,10 @@ public class Tokenizer {
     
     /// Tokenize the entire source and return all tokens
     public func tokenize() throws -> [Token] {
+        // Pre-allocate array capacity: ~1 token per 7 characters is typical for Python
+        let estimatedTokens = max(100, chars.count / 7)
         var tokens: [Token] = []
+        tokens.reserveCapacity(estimatedTokens)
         
         while true {
             let token = try nextToken()
