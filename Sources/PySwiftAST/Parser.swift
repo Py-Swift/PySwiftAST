@@ -161,10 +161,22 @@ public class Parser {
                 ))
             }
             
-            // Check for type annotation (annotated assignment) - only valid for names
+            // Grammar: assignment[stmt_ty]: 
+            //   | NAME ':' expression ['=' annotated_rhs] → AnnAssign(target, annotation, value, simple=1)
+            //   | (single_target | single_subscript_attribute_target) ':' expression ['=' annotated_rhs] → AnnAssign(target, annotation, value, simple=0)
+            // Where single_subscript_attribute_target includes:
+            //   - Attribute: t_primary '.' NAME (e.g., self.x)
+            //   - Subscript: t_primary '[' slices ']' (e.g., dict[key])
             if currentToken().type == .colon {
-                guard case .name = expr else {
-                    throw ParseError.expected(message: "Type annotations are only allowed for names", line: currentToken().line)
+                // Validate target is a valid annotation target per grammar
+                let isSimple: Bool
+                switch expr {
+                case .name:
+                    isSimple = true  // simple=1 for NAME targets
+                case .attribute, .subscriptExpr:
+                    isSimple = false  // simple=0 for attribute/subscript targets
+                default:
+                    throw ParseError.expected(message: "Invalid target for type annotation", line: currentToken().line)
                 }
                 
                 advance() // consume ':'
@@ -182,7 +194,7 @@ public class Parser {
                     target: expr,
                     annotation: annotation,
                     value: value,
-                    simple: true,
+                    simple: isSimple,
                     lineno: token.line,
                     colOffset: token.column,
                     endLineno: nil,
@@ -1723,21 +1735,20 @@ public class Parser {
     private func parseNotExpression() throws -> Expression {
         if currentToken().type == .not {
             // Check if this is 'not in' (comparison operator) vs 'not' (unary operator)
-            // Peek ahead to see if next token is 'in', skipping comments and newlines
+            // Peek ahead to see if the next non-comment/non-newline token is 'in'
             var peekPos = position + 1
             while peekPos < tokens.count {
-                let peekType = tokens[peekPos].type
-                // Skip comments and newlines
-                if case .comment = peekType {
+                let peekToken = tokens[peekPos]
+                if case .comment = peekToken.type {
                     peekPos += 1
                     continue
                 }
-                if peekType == .newline {
+                if peekToken.type == .newline {
                     peekPos += 1
                     continue
                 }
-                // Found a non-comment, non-newline token
-                if peekType == .in {
+                // Found first non-trivial token
+                if peekToken.type == .in {
                     // This is 'not in' - don't consume 'not', let comparison handle it
                     return try parseWalrusExpression()
                 }
@@ -2687,7 +2698,10 @@ public class Parser {
                 var elts = [first]
                 while currentToken().type == .comma {
                     advance()
-                    // Skip newlines after comma (implicit line joining)
+                    // Skip comments and newlines after comma (implicit line joining)
+                    while case .comment = currentToken().type {
+                        advance()
+                    }
                     while currentToken().type == .newline {
                         advance()
                     }
@@ -2704,7 +2718,10 @@ public class Parser {
                         element = try parseExpression()
                     }
                     elts.append(element)
-                    // Skip newlines after element (implicit line joining)
+                    // Skip comments and newlines after element (implicit line joining)
+                    while case .comment = currentToken().type {
+                        advance()
+                    }
                     while currentToken().type == .newline {
                         advance()
                     }
@@ -2774,6 +2791,10 @@ public class Parser {
             var elts = [first]
             while currentToken().type == .comma {
                 advance()
+                // Skip comments after comma
+                while case .comment = currentToken().type {
+                    advance()
+                }
                 if currentToken().type == .rightbracket {
                     break
                 }
@@ -2787,6 +2808,10 @@ public class Parser {
                     element = try parseExpression()
                 }
                 elts.append(element)
+                // Skip comments after element
+                while case .comment = currentToken().type {
+                    advance()
+                }
             }
             
             try consume(.rightbracket, "Expected ']' after list")

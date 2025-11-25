@@ -1,0 +1,175 @@
+# Cline Rules for PySwiftAST Development
+
+## Parser Development Guidelines
+
+### Always Consult Grammar File
+When working on parser-related code (Parser.swift, Tokenizer.swift, or any parsing logic):
+
+1. **ALWAYS reference `/Volumes/CodeSSD/GitHub/PySwiftAST/Grammar/python.gram`** before making changes
+2. **Read the relevant grammar rules** for the feature you're implementing or fixing
+3. **Verify your implementation matches the official Python grammar** defined in python.gram
+4. **Include grammar rule references** in comments when implementing parser logic
+
+### Grammar File Usage Pattern
+```
+When fixing/implementing parser feature X:
+1. Read python.gram to find the rule for X
+2. Understand the grammar notation (e.g., ','.expression+, [optional], element*, etc.)
+3. Implement according to the grammar rule
+4. Add a comment referencing the grammar rule in the code
+```
+
+### Example Flow
+```
+Task: Fix type annotations
+↓
+1. Read python.gram for "ann_assign" or related rules
+2. Understand: target ':' annotation ['=' value]
+3. Check valid targets in grammar
+4. Implement in Parser.swift with grammar rule comment
+5. Test against real-world Python code
+```
+
+### Key Grammar Principles (from python.gram header)
+- **Implicit Line Joining**: Expressions inside (), [], {} can span multiple lines
+- **NEWLINES are significant** except inside (), [], {}
+- **Grammar Notation**:
+  - `,`.expression+ means "comma-separated list of expressions"
+  - [optional] means optional element
+  - element+ means one or more
+  - element* means zero or more
+  - ~ means "commit to this branch" (for better error messages)
+
+### Code Comment Convention
+When implementing a grammar rule, add a comment like:
+```swift
+// Grammar: ann_assign: target ':' annotation ['=' value]
+// Valid targets: NAME | attr | subscript (per Python grammar)
+```
+
+### Verification Steps
+1. ✅ Check python.gram for the official rule
+2. ✅ Verify implementation matches grammar
+3. ✅ Test with real-world Python files
+4. ✅ Ensure AST structure matches Python's AST module
+
+## Performance Optimization Guidelines
+
+### ALWAYS Follow OPTIMIZATION_GUIDELINES.md
+
+When making ANY performance-related changes, **MUST** follow the workflow in:
+`/Volumes/CodeSSD/GitHub/PySwiftAST/OPTIMIZATION_GUIDELINES.md`
+
+### Critical Rules (Never Skip These!)
+
+1. **Establish Baseline FIRST**
+   ```bash
+   swift test -c release --filter PerformanceTests 2>&1 | tee baseline.txt
+   ```
+   - Record current metrics before any changes
+   - Update `performance_history.json` with baseline
+
+2. **ONE Optimization at a Time**
+   - ✅ Good: "Optimize parseExpression() bounds checking"
+   - ❌ Bad: "Optimize parser, tokenizer, and codegen"
+   - Each change must be isolated and measurable
+
+3. **Profile Before Optimizing**
+   - **Never guess what's slow** - always profile first
+   - Use Instruments Time Profiler or sampling
+   - Focus on actual hotspots, not assumptions
+
+4. **Test Everything After Changes**
+   ```bash
+   swift test  # All 81 tests must pass
+   swift test -c release --filter PerformanceTests  # Measure impact
+   ```
+   - **If ANY test fails → REVERT immediately**
+   - **If performance regresses >2% → REVERT immediately**
+
+5. **Update Performance History**
+   - Add entry to `performance_history.json` after every optimization
+   - Include: date, commit, metrics, delta percentages, status
+   - Document what worked and what didn't
+
+### Performance Decision Matrix
+
+After measuring performance impact:
+- **Improved >2%**: ✅ Keep change, commit, update history
+- **Neutral ±2%**: 🤔 Keep only if code is simpler, otherwise revert
+- **Regressed >2%**: ❌ **REVERT immediately**, try different approach
+
+### Current Performance Baseline (2025-11-25)
+- **Parsing**: 6.5 ms median (1.34x vs Python, target: 2.0x)
+- **Round-trip**: 26.3 ms median (1.15x vs Python, target: 1.5x)
+- **Tokenization**: 44.2 ms median (51% faster than old baseline)
+
+### Optimization Priority (Based on Profiling)
+
+1. **High Impact**: Tokenization (44ms) - UTF-8 byte array could give 6x improvement
+2. **Medium Impact**: Code generation (~5ms) - String building optimization
+3. **Low Impact**: Parsing (6.5ms) - Already quite fast
+
+### Quick Reference: Safe vs Unsafe Optimizations
+
+**Safe (Try First)**:
+- Better algorithms (O(n²) → O(n))
+- Reduce allocations (`reserveCapacity`, reuse buffers)
+- Compiler hints (`@inline`, `@_optimize(speed)`)
+- Caching repeated work
+
+**Unsafe (Only After Profiling Proves >5% Benefit)**:
+- `unsafelyUnwrapped` (when bounds already checked)
+- `withUnsafeBufferPointer` (for hot loops)
+- `UnsafePointer` (for string scanning)
+- **MUST** document why it's safe in code comments
+
+### Commit Message Template for Optimizations
+
+```
+perf: [brief description of optimization]
+
+- [Component]: [before]ms -> [after]ms ([X]% improvement)
+- Overall speedup: [X.XX]x vs Python (was [X.XX]x)
+- All [N] tests passing
+- [Specific test] validated
+
+[Brief explanation of what was optimized and why it works]
+
+Profiling showed [finding]. [Approach taken]. [Result achieved].
+```
+
+## File References
+- Grammar: `/Volumes/CodeSSD/GitHub/PySwiftAST/Grammar/python.gram`
+- Optimization Guidelines: `/Volumes/CodeSSD/GitHub/PySwiftAST/OPTIMIZATION_GUIDELINES.md`
+- Performance History: `/Volumes/CodeSSD/GitHub/PySwiftAST/performance_history.json`
+- Profiling Analysis: `/Volumes/CodeSSD/GitHub/PySwiftAST/PROFILING_ANALYSIS.md`
+- Parser: `/Volumes/CodeSSD/GitHub/PySwiftAST/Sources/PySwiftAST/Parser.swift`
+- Tokenizer: `/Volumes/CodeSSD/GitHub/PySwiftAST/Sources/PySwiftAST/Tokenizer.swift`
+- Code Generator: `/Volumes/CodeSSD/GitHub/PySwiftAST/Sources/PySwiftCodeGen/`
+
+## Workflow Summary
+
+### For Parser Changes:
+1. Check `Grammar/python.gram` for official rule
+2. Implement with grammar rule comment
+3. Test with real Python files
+4. Verify AST structure correctness
+
+### For Performance Changes:
+1. Read `OPTIMIZATION_GUIDELINES.md` completely
+2. Establish baseline and record metrics
+3. Profile to find actual hotspots
+4. Make ONE targeted change
+5. Test all 81 tests (must pass)
+6. Measure performance (must improve or stay neutral)
+7. Update `performance_history.json`
+8. Commit with performance metrics
+
+### Never:
+- ❌ Skip grammar verification for parser changes
+- ❌ Skip baseline measurement for optimizations
+- ❌ Make multiple optimizations at once
+- ❌ Accept test failures or performance regressions
+- ❌ Optimize without profiling first
+- ❌ Use unsafe operations without proven benefit

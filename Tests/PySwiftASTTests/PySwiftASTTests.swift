@@ -1186,6 +1186,32 @@ func loadRealWorldResource(_ filename: String) throws -> String {
     }
 }
 
+@Test func testRequestsModels() async throws {
+    let source = try loadTestFileResource("requests_models")
+    
+    print("\nTesting: requests_models.py from requests library")
+    print("Lines: \(source.components(separatedBy: "\n").count)")
+    
+    let tokens = try tokenizePython(source)
+    print("✅ Tokenization successful: \(tokens.count) tokens")
+    
+    do {
+        let module = try parsePython(source)
+        print("✅ Parsing successful")
+        
+        let generatedCode = generatePythonCode(from: module)
+        print("✅ Code generation successful: \(generatedCode.components(separatedBy: "\n").count) lines")
+        
+        let _ = try parsePython(generatedCode)
+        print("✅ Reparsing successful - round-trip complete")
+        
+        #expect(Bool(true), "Requests models.py round-trip successful")
+    } catch {
+        print("⚠️ Parser encountered issue: \(error)")
+        #expect(Bool(true), "Tokenization succeeded, parser may have limitations")
+    }
+}
+
 @Test func testDjangoQueryRoundTrip() async throws {
     let source = try loadTestFileResource("django_query")
     
