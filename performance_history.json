@@ -119,6 +119,28 @@
       "status": "completed",
       "tests_passing": true,
       "notes": "MASSIVE SUCCESS! Implemented UTF8Tokenizer with byte-level scanning. Results: 18.8x faster tokenization (5.593ms → 0.297ms), 94.7% time reduction. Far exceeded 6x target! All 81 tests pass. Test file: ml_pipeline.py (482 lines). Single largest performance improvement in project history."
+    },
+    {
+      "date": "2025-11-25T16:35:00Z",
+      "commit": "902976e",
+      "optimization": "Parser hot path function inlining",
+      "parsing_speedup": 1.09,
+      "roundtrip_speedup": 1.32,
+      "status": "completed",
+      "tests_passing": true,
+      "notes": "Added @inline(__always) to currentToken(), advance(), isAtEnd(), skipComments(). Small improvement in round-trip (1.30x → 1.32x). Part of parser optimization Phase 1."
+    },
+    {
+      "date": "2025-11-25T16:40:00Z",
+      "commit": "attempted",
+      "optimization": "Array pre-allocation in parser",
+      "parsing_speedup": 0.92,
+      "roundtrip_speedup": 1.24,
+      "delta_parsing_percent": -15.6,
+      "delta_roundtrip_percent": -6.1,
+      "status": "reverted",
+      "tests_passing": true,
+      "notes": "Attempted reserveCapacity() on statement/expression/argument arrays. REGRESSION: parsing 1.09x → 0.92x (15.6% slower). Overhead of reserveCapacity outweighed benefits for small arrays. Swift's array growth is already well-optimized. REVERTED per guidelines."
     }
   ]
 }
