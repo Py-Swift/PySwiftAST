@@ -32,7 +32,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "PySwiftBenchmark",
-            dependencies: ["PySwiftAST"]
+            dependencies: ["PySwiftAST", "PySwiftCodeGen"]
         ),
         .testTarget(
             name: "PySwiftASTTests",

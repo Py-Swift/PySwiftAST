@@ -199,12 +199,18 @@ python3 benchmark.py
 
 **Benchmark Results** (Django query.py, 2,886 lines):
 
-| Parser | Median | Mean | P95 | Speedup |
-|--------|--------|------|-----|---------|
-| Python ast | 8.943 ms | 9.017 ms | 9.527 ms | 1.00x |
-| **PySwiftAST** | **6.537 ms** | **6.564 ms** | **6.967 ms** | **1.37x** |
+| Operation | Median | Mean | P95 | vs Python ast |
+|-----------|--------|------|-----|---------------|
+| Python ast (parse) | 9.304 ms | 9.432 ms | 10.779 ms | 1.00x |
+| **PySwiftAST (parse)** | **6.811 ms** | **7.537 ms** | **9.688 ms** | **1.37x faster** |
+| PySwiftAST (round-trip) | 30.770 ms | 30.850 ms | 31.951 ms | - |
 
-✨ **PySwiftAST is 1.37x faster than Python's ast module**
+✨ **PySwiftAST is 1.37x faster than Python's ast module for parsing**
+
+**Round-trip Performance** (parse → generate → reparse):
+- Full round-trip: **~30ms median** for 2,886 lines
+- 4.52x overhead vs parsing alone
+- Validates code generation correctness
 
 *Benchmark: 100 iterations with 10 warmup runs, release build, macOS*
 

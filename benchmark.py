@@ -41,7 +41,7 @@ def benchmark_pyswift_ast(file_path: Path, iterations: int = 100):
     try:
         # Run Swift benchmark
         result = subprocess.run(
-            [str(benchmark_exe), str(file_path), str(iterations)],
+            [str(benchmark_exe), str(file_path), str(iterations), "parse"],
             capture_output=True,
             text=True,
             timeout=120
@@ -58,6 +58,37 @@ def benchmark_pyswift_ast(file_path: Path, iterations: int = 100):
         return None
     except Exception as e:
         print(f"Error running Swift benchmark: {e}")
+        return None
+
+def benchmark_pyswift_roundtrip(file_path: Path, iterations: int = 100):
+    """Benchmark PySwiftAST full round-trip (parse → generate → reparse)"""
+    # Use the built executable
+    benchmark_exe = Path(".build/release/pyswift-benchmark")
+    
+    if not benchmark_exe.exists():
+        print(f"Error: {benchmark_exe} not found. Run: swift build -c release")
+        return None
+    
+    try:
+        # Run Swift benchmark in roundtrip mode
+        result = subprocess.run(
+            [str(benchmark_exe), str(file_path), str(iterations), "roundtrip"],
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+        
+        if result.returncode != 0:
+            print(f"Swift roundtrip benchmark error: {result.stderr}")
+            return None
+        
+        times = json.loads(result.stdout.strip())
+        return times
+    except subprocess.TimeoutExpired:
+        print("Swift roundtrip benchmark timed out")
+        return None
+    except Exception as e:
+        print(f"Error running Swift roundtrip benchmark: {e}")
         return None
 
 def calculate_stats(times):
@@ -116,10 +147,15 @@ def main():
     python_times = benchmark_python_ast(django_file, iterations)
     python_stats = calculate_stats(python_times)
     
-    # Benchmark PySwiftAST
-    print("Benchmarking PySwiftAST...")
+    # Benchmark PySwiftAST parsing
+    print("Benchmarking PySwiftAST (parsing only)...")
     swift_times = benchmark_pyswift_ast(django_file, iterations)
     swift_stats = calculate_stats(swift_times) if swift_times else None
+    
+    # Benchmark PySwiftAST round-trip
+    print("Benchmarking PySwiftAST (full round-trip)...")
+    roundtrip_times = benchmark_pyswift_roundtrip(django_file, iterations)
+    roundtrip_stats = calculate_stats(roundtrip_times) if roundtrip_times else None
     
     # Display results
     print()
@@ -128,7 +164,7 @@ def main():
     print("=" * 70)
     print()
     
-    print("Python ast module:")
+    print("Python ast module (parsing only):")
     if python_stats:
         print(f"  Min:    {python_stats['min']:8.3f} ms")
         print(f"  Median: {python_stats['median']:8.3f} ms")
@@ -138,7 +174,7 @@ def main():
         print(f"  Max:    {python_stats['max']:8.3f} ms")
     print()
     
-    print("PySwiftAST:")
+    print("PySwiftAST (parsing only):")
     if swift_stats:
         print(f"  Min:    {swift_stats['min']:8.3f} ms")
         print(f"  Median: {swift_stats['median']:8.3f} ms")
@@ -154,6 +190,24 @@ def main():
             print(f"✨ PySwiftAST is {ratio:.2f}x FASTER than Python ast")
         else:
             print(f"PySwiftAST is {1/ratio:.2f}x slower than Python ast")
+    else:
+        print("  [Benchmark failed]")
+    
+    print()
+    print("PySwiftAST (full round-trip: parse → generate → reparse):")
+    if roundtrip_stats:
+        print(f"  Min:    {roundtrip_stats['min']:8.3f} ms")
+        print(f"  Median: {roundtrip_stats['median']:8.3f} ms")
+        print(f"  Mean:   {roundtrip_stats['mean']:8.3f} ms")
+        print(f"  P95:    {roundtrip_stats['p95']:8.3f} ms")
+        print(f"  P99:    {roundtrip_stats['p99']:8.3f} ms")
+        print(f"  Max:    {roundtrip_stats['max']:8.3f} ms")
+        print()
+        
+        # Compare round-trip to parsing only
+        ratio = roundtrip_stats['median'] / swift_stats['median']
+        print(f"Round-trip is {ratio:.2f}x slower than parsing alone")
+        print(f"(includes code generation + reparsing)")
     else:
         print("  [Benchmark failed]")
     
