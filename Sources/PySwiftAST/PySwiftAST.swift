@@ -8,7 +8,7 @@
 public func parsePython(_ source: String) throws -> Module {
     let tokenizer = Tokenizer(source: source)
     let tokens = try tokenizer.tokenize()
-    let parser = Parser(tokens: tokens)
+    let parser = Parser(tokens: tokens, source: source)
     return try parser.parse()
 }
 
@@ -16,7 +16,7 @@ public func parsePython(_ source: String) throws -> Module {
 public func parsePythonFast(_ source: String) throws -> Module {
     let tokenizer = UTF8Tokenizer(source: source)
     let tokens = try tokenizer.tokenize()
-    let parser = Parser(tokens: tokens)
+    let parser = Parser(tokens: tokens, source: source)
     return try parser.parse()
 }
 

@@ -5,9 +5,15 @@ import Foundation
 public class Parser {
     private let tokens: [Token]
     private var position: Int = 0
+    private var sourceLines: [String] = []
     
     public init(tokens: [Token]) {
         self.tokens = tokens
+    }
+    
+    public convenience init(tokens: [Token], source: String) {
+        self.init(tokens: tokens)
+        self.sourceLines = source.components(separatedBy: .newlines)
     }
     
     /// Parse the tokens into a Module
@@ -3115,7 +3121,34 @@ public class Parser {
         if currentToken().type == type {
             advance()
         } else {
-            throw ParseError.expected(message: message, line: currentToken().line)
+            // Try to provide better error with code context
+            let token = currentToken()
+            let expectedChar = getExpectedChar(for: type)
+            
+            if !expectedChar.isEmpty && !sourceLines.isEmpty && token.line > 0 && token.line <= sourceLines.count {
+                let context = sourceLines[token.line - 1]
+                throw ParseError.expectedToken(expected: expectedChar, got: token, context: context)
+            } else {
+                throw ParseError.expected(message: message, line: token.line)
+            }
+        }
+    }
+    
+    private func getExpectedChar(for type: TokenType) -> String {
+        switch type {
+        case .colon: return ":"
+        case .leftparen: return "("
+        case .rightparen: return ")"
+        case .leftbracket: return "["
+        case .rightbracket: return "]"
+        case .leftbrace: return "{"
+        case .rightbrace: return "}"
+        case .comma: return ","
+        case .semicolon: return ";"
+        case .assign: return "="
+        case .arrow: return "->"
+        case .dot: return "."
+        default: return ""
         }
     }
     
@@ -3410,6 +3443,7 @@ public enum ParseError: Error, CustomStringConvertible {
     case unexpectedToken(token: Token)
     case expectedName(line: Int)
     case expected(message: String, line: Int)
+    case expectedToken(expected: String, got: Token, context: String?)
     case syntaxError(message: String, line: Int)
     
     public var description: String {
@@ -3420,6 +3454,22 @@ public enum ParseError: Error, CustomStringConvertible {
             return "Expected name at line \(line)"
         case .expected(let message, let line):
             return "\(message) at line \(line)"
+        case .expectedToken(let expected, let got, let context):
+            let gotDesc = got.value.isEmpty ? "newline" : "'\(got.value)'"
+            var message = "Expected '\(expected)' but got \(gotDesc) at line \(got.line), column \(got.column)"
+            if let ctx = context, !ctx.isEmpty {
+                message += "\n\n  \(ctx)"
+                // Add caret pointing to error location (accounting for the 2-space prefix)
+                let spaces = String(repeating: " ", count: got.column + 1)
+                message += "\n  \(spaces)^"
+                // Show suggestion with the fix
+                // Insert the expected character at the error position
+                let insertPos = ctx.index(ctx.startIndex, offsetBy: min(got.column, ctx.count))
+                var fixed = ctx
+                fixed.insert(contentsOf: expected, at: insertPos)
+                message += "\n\nDid you mean:\n  \(fixed)"
+            }
+            return message
         case .syntaxError(let message, let line):
             return "Syntax error: \(message) at line \(line)"
         }

@@ -758,13 +758,15 @@ func loadSyntaxErrorResource(_ filename: String) throws -> String {
 @Test func testMissingColon() async throws {
     let source = try loadSyntaxErrorResource("missing_colon")
     
-    // Try to parse - should fail
+    // Try to parse - should fail with improved error message
     do {
         let _ = try parsePython(source)
         print("❌ ERROR: Parser should have failed but succeeded")
         #expect(Bool(false), "Parser should fail on missing colon")
     } catch {
-        print("✅ Parser correctly failed: \(error)")
+        print("✅ Parser correctly failed with improved error message:")
+        print(error)
+        print("")
         #expect(Bool(true), "Parser correctly detected syntax error")
     }
 }
@@ -795,6 +797,79 @@ func loadSyntaxErrorResource(_ filename: String) throws -> String {
     } catch {
         print("✅ Parser correctly failed: \(error)")
         #expect(Bool(true), "Parser correctly detected string error")
+    }
+}
+
+@Test func testImprovedErrorMessages() async throws {
+    // Test the user's specific example: def func() missing colon
+    let source = """
+    def func()
+        pass
+    """
+    
+    print("\n=== Testing improved error messages ===")
+    print("Source code:")
+    print(source)
+    print("\n")
+    
+    do {
+        let _ = try parsePythonFast(source)
+        print("❌ ERROR: Parser should have failed")
+        #expect(Bool(false), "Parser should fail on missing colon")
+    } catch {
+        print("Error output:")
+        print(error)
+        print("")
+        
+        let errorStr = String(describing: error)
+        // Check that error message contains helpful information
+        #expect(errorStr.contains(":"), "Error should mention the missing colon")
+        #expect(errorStr.contains("def func()"), "Error should show the problematic line")
+        #expect(Bool(true), "Parser correctly provided helpful error message")
+    }
+}
+
+@Test func testImprovedErrorMessagesClass() async throws {
+    // Test class definition missing colon
+    let source = """
+    class MyClass
+        pass
+    """
+    
+    print("\n=== Testing class definition error ===")
+    
+    do {
+        let _ = try parsePythonFast(source)
+        #expect(Bool(false), "Parser should fail on missing colon")
+    } catch {
+        print("Error output:")
+        print(error)
+        
+        let errorStr = String(describing: error)
+        #expect(errorStr.contains("class MyClass:"), "Error should suggest the fix")
+        #expect(Bool(true), "Parser correctly provided helpful error message")
+    }
+}
+
+@Test func testImprovedErrorMessagesWhile() async throws {
+    // Test while loop missing colon
+    let source = """
+    while x > 0
+        x -= 1
+    """
+    
+    print("\n=== Testing while loop error ===")
+    
+    do {
+        let _ = try parsePythonFast(source)
+        #expect(Bool(false), "Parser should fail on missing colon")
+    } catch {
+        print("Error output:")
+        print(error)
+        
+        let errorStr = String(describing: error)
+        #expect(errorStr.contains("while x > 0:"), "Error should suggest the fix")
+        #expect(Bool(true), "Parser correctly provided helpful error message")
     }
 }
 
