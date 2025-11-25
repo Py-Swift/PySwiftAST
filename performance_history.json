@@ -25,5 +25,23 @@
     "roundtrip_target_ms": 20.15,
     "notes": "Target is 2x+ faster than Python for parsing, 1.5x+ for round-trip"
   },
-  "history": []
+  "history": [
+    {
+      "date": "2025-11-25T10:55:00Z",
+      "commit": "attempted",
+      "optimization": "Added @inline(__always) to advance() and skipWhitespace()",
+      "parsing_median_ms": 6.325,
+      "roundtrip_median_ms": 31.611,
+      "tokenization_median_ms": 90.546,
+      "codegen_median_ms": 4.832,
+      "speedup_vs_python_parsing": 1.37,
+      "speedup_vs_python_roundtrip": 0.96,
+      "delta_parsing_percent": -0.6,
+      "delta_roundtrip_percent": 9.9,
+      "delta_tokenization_percent": 2.7,
+      "status": "reverted",
+      "tests_passing": true,
+      "notes": "Inline hints provided minimal parsing improvement (<1%) but caused round-trip regression. Reverted per guidelines."
+    }
+  ]
 }
