@@ -10,4 +10,29 @@ public struct ClassDef: ASTNode {
     public let colOffset: Int
     public let endLineno: Int?
     public let endColOffset: Int?
+
+    public init(
+        name: String,
+        bases: [Expression],
+        keywords: [Keyword],
+        body: [Statement],
+        decoratorList: [Expression],
+        typeParams: [TypeParam],
+        lineno: Int,
+        colOffset: Int,
+        endLineno: Int?,
+        endColOffset: Int?
+    ) {
+        self.name = name
+        self.bases = bases
+        self.keywords = keywords
+        self.body = body
+        self.decoratorList = decoratorList
+        self.typeParams = typeParams
+        self.lineno = lineno
+        self.colOffset = colOffset
+        self.endLineno = endLineno
+        self.endColOffset = endColOffset
+    }
+
 }

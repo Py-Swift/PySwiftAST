@@ -13,16 +13,28 @@ public indirect enum Pattern {
 /// Match value pattern
 public struct MatchValue {
     public let value: Expression
+    
+    public init(value: Expression) {
+        self.value = value
+    }
 }
 
 /// Match singleton pattern
 public struct MatchSingleton {
     public let value: ConstantValue
+    
+    public init(value: ConstantValue) {
+        self.value = value
+    }
 }
 
 /// Match sequence pattern
 public struct MatchSequence {
     public let patterns: [Pattern]
+    
+    public init(patterns: [Pattern]) {
+        self.patterns = patterns
+    }
 }
 
 /// Match mapping pattern
@@ -30,6 +42,16 @@ public struct MatchMapping {
     public let keys: [Expression]
     public let patterns: [Pattern]
     public let rest: String?
+    
+    public init(
+        keys: [Expression],
+        patterns: [Pattern],
+        rest: String?
+    ) {
+        self.keys = keys
+        self.patterns = patterns
+        self.rest = rest
+    }
 }
 
 /// Match class pattern
@@ -38,20 +60,48 @@ public struct MatchClass {
     public let patterns: [Pattern]
     public let kwdAttrs: [String]
     public let kwdPatterns: [Pattern]
+    
+    public init(
+        cls: Expression,
+        patterns: [Pattern],
+        kwdAttrs: [String],
+        kwdPatterns: [Pattern]
+    ) {
+        self.cls = cls
+        self.patterns = patterns
+        self.kwdAttrs = kwdAttrs
+        self.kwdPatterns = kwdPatterns
+    }
 }
 
 /// Match star pattern
 public struct MatchStar {
     public let name: String?
+    
+    public init(name: String?) {
+        self.name = name
+    }
 }
 
 /// Match as pattern
 public struct MatchAs {
     public let pattern: Pattern?
     public let name: String?
+    
+    public init(
+        pattern: Pattern?,
+        name: String?
+    ) {
+        self.pattern = pattern
+        self.name = name
+    }
 }
 
 /// Match or pattern
 public struct MatchOr {
     public let patterns: [Pattern]
+    
+    public init(patterns: [Pattern]) {
+        self.patterns = patterns
+    }
 }
