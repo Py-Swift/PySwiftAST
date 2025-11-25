@@ -1,12 +1,12 @@
 /// Function/method call
 public struct Call: ASTNode {
-    public let fun: Expression
-    public let args: [Expression]
-    public let keywords: [Keyword]
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var fun: Expression
+    public var args: [Expression]
+    public var keywords: [Keyword]
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         fun: Expression,
@@ -30,13 +30,13 @@ public struct Call: ASTNode {
 
 /// Attribute access (obj.attr)
 public struct Attribute: ASTNode {
-    public let value: Expression
-    public let attr: String
-    public let ctx: ExprContext
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var value: Expression
+    public var attr: String
+    public var ctx: ExprContext
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         value: Expression,
@@ -60,13 +60,13 @@ public struct Attribute: ASTNode {
 
 /// Subscript access (obj[key])
 public struct Subscript: ASTNode {
-    public let value: Expression
-    public let slice: Expression
-    public let ctx: ExprContext
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var value: Expression
+    public var slice: Expression
+    public var ctx: ExprContext
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         value: Expression,
@@ -90,13 +90,13 @@ public struct Subscript: ASTNode {
 
 /// Slice expression
 public struct Slice: ASTNode {
-    public let lower: Expression?
-    public let upper: Expression?
-    public let step: Expression?
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var lower: Expression?
+    public var upper: Expression?
+    public var step: Expression?
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         lower: Expression?,

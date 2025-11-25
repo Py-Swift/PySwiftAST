@@ -1,15 +1,15 @@
 /// Class definition
 public struct ClassDef: ASTNode {
-    public let name: String
-    public let bases: [Expression]
-    public let keywords: [Keyword]
-    public let body: [Statement]
-    public let decoratorList: [Expression]
-    public let typeParams: [TypeParam]
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var name: String
+    public var bases: [Expression]
+    public var keywords: [Keyword]
+    public var body: [Statement]
+    public var decoratorList: [Expression]
+    public var typeParams: [TypeParam]
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         name: String,

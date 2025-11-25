@@ -1,12 +1,12 @@
 /// Formatted value in f-string
 public struct FormattedValue: ASTNode {
-    public let value: Expression
-    public let conversion: Int
-    public let formatSpec: Expression?
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var value: Expression
+    public var conversion: Int
+    public var formatSpec: Expression?
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         value: Expression,
@@ -30,11 +30,11 @@ public struct FormattedValue: ASTNode {
 
 /// Joined string (f-string)
 public struct JoinedStr: ASTNode {
-    public let values: [Expression]
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var values: [Expression]
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         values: [Expression],

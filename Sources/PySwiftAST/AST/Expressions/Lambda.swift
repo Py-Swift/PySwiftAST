@@ -1,11 +1,11 @@
 /// Lambda expression
 public struct Lambda: ASTNode {
-    public let args: Arguments
-    public let body: Expression
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var args: Arguments
+    public var body: Expression
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         args: Arguments,

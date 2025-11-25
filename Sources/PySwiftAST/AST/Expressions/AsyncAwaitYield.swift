@@ -1,10 +1,10 @@
 /// Await expression
 public struct Await: ASTNode {
-    public let value: Expression
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var value: Expression
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         value: Expression,
@@ -24,11 +24,11 @@ public struct Await: ASTNode {
 
 /// Yield expression
 public struct Yield: ASTNode {
-    public let value: Expression?
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var value: Expression?
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         value: Expression?,
@@ -48,11 +48,11 @@ public struct Yield: ASTNode {
 
 /// Yield from expression
 public struct YieldFrom: ASTNode {
-    public let value: Expression
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var value: Expression
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         value: Expression,

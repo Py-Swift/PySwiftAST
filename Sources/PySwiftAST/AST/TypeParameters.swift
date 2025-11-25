@@ -7,9 +7,9 @@ public indirect enum TypeParam {
 
 /// Type variable
 public struct TypeVar {
-    public let name: String
-    public let bound: Expression?
-    public let defaultValue: Expression?
+    public var name: String
+    public var bound: Expression?
+    public var defaultValue: Expression?
     
     public init(
         name: String,
@@ -24,8 +24,8 @@ public struct TypeVar {
 
 /// Parameter specification
 public struct ParamSpec {
-    public let name: String
-    public let defaultValue: Expression?
+    public var name: String
+    public var defaultValue: Expression?
     
     public init(
         name: String,
@@ -38,8 +38,8 @@ public struct ParamSpec {
 
 /// Type variable tuple
 public struct TypeVarTuple {
-    public let name: String
-    public let defaultValue: Expression?
+    public var name: String
+    public var defaultValue: Expression?
     
     public init(
         name: String,

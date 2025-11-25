@@ -12,7 +12,7 @@ public indirect enum Pattern {
 
 /// Match value pattern
 public struct MatchValue {
-    public let value: Expression
+    public var value: Expression
     
     public init(value: Expression) {
         self.value = value
@@ -21,7 +21,7 @@ public struct MatchValue {
 
 /// Match singleton pattern
 public struct MatchSingleton {
-    public let value: ConstantValue
+    public var value: ConstantValue
     
     public init(value: ConstantValue) {
         self.value = value
@@ -30,7 +30,7 @@ public struct MatchSingleton {
 
 /// Match sequence pattern
 public struct MatchSequence {
-    public let patterns: [Pattern]
+    public var patterns: [Pattern]
     
     public init(patterns: [Pattern]) {
         self.patterns = patterns
@@ -39,9 +39,9 @@ public struct MatchSequence {
 
 /// Match mapping pattern
 public struct MatchMapping {
-    public let keys: [Expression]
-    public let patterns: [Pattern]
-    public let rest: String?
+    public var keys: [Expression]
+    public var patterns: [Pattern]
+    public var rest: String?
     
     public init(
         keys: [Expression],
@@ -56,10 +56,10 @@ public struct MatchMapping {
 
 /// Match class pattern
 public struct MatchClass {
-    public let cls: Expression
-    public let patterns: [Pattern]
-    public let kwdAttrs: [String]
-    public let kwdPatterns: [Pattern]
+    public var cls: Expression
+    public var patterns: [Pattern]
+    public var kwdAttrs: [String]
+    public var kwdPatterns: [Pattern]
     
     public init(
         cls: Expression,
@@ -76,7 +76,7 @@ public struct MatchClass {
 
 /// Match star pattern
 public struct MatchStar {
-    public let name: String?
+    public var name: String?
     
     public init(name: String?) {
         self.name = name
@@ -85,8 +85,8 @@ public struct MatchStar {
 
 /// Match as pattern
 public struct MatchAs {
-    public let pattern: Pattern?
-    public let name: String?
+    public var pattern: Pattern?
+    public var name: String?
     
     public init(
         pattern: Pattern?,
@@ -99,7 +99,7 @@ public struct MatchAs {
 
 /// Match or pattern
 public struct MatchOr {
-    public let patterns: [Pattern]
+    public var patterns: [Pattern]
     
     public init(patterns: [Pattern]) {
         self.patterns = patterns

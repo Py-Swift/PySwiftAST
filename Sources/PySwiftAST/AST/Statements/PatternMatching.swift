@@ -1,11 +1,11 @@
 /// Match statement (Python 3.10+)
 public struct Match: ASTNode {
-    public let subject: Expression
-    public let cases: [MatchCase]
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var subject: Expression
+    public var cases: [MatchCase]
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         subject: Expression,

@@ -1,12 +1,12 @@
 /// Function arguments
 public struct Arguments {
-    public let posonlyArgs: [Arg]
-    public let args: [Arg]
-    public let vararg: Arg?
-    public let kwonlyArgs: [Arg]
-    public let kwDefaults: [Expression?]
-    public let kwarg: Arg?
-    public let defaults: [Expression]
+    public var posonlyArgs: [Arg]
+    public var args: [Arg]
+    public var vararg: Arg?
+    public var kwonlyArgs: [Arg]
+    public var kwDefaults: [Expression?]
+    public var kwarg: Arg?
+    public var defaults: [Expression]
     
     public init(
         posonlyArgs: [Arg],
@@ -29,9 +29,9 @@ public struct Arguments {
 
 /// Function argument
 public struct Arg {
-    public let arg: String
-    public let annotation: Expression?
-    public let typeComment: String?
+    public var arg: String
+    public var annotation: Expression?
+    public var typeComment: String?
     
     public init(
         arg: String,
@@ -46,8 +46,8 @@ public struct Arg {
 
 /// Keyword argument
 public struct Keyword {
-    public let arg: String?
-    public let value: Expression
+    public var arg: String?
+    public var value: Expression
     
     public init(
         arg: String?,
@@ -60,8 +60,8 @@ public struct Keyword {
 
 /// Import alias
 public struct Alias {
-    public let name: String
-    public let asName: String?
+    public var name: String
+    public var asName: String?
     
     public init(
         name: String,
@@ -74,8 +74,8 @@ public struct Alias {
 
 /// With statement item
 public struct WithItem {
-    public let contextExpr: Expression
-    public let optionalVars: Expression?
+    public var contextExpr: Expression
+    public var optionalVars: Expression?
     
     public init(
         contextExpr: Expression,
@@ -88,9 +88,9 @@ public struct WithItem {
 
 /// Match case
 public struct MatchCase {
-    public let pattern: Pattern
-    public let guardExpr: Expression?
-    public let body: [Statement]
+    public var pattern: Pattern
+    public var guardExpr: Expression?
+    public var body: [Statement]
     
     public init(
         pattern: Pattern,
@@ -105,9 +105,9 @@ public struct MatchCase {
 
 /// Exception handler
 public struct ExceptHandler {
-    public let type: Expression?
-    public let name: String?
-    public let body: [Statement]
+    public var type: Expression?
+    public var name: String?
+    public var body: [Statement]
     
     public init(
         type: Expression?,
@@ -122,10 +122,10 @@ public struct ExceptHandler {
 
 /// Comprehension clause
 public struct Comprehension {
-    public let target: Expression
-    public let iter: Expression
-    public let ifs: [Expression]
-    public let isAsync: Bool
+    public var target: Expression
+    public var iter: Expression
+    public var ifs: [Expression]
+    public var isAsync: Bool
     
     public init(
         target: Expression,

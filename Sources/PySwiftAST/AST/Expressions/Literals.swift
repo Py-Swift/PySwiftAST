@@ -1,11 +1,11 @@
 /// Constant value
 public struct Constant: ASTNode {
-    public let value: ConstantValue
-    public let kind: String?
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var value: ConstantValue
+    public var kind: String?
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         value: ConstantValue,
@@ -39,12 +39,12 @@ public enum ConstantValue {
 
 /// Variable name
 public struct Name: ASTNode {
-    public let id: String
-    public let ctx: ExprContext
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var id: String
+    public var ctx: ExprContext
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         id: String,

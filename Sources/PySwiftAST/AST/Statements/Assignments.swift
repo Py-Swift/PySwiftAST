@@ -1,12 +1,12 @@
 /// Assignment statement
 public struct Assign: ASTNode {
-    public let targets: [Expression]
-    public let value: Expression
-    public let typeComment: String?
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var targets: [Expression]
+    public var value: Expression
+    public var typeComment: String?
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         targets: [Expression],
@@ -30,13 +30,13 @@ public struct Assign: ASTNode {
 
 /// Augmented assignment (+=, -=, etc.)
 public struct AugAssign: ASTNode {
-    public let target: Expression
-    public let op: Operator
-    public let value: Expression
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var target: Expression
+    public var op: Operator
+    public var value: Expression
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         target: Expression,
@@ -60,14 +60,14 @@ public struct AugAssign: ASTNode {
 
 /// Annotated assignment
 public struct AnnAssign: ASTNode {
-    public let target: Expression
-    public let annotation: Expression
-    public let value: Expression?
-    public let simple: Bool
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var target: Expression
+    public var annotation: Expression
+    public var value: Expression?
+    public var simple: Bool
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         target: Expression,
@@ -93,11 +93,11 @@ public struct AnnAssign: ASTNode {
 
 /// Delete statement
 public struct Delete: ASTNode {
-    public let targets: [Expression]
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var targets: [Expression]
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         targets: [Expression],

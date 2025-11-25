@@ -1,10 +1,10 @@
 /// Return statement
 public struct Return: ASTNode {
-    public let value: Expression?
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var value: Expression?
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         value: Expression?,
@@ -24,13 +24,13 @@ public struct Return: ASTNode {
 
 /// If statement
 public struct If: ASTNode {
-    public let test: Expression
-    public let body: [Statement]
-    public let orElse: [Statement]
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var test: Expression
+    public var body: [Statement]
+    public var orElse: [Statement]
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         test: Expression,
@@ -54,13 +54,13 @@ public struct If: ASTNode {
 
 /// While loop
 public struct While: ASTNode {
-    public let test: Expression
-    public let body: [Statement]
-    public let orElse: [Statement]
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var test: Expression
+    public var body: [Statement]
+    public var orElse: [Statement]
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         test: Expression,
@@ -84,15 +84,15 @@ public struct While: ASTNode {
 
 /// For loop
 public struct For: ASTNode {
-    public let target: Expression
-    public let iter: Expression
-    public let body: [Statement]
-    public let orElse: [Statement]
-    public let typeComment: String?
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var target: Expression
+    public var iter: Expression
+    public var body: [Statement]
+    public var orElse: [Statement]
+    public var typeComment: String?
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         target: Expression,
@@ -120,15 +120,15 @@ public struct For: ASTNode {
 
 /// Async for loop
 public struct AsyncFor: ASTNode {
-    public let target: Expression
-    public let iter: Expression
-    public let body: [Statement]
-    public let orElse: [Statement]
-    public let typeComment: String?
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var target: Expression
+    public var iter: Expression
+    public var body: [Statement]
+    public var orElse: [Statement]
+    public var typeComment: String?
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         target: Expression,
@@ -156,10 +156,10 @@ public struct AsyncFor: ASTNode {
 
 /// Break statement
 public struct Break: ASTNode {
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         lineno: Int,
@@ -177,10 +177,10 @@ public struct Break: ASTNode {
 
 /// Continue statement
 public struct Continue: ASTNode {
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         lineno: Int,
@@ -198,10 +198,10 @@ public struct Continue: ASTNode {
 
 /// Pass statement
 public struct Pass: ASTNode {
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         lineno: Int,

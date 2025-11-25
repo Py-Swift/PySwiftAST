@@ -1,12 +1,12 @@
 /// Conditional expression (ternary operator)
 public struct IfExp: ASTNode {
-    public let test: Expression
-    public let body: Expression
-    public let orElse: Expression
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var test: Expression
+    public var body: Expression
+    public var orElse: Expression
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         test: Expression,

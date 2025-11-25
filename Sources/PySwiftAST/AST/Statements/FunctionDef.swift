@@ -1,16 +1,16 @@
 /// Function definition
 public struct FunctionDef: ASTNode {
-    public let name: String
-    public let args: Arguments
-    public let body: [Statement]
-    public let decoratorList: [Expression]
-    public let returns: Expression?
-    public let typeComment: String?
-    public let typeParams: [TypeParam]
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var name: String
+    public var args: Arguments
+    public var body: [Statement]
+    public var decoratorList: [Expression]
+    public var returns: Expression?
+    public var typeComment: String?
+    public var typeParams: [TypeParam]
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         name: String,
@@ -42,17 +42,17 @@ public struct FunctionDef: ASTNode {
 
 /// Async function definition
 public struct AsyncFunctionDef: ASTNode {
-    public let name: String
-    public let args: Arguments
-    public let body: [Statement]
-    public let decoratorList: [Expression]
-    public let returns: Expression?
-    public let typeComment: String?
-    public let typeParams: [TypeParam]
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var name: String
+    public var args: Arguments
+    public var body: [Statement]
+    public var decoratorList: [Expression]
+    public var returns: Expression?
+    public var typeComment: String?
+    public var typeParams: [TypeParam]
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         name: String,

@@ -1,10 +1,10 @@
 /// Import statement
 public struct Import: ASTNode {
-    public let names: [Alias]
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var names: [Alias]
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         names: [Alias],
@@ -24,13 +24,13 @@ public struct Import: ASTNode {
 
 /// Import from statement
 public struct ImportFrom: ASTNode {
-    public let module: String?
-    public let names: [Alias]
-    public let level: Int
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var module: String?
+    public var names: [Alias]
+    public var level: Int
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         module: String?,

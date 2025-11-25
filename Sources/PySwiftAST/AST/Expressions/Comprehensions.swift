@@ -1,11 +1,11 @@
 /// List comprehension
 public struct ListComp: ASTNode {
-    public let elt: Expression
-    public let generators: [Comprehension]
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var elt: Expression
+    public var generators: [Comprehension]
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         elt: Expression,
@@ -27,12 +27,12 @@ public struct ListComp: ASTNode {
 
 /// Set comprehension
 public struct SetComp: ASTNode {
-    public let elt: Expression
-    public let generators: [Comprehension]
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var elt: Expression
+    public var generators: [Comprehension]
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         elt: Expression,
@@ -54,13 +54,13 @@ public struct SetComp: ASTNode {
 
 /// Dictionary comprehension
 public struct DictComp: ASTNode {
-    public let key: Expression
-    public let value: Expression
-    public let generators: [Comprehension]
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var key: Expression
+    public var value: Expression
+    public var generators: [Comprehension]
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         key: Expression,
@@ -84,12 +84,12 @@ public struct DictComp: ASTNode {
 
 /// Generator expression
 public struct GeneratorExp: ASTNode {
-    public let elt: Expression
-    public let generators: [Comprehension]
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var elt: Expression
+    public var generators: [Comprehension]
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         elt: Expression,

@@ -1,11 +1,11 @@
 /// Dictionary literal
 public struct Dict: ASTNode {
-    public let keys: [Expression?]
-    public let values: [Expression]
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var keys: [Expression?]
+    public var values: [Expression]
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         keys: [Expression?],
@@ -27,11 +27,11 @@ public struct Dict: ASTNode {
 
 /// Set literal
 public struct Set: ASTNode {
-    public let elts: [Expression]
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var elts: [Expression]
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         elts: [Expression],
@@ -51,12 +51,12 @@ public struct Set: ASTNode {
 
 /// List literal
 public struct List: ASTNode {
-    public let elts: [Expression]
-    public let ctx: ExprContext
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var elts: [Expression]
+    public var ctx: ExprContext
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         elts: [Expression],
@@ -78,12 +78,12 @@ public struct List: ASTNode {
 
 /// Tuple literal
 public struct Tuple: ASTNode {
-    public let elts: [Expression]
-    public let ctx: ExprContext
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var elts: [Expression]
+    public var ctx: ExprContext
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         elts: [Expression],

@@ -1,12 +1,12 @@
 /// With statement
 public struct With: ASTNode {
-    public let items: [WithItem]
-    public let body: [Statement]
-    public let typeComment: String?
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var items: [WithItem]
+    public var body: [Statement]
+    public var typeComment: String?
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         items: [WithItem],
@@ -30,13 +30,13 @@ public struct With: ASTNode {
 
 /// Async with statement
 public struct AsyncWith: ASTNode {
-    public let items: [WithItem]
-    public let body: [Statement]
-    public let typeComment: String?
-    public let lineno: Int
-    public let colOffset: Int
-    public let endLineno: Int?
-    public let endColOffset: Int?
+    public var items: [WithItem]
+    public var body: [Statement]
+    public var typeComment: String?
+    public var lineno: Int
+    public var colOffset: Int
+    public var endLineno: Int?
+    public var endColOffset: Int?
 
     public init(
         items: [WithItem],
