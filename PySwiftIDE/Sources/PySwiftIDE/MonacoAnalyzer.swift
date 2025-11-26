@@ -75,6 +75,9 @@ public class MonacoAnalyzer {
         // Add numeric types and special attributes
         items.append(contentsOf: getNumericAndSpecialCompletions())
         
+        // Add itertools module completions
+        items.append(contentsOf: getItertoolsCompletions())
+        
         // If we have AST, add context-aware completions
         if let ast = ast {
             items.append(contentsOf: getContextualCompletions(at: position, in: ast))
@@ -878,6 +881,123 @@ public class MonacoAnalyzer {
         for (name, type, _) in specialAttrs {
             items.append(CompletionItem.variable(name: name, type: type))
         }
+        
+        return items
+    }
+    
+    private func getItertoolsCompletions() -> [CompletionItem] {
+        var items: [CompletionItem] = []
+        
+        // Infinite iterators
+        items.append(CompletionItem.function(
+            name: "itertools.count",
+            parameters: ["start=0", "step=1"],
+            documentation: "Make iterator returning evenly spaced values starting with start"
+        ))
+        items.append(CompletionItem.function(
+            name: "itertools.cycle",
+            parameters: ["iterable"],
+            documentation: "Make iterator returning elements from iterable and saving a copy. Repeats indefinitely"
+        ))
+        items.append(CompletionItem.function(
+            name: "itertools.repeat",
+            parameters: ["object", "times=None"],
+            documentation: "Make iterator that returns object over and over again. Runs indefinitely unless times specified"
+        ))
+        
+        // Iterators terminating on shortest input sequence
+        items.append(CompletionItem.function(
+            name: "itertools.accumulate",
+            parameters: ["iterable", "function=operator.add", "initial=None"],
+            documentation: "Make iterator that returns accumulated sums or accumulated results from binary functions"
+        ))
+        items.append(CompletionItem.function(
+            name: "itertools.batched",
+            parameters: ["iterable", "n", "strict=False"],
+            documentation: "Batch data from iterable into tuples of length n. Last batch may be shorter unless strict=True"
+        ))
+        items.append(CompletionItem.function(
+            name: "itertools.chain",
+            parameters: ["*iterables"],
+            documentation: "Make iterator that returns elements from first iterable until exhausted, then next iterable"
+        ))
+        items.append(CompletionItem.function(
+            name: "itertools.chain.from_iterable",
+            parameters: ["iterable"],
+            documentation: "Alternate constructor for chain(). Gets chained inputs from single iterable"
+        ))
+        items.append(CompletionItem.function(
+            name: "itertools.compress",
+            parameters: ["data", "selectors"],
+            documentation: "Make iterator that returns elements from data where corresponding selector is true"
+        ))
+        items.append(CompletionItem.function(
+            name: "itertools.dropwhile",
+            parameters: ["predicate", "iterable"],
+            documentation: "Make iterator that drops elements while predicate is true, then returns every element"
+        ))
+        items.append(CompletionItem.function(
+            name: "itertools.filterfalse",
+            parameters: ["predicate", "iterable"],
+            documentation: "Make iterator that filters elements returning only those where predicate is false"
+        ))
+        items.append(CompletionItem.function(
+            name: "itertools.groupby",
+            parameters: ["iterable", "key=None"],
+            documentation: "Make iterator returning consecutive keys and groups from iterable"
+        ))
+        items.append(CompletionItem.function(
+            name: "itertools.islice",
+            parameters: ["iterable", "stop"],
+            documentation: "Make iterator that returns selected elements from iterable. islice(iterable, start, stop, step)"
+        ))
+        items.append(CompletionItem.function(
+            name: "itertools.pairwise",
+            parameters: ["iterable"],
+            documentation: "Return successive overlapping pairs taken from input iterable"
+        ))
+        items.append(CompletionItem.function(
+            name: "itertools.starmap",
+            parameters: ["function", "iterable"],
+            documentation: "Make iterator that computes function using arguments obtained from iterable"
+        ))
+        items.append(CompletionItem.function(
+            name: "itertools.takewhile",
+            parameters: ["predicate", "iterable"],
+            documentation: "Make iterator that returns elements as long as predicate is true"
+        ))
+        items.append(CompletionItem.function(
+            name: "itertools.tee",
+            parameters: ["iterable", "n=2"],
+            documentation: "Return n independent iterators from single iterable"
+        ))
+        items.append(CompletionItem.function(
+            name: "itertools.zip_longest",
+            parameters: ["*iterables", "fillvalue=None"],
+            documentation: "Make iterator that aggregates elements from iterables. Continues until longest is exhausted"
+        ))
+        
+        // Combinatoric iterators
+        items.append(CompletionItem.function(
+            name: "itertools.product",
+            parameters: ["*iterables", "repeat=1"],
+            documentation: "Cartesian product of input iterables. Equivalent to nested for-loops"
+        ))
+        items.append(CompletionItem.function(
+            name: "itertools.permutations",
+            parameters: ["iterable", "r=None"],
+            documentation: "Return r-length permutations of elements from iterable"
+        ))
+        items.append(CompletionItem.function(
+            name: "itertools.combinations",
+            parameters: ["iterable", "r"],
+            documentation: "Return r-length subsequences of elements from iterable (no repeated elements)"
+        ))
+        items.append(CompletionItem.function(
+            name: "itertools.combinations_with_replacement",
+            parameters: ["iterable", "r"],
+            documentation: "Return r-length subsequences allowing individual elements to be repeated"
+        ))
         
         return items
     }
