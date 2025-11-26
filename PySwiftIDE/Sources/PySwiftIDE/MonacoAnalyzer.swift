@@ -72,6 +72,9 @@ public class MonacoAnalyzer {
         // Add sequence operations and utilities
         items.append(contentsOf: getSequenceOperations())
         
+        // Add numeric types and special attributes
+        items.append(contentsOf: getNumericAndSpecialCompletions())
+        
         // If we have AST, add context-aware completions
         if let ast = ast {
             items.append(contentsOf: getContextualCompletions(at: position, in: ast))
@@ -763,6 +766,117 @@ public class MonacoAnalyzer {
                     documentation: doc
                 ))
             }
+        }
+        
+        return items
+    }
+    
+    // MARK: - Numeric Types and Special Attributes
+    
+    /// Returns completions for numeric type methods and special attributes
+    private func getNumericAndSpecialCompletions() -> [CompletionItem] {
+        var items: [CompletionItem] = []
+        
+        // Integer methods (int type)
+        let intMethods: [(String, [String], String)] = [
+            ("bit_length", [], "Return number of bits necessary to represent integer in binary"),
+            ("bit_count", [], "Return number of ones in binary representation"),
+            ("to_bytes", ["length=1", "byteorder='big'", "signed=False"], "Return array of bytes representing integer"),
+            ("from_bytes", ["bytes", "byteorder='big'", "signed=False"], "Return integer represented by byte array (class method)"),
+            ("as_integer_ratio", [], "Return pair of integers whose ratio equals the original"),
+            ("is_integer", [], "Returns True (for duck-type compatibility with float)")
+        ]
+        
+        for (name, params, doc) in intMethods {
+            items.append(CompletionItem.function(
+                name: "int.\(name)",
+                parameters: params,
+                documentation: doc
+            ))
+        }
+        
+        // Float methods
+        let floatMethods: [(String, [String], String)] = [
+            ("as_integer_ratio", [], "Return pair of integers whose ratio equals the float"),
+            ("is_integer", [], "Return True if float has integral value"),
+            ("hex", [], "Return hexadecimal representation of float"),
+            ("fromhex", ["s"], "Create float from hexadecimal string (class method)")
+        ]
+        
+        for (name, params, doc) in floatMethods {
+            items.append(CompletionItem.function(
+                name: "float.\(name)",
+                parameters: params,
+                documentation: doc
+            ))
+        }
+        
+        // Complex number attributes
+        let complexAttrs: [(String, String)] = [
+            ("real", "The real part of complex number"),
+            ("imag", "The imaginary part of complex number")
+        ]
+        
+        for (name, _) in complexAttrs {
+            items.append(CompletionItem.variable(name: "complex.\(name)", type: "float"))
+        }
+        
+        items.append(CompletionItem.function(
+            name: "complex.conjugate",
+            parameters: [],
+            documentation: "Return complex conjugate"
+        ))
+        
+        // Boolean constants
+        items.append(CompletionItem.constant(
+            name: "True",
+            value: "True",
+            documentation: "Boolean true constant"
+        ))
+        items.append(CompletionItem.constant(
+            name: "False",
+            value: "False",
+            documentation: "Boolean false constant"
+        ))
+        
+        // Special singleton objects
+        items.append(CompletionItem.constant(
+            name: "None",
+            value: "None",
+            documentation: "The null object - represents absence of value"
+        ))
+        items.append(CompletionItem.constant(
+            name: "Ellipsis",
+            value: "...",
+            documentation: "The ellipsis object - commonly used to indicate omission"
+        ))
+        items.append(CompletionItem.constant(
+            name: "...",
+            value: "...",
+            documentation: "The ellipsis literal - same as Ellipsis"
+        ))
+        items.append(CompletionItem.constant(
+            name: "NotImplemented",
+            value: "NotImplemented",
+            documentation: "Returned from comparisons and binary ops on unsupported types"
+        ))
+        
+        // Special method attributes  
+        let specialAttrs: [(String, String, String)] = [
+            ("__name__", "str", "Name of class, function, method, descriptor, or generator"),
+            ("__qualname__", "str", "Qualified name of class, function, method, or descriptor"),
+            ("__module__", "str", "Name of module in which class or function was defined"),
+            ("__doc__", "str", "Documentation string, or None if undefined"),
+            ("__dict__", "dict", "Dictionary containing object's namespace"),
+            ("__class__", "type", "Class of an instance"),
+            ("__annotations__", "dict", "Dictionary of variable annotations"),
+            ("__code__", "code", "Code object (for functions)"),
+            ("__func__", "function", "Underlying function (for methods)"),
+            ("__self__", "object", "Instance bound to method")
+        ]
+        
+        for (name, type, _) in specialAttrs {
+            items.append(CompletionItem.variable(name: name, type: type))
         }
         
         return items
