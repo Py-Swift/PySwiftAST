@@ -606,4 +606,15 @@ extension CompletionItem {
             insertText: name
         )
     }
+    
+    /// Create a constant completion
+    public static func constant(name: String, value: String, documentation: String? = nil) -> CompletionItem {
+        CompletionItem(
+            label: name,
+            kind: CompletionItemKind.constant,
+            detail: "\(name) = \(value)",
+            documentation: documentation.map { HoverContent.plainText($0) },
+            insertText: name
+        )
+    }
 }

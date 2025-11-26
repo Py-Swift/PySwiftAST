@@ -63,6 +63,9 @@ public class MonacoAnalyzer {
         // Add builtin functions
         items.append(contentsOf: getBuiltinCompletions())
         
+        // Add math module completions
+        items.append(contentsOf: getMathModuleCompletions())
+        
         // If we have AST, add context-aware completions
         if let ast = ast {
             items.append(contentsOf: getContextualCompletions(at: position, in: ast))
@@ -336,6 +339,113 @@ public class MonacoAnalyzer {
         return builtins.map { name, params in
             CompletionItem.function(name: name, parameters: params)
         }
+    }
+    
+    private func getMathModuleCompletions() -> [CompletionItem] {
+        var items: [CompletionItem] = []
+        
+        // Math module constants
+        let constants = [
+            ("pi", "3.141592653589793", "The mathematical constant π"),
+            ("e", "2.718281828459045", "The mathematical constant e"),
+            ("tau", "6.283185307179586", "The mathematical constant τ = 2π"),
+            ("inf", "Positive infinity", "Floating-point positive infinity"),
+            ("nan", "Not a number", "Floating-point 'not a number' (NaN)")
+        ]
+        
+        for (name, value, doc) in constants {
+            items.append(CompletionItem.constant(name: "math.\(name)", value: value, documentation: doc))
+        }
+        
+        // Number-theoretic and representation functions
+        let numberTheory: [(String, [String], String)] = [
+            ("ceil", ["x"], "Return the ceiling of x, the smallest integer >= x"),
+            ("comb", ["n", "k"], "Return n! / (k! * (n-k)!), the number of ways to choose k items from n"),
+            ("copysign", ["x", "y"], "Return a float with the magnitude of x and the sign of y"),
+            ("fabs", ["x"], "Return the absolute value of x"),
+            ("factorial", ["n"], "Return n factorial as an integer"),
+            ("floor", ["x"], "Return the floor of x, the largest integer <= x"),
+            ("fmod", ["x", "y"], "Return x modulo y as defined by the platform C library"),
+            ("frexp", ["x"], "Return the mantissa and exponent of x as the pair (m, e)"),
+            ("fsum", ["iterable"], "Return an accurate floating point sum of values in the iterable"),
+            ("gcd", ["*integers"], "Return the greatest common divisor of the specified integer arguments"),
+            ("isclose", ["a", "b", "rel_tol=1e-09", "abs_tol=0.0"], "Return True if a is close in value to b"),
+            ("isfinite", ["x"], "Return True if x is neither an infinity nor a NaN"),
+            ("isinf", ["x"], "Return True if x is a positive or negative infinity"),
+            ("isnan", ["x"], "Return True if x is a NaN (not a number)"),
+            ("isqrt", ["n"], "Return the integer square root of n"),
+            ("lcm", ["*integers"], "Return the least common multiple of the specified integer arguments"),
+            ("ldexp", ["x", "i"], "Return x * (2**i), the inverse of frexp()"),
+            ("modf", ["x"], "Return the fractional and integer parts of x"),
+            ("nextafter", ["x", "y"], "Return the next floating-point value after x towards y"),
+            ("perm", ["n", "k=None"], "Return n! / (n-k)!, the number of ways to choose and arrange k items from n"),
+            ("remainder", ["x", "y"], "Return the IEEE 754-style remainder of x with respect to y"),
+            ("trunc", ["x"], "Return x truncated to an Integral")
+        ]
+        
+        // Power and logarithmic functions
+        let powerLog: [(String, [String], String)] = [
+            ("cbrt", ["x"], "Return the cube root of x"),
+            ("exp", ["x"], "Return e raised to the power x"),
+            ("exp2", ["x"], "Return 2 raised to the power x"),
+            ("expm1", ["x"], "Return e**x - 1, computed in a way that is accurate for small x"),
+            ("log", ["x", "base=e"], "Return the logarithm of x to the given base"),
+            ("log1p", ["x"], "Return the natural logarithm of 1+x (base e)"),
+            ("log2", ["x"], "Return the base-2 logarithm of x"),
+            ("log10", ["x"], "Return the base-10 logarithm of x"),
+            ("pow", ["x", "y"], "Return x raised to the power y"),
+            ("sqrt", ["x"], "Return the square root of x")
+        ]
+        
+        // Trigonometric functions
+        let trig: [(String, [String], String)] = [
+            ("acos", ["x"], "Return the arc cosine of x, in radians"),
+            ("asin", ["x"], "Return the arc sine of x, in radians"),
+            ("atan", ["x"], "Return the arc tangent of x, in radians"),
+            ("atan2", ["y", "x"], "Return atan(y / x), in radians"),
+            ("cos", ["x"], "Return the cosine of x radians"),
+            ("dist", ["p", "q"], "Return the Euclidean distance between two points p and q"),
+            ("hypot", ["*coordinates"], "Return the Euclidean norm, sqrt(sum(x**2 for x in coordinates))"),
+            ("sin", ["x"], "Return the sine of x radians"),
+            ("tan", ["x"], "Return the tangent of x radians")
+        ]
+        
+        // Hyperbolic functions
+        let hyperbolic: [(String, [String], String)] = [
+            ("acosh", ["x"], "Return the inverse hyperbolic cosine of x"),
+            ("asinh", ["x"], "Return the inverse hyperbolic sine of x"),
+            ("atanh", ["x"], "Return the inverse hyperbolic tangent of x"),
+            ("cosh", ["x"], "Return the hyperbolic cosine of x"),
+            ("sinh", ["x"], "Return the hyperbolic sine of x"),
+            ("tanh", ["x"], "Return the hyperbolic tangent of x")
+        ]
+        
+        // Angular conversion
+        let angular: [(String, [String], String)] = [
+            ("degrees", ["x"], "Convert angle x from radians to degrees"),
+            ("radians", ["x"], "Convert angle x from degrees to radians")
+        ]
+        
+        // Special functions
+        let special: [(String, [String], String)] = [
+            ("erf", ["x"], "Return the error function at x"),
+            ("erfc", ["x"], "Return the complementary error function at x"),
+            ("gamma", ["x"], "Return the Gamma function at x"),
+            ("lgamma", ["x"], "Return the natural logarithm of the absolute value of the Gamma function at x")
+        ]
+        
+        // Combine all function groups
+        let allFunctions = numberTheory + powerLog + trig + hyperbolic + angular + special
+        
+        for (name, params, doc) in allFunctions {
+            items.append(CompletionItem.function(
+                name: "math.\(name)",
+                parameters: params,
+                documentation: doc
+            ))
+        }
+        
+        return items
     }
     
     private func getContextualCompletions(at position: Position, in module: Module) -> [CompletionItem] {
@@ -776,45 +886,34 @@ public class MonacoAnalyzer {
         switch statement {
         case .functionDef(let funcDef):
             // Function name as function token
-            if let line = funcDef.lineno {
-                builder.push(
-                    line: line,
-                    startChar: funcDef.colOffset,
-                    length: funcDef.name.count,
-                    tokenType: .function,
-                    tokenModifiers: [.definition]
-                )
-            }
+            let line = funcDef.lineno
+            builder.push(
+                line: line,
+                startChar: funcDef.colOffset,
+                length: funcDef.name.count,
+                tokenType: .function,
+                tokenModifiers: [.definition]
+            )
             
-            // Parameters
-            for arg in funcDef.args.args {
-                if let line = arg.lineno {
-                    builder.push(
-                        line: line,
-                        startChar: arg.colOffset,
-                        length: arg.arg.count,
-                        tokenType: .parameter,
-                        tokenModifiers: []
-                    )
-                }
-            }
+            // Parameters (Arg doesn't have lineno/colOffset, skip for now)
+            // TODO: Add parameter token classification when we have proper AST traversal
             
         case .classDef(let classDef):
             // Class name as class token
-            if let line = classDef.lineno {
-                builder.push(
-                    line: line,
-                    startChar: classDef.colOffset,
-                    length: classDef.name.count,
-                    tokenType: .class,
-                    tokenModifiers: [.definition]
-                )
-            }
+            let line = classDef.lineno
+            builder.push(
+                line: line,
+                startChar: classDef.colOffset,
+                length: classDef.name.count,
+                tokenType: .class,
+                tokenModifiers: [.definition]
+            )
             
         case .assign(let assign):
             // Variables
             for target in assign.targets {
-                if case .name(let name) = target, let line = name.lineno {
+                if case .name(let name) = target {
+                    let line = name.lineno
                     builder.push(
                         line: line,
                         startChar: name.colOffset,
@@ -923,7 +1022,6 @@ public class MonacoAnalyzer {
             }
         } else if character == "\n" {
             // Auto-indent new line
-            let lineIndex = position.lineNumber - 1
             let indent = calculateIndentation(at: position.lineNumber)
             let indentString = String(repeating: options.insertSpaces ? " " : "\t",
                                      count: options.insertSpaces ? indent : indent / options.tabSize)
@@ -968,26 +1066,26 @@ public class MonacoAnalyzer {
         let statements = getStatements(from: ast)
         for statement in statements {
             switch statement {
-            case .import(let imp):
+            case .importStmt(let imp):
                 for alias in imp.names {
-                    if let line = imp.lineno {
-                        let range = IDERange(
-                            startLineNumber: line,
-                            startColumn: imp.colOffset + 7, // After "import "
-                            endLineNumber: line,
-                            endColumn: imp.colOffset + 7 + alias.name.count
-                        )
-                        
-                        links.append(DocumentLink(
-                            range: range,
-                            url: "file://\(alias.name.replacingOccurrences(of: ".", with: "/")).py",
-                            tooltip: "Open \(alias.name)"
-                        ))
-                    }
+                    let line = imp.lineno
+                    let range = IDERange(
+                        startLineNumber: line,
+                        startColumn: imp.colOffset + 7, // After "import "
+                        endLineNumber: line,
+                        endColumn: imp.colOffset + 7 + alias.name.count
+                    )
+                    
+                    links.append(DocumentLink(
+                        range: range,
+                        url: "file://\(alias.name.replacingOccurrences(of: ".", with: "/")).py",
+                        tooltip: "Open \(alias.name)"
+                    ))
                 }
                 
             case .importFrom(let impFrom):
-                if let moduleName = impFrom.module, let line = impFrom.lineno {
+                if let moduleName = impFrom.module {
+                    let line = impFrom.lineno
                     let range = IDERange(
                         startLineNumber: line,
                         startColumn: impFrom.colOffset + 5, // After "from "
@@ -1093,30 +1191,30 @@ public class MonacoAnalyzer {
         // Find the function at the given position
         let statements = getStatements(from: ast)
         for statement in statements {
-            if case .functionDef(let funcDef) = statement,
-               let line = funcDef.lineno,
-               line == position.lineNumber {
-                
-                let range = IDERange(
-                    startLineNumber: line,
-                    startColumn: funcDef.colOffset,
-                    endLineNumber: line + funcDef.body.count,
-                    endColumn: 1
-                )
-                
-                return [CallHierarchyItem(
-                    name: funcDef.name,
-                    kind: .function,
-                    detail: "def \(funcDef.name)(...)",
-                    uri: "document",
-                    range: range,
-                    selectionRange: IDERange(
+            if case .functionDef(let funcDef) = statement {
+                let line = funcDef.lineno
+                if line == position.lineNumber {
+                    let range = IDERange(
                         startLineNumber: line,
                         startColumn: funcDef.colOffset,
-                        endLineNumber: line,
-                        endColumn: funcDef.colOffset + funcDef.name.count
+                        endLineNumber: line + funcDef.body.count,
+                        endColumn: 1
                     )
-                )]
+                    
+                    return [CallHierarchyItem(
+                        name: funcDef.name,
+                        kind: .function,
+                        detail: "def \(funcDef.name)(...)",
+                        uri: "document",
+                        range: range,
+                        selectionRange: IDERange(
+                            startLineNumber: line,
+                            startColumn: funcDef.colOffset,
+                            endLineNumber: line,
+                            endColumn: funcDef.colOffset + funcDef.name.count
+                        )
+                    )]
+                }
             }
         }
         
@@ -1146,30 +1244,30 @@ public class MonacoAnalyzer {
         // Find the class at the given position
         let statements = getStatements(from: ast)
         for statement in statements {
-            if case .classDef(let classDef) = statement,
-               let line = classDef.lineno,
-               line == position.lineNumber {
-                
-                let range = IDERange(
-                    startLineNumber: line,
-                    startColumn: classDef.colOffset,
-                    endLineNumber: line + classDef.body.count,
-                    endColumn: 1
-                )
-                
-                return [TypeHierarchyItem(
-                    name: classDef.name,
-                    kind: .class,
-                    detail: "class \(classDef.name)",
-                    uri: "document",
-                    range: range,
-                    selectionRange: IDERange(
+            if case .classDef(let classDef) = statement {
+                let line = classDef.lineno
+                if line == position.lineNumber {
+                    let range = IDERange(
                         startLineNumber: line,
                         startColumn: classDef.colOffset,
-                        endLineNumber: line,
-                        endColumn: classDef.colOffset + classDef.name.count
+                        endLineNumber: line + classDef.body.count,
+                        endColumn: 1
                     )
-                )]
+                    
+                    return [TypeHierarchyItem(
+                        name: classDef.name,
+                        kind: .class,
+                        detail: "class \(classDef.name)",
+                        uri: "document",
+                        range: range,
+                        selectionRange: IDERange(
+                            startLineNumber: line,
+                            startColumn: classDef.colOffset,
+                            endLineNumber: line,
+                            endColumn: classDef.colOffset + classDef.name.count
+                        )
+                    )]
+                }
             }
         }
         
@@ -1202,22 +1300,22 @@ public class MonacoAnalyzer {
         let statements = getStatements(from: ast)
         for statement in statements {
             // Look for variable assignments
-            if case .assign(let assign) = statement,
-               let line = assign.lineno,
-               line >= range.startLineNumber && line <= range.endLineNumber {
-                
-                for target in assign.targets {
-                    if case .name(let name) = target {
-                        inlineValues.append(.variableLookup(InlineValueVariableLookup(
-                            range: IDERange(
-                                startLineNumber: line,
-                                startColumn: name.colOffset,
-                                endLineNumber: line,
-                                endColumn: name.colOffset + name.id.count
-                            ),
-                            variableName: name.id,
-                            caseSensitiveLookup: true
-                        )))
+            if case .assign(let assign) = statement {
+                let line = assign.lineno
+                if line >= range.startLineNumber && line <= range.endLineNumber {
+                    for target in assign.targets {
+                        if case .name(let name) = target {
+                            inlineValues.append(.variableLookup(InlineValueVariableLookup(
+                                range: IDERange(
+                                    startLineNumber: line,
+                                    startColumn: name.colOffset,
+                                    endLineNumber: line,
+                                    endColumn: name.colOffset + name.id.count
+                                ),
+                                variableName: name.id,
+                                caseSensitiveLookup: true
+                            )))
+                        }
                     }
                 }
             }
