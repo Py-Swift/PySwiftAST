@@ -12,23 +12,9 @@ public func parsePython(_ source: String) throws -> Module {
     return try parser.parse()
 }
 
-/// Parse Python source code into an AST using UTF-8 tokenizer (19x faster)
-public func parsePythonFast(_ source: String) throws -> Module {
-    let tokenizer = UTF8Tokenizer(source: source)
-    let tokens = try tokenizer.tokenize()
-    let parser = Parser(tokens: tokens, source: source)
-    return try parser.parse()
-}
-
 /// Tokenize Python source code
 public func tokenizePython(_ source: String) throws -> [Token] {
     let tokenizer = Tokenizer(source: source)
-    return try tokenizer.tokenize()
-}
-
-/// Tokenize Python source code using UTF-8 tokenizer (19x faster)
-public func tokenizePythonFast(_ source: String) throws -> [Token] {
-    let tokenizer = UTF8Tokenizer(source: source)
     return try tokenizer.tokenize()
 }
 

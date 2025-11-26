@@ -5,7 +5,7 @@ import PySwiftCodeGen
 let args = CommandLine.arguments
 guard args.count >= 4 else {
     print("Usage: pyswift-benchmark <file> <iterations> <mode>")
-    print("  mode: parse | roundtrip | tokenize | tokenize-utf8")
+    print("  mode: parse | roundtrip | tokenize")
     exit(1)
 }
 
@@ -31,7 +31,7 @@ do {
 var times: [Double] = []
 
 if mode == "tokenize" {
-    // Benchmark old tokenizer
+    // Benchmark UTF-8 tokenizer
     // Warmup
     for _ in 0..<10 {
         _ = try? Tokenizer(source: source).tokenize()
@@ -40,19 +40,6 @@ if mode == "tokenize" {
     for _ in 0..<iterations {
         let start = Date()
         _ = try? Tokenizer(source: source).tokenize()
-        let end = Date()
-        times.append(end.timeIntervalSince(start))
-    }
-} else if mode == "tokenize-utf8" {
-    // Benchmark new UTF8Tokenizer
-    // Warmup
-    for _ in 0..<10 {
-        _ = try? UTF8Tokenizer(source: source).tokenize()
-    }
-    
-    for _ in 0..<iterations {
-        let start = Date()
-        _ = try? UTF8Tokenizer(source: source).tokenize()
         let end = Date()
         times.append(end.timeIntervalSince(start))
     }
@@ -91,7 +78,7 @@ if mode == "tokenize" {
         times.append(end.timeIntervalSince(start))
     }
 } else {
-    print("Error: Invalid mode '\(mode)'. Use 'parse', 'roundtrip', 'tokenize', or 'tokenize-utf8'")
+    print("Error: Invalid mode '\(mode)'. Use 'parse', 'roundtrip', or 'tokenize'")
     exit(1)
 }
 

@@ -813,7 +813,7 @@ func loadSyntaxErrorResource(_ filename: String) throws -> String {
     print("\n")
     
     do {
-        let _ = try parsePythonFast(source)
+        let _ = try parsePython(source)
         print("❌ ERROR: Parser should have failed")
         #expect(Bool(false), "Parser should fail on missing colon")
     } catch {
@@ -839,7 +839,7 @@ func loadSyntaxErrorResource(_ filename: String) throws -> String {
     print("\n=== Testing class definition error ===")
     
     do {
-        let _ = try parsePythonFast(source)
+        let _ = try parsePython(source)
         #expect(Bool(false), "Parser should fail on missing colon")
     } catch {
         print("Error output:")
@@ -861,7 +861,7 @@ func loadSyntaxErrorResource(_ filename: String) throws -> String {
     print("\n=== Testing while loop error ===")
     
     do {
-        let _ = try parsePythonFast(source)
+        let _ = try parsePython(source)
         #expect(Bool(false), "Parser should fail on missing colon")
     } catch {
         print("Error output:")

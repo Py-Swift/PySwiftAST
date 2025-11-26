@@ -18,7 +18,7 @@ public class PythonValidator {
         var ast: Module? = nil
         
         do {
-            ast = try parsePythonFast(source)
+            ast = try parsePython(source)
         } catch let error as ParseError {
             // Convert ParseError to Diagnostic
             diagnostics.append(convertParseError(error))

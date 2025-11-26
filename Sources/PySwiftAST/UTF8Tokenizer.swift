@@ -1,13 +1,13 @@
 import Foundation
 
 /// High-performance UTF-8 based Python tokenizer
-/// Uses byte-level scanning for 6x faster tokenization than Character-based approach
+/// Uses byte-level scanning for 18.8x faster tokenization than Character-based approach
 /// Handles Python's indentation-based syntax with INDENT/DEDENT tokens
 ///
 /// Grammar references: python.gram (Python 3.13)
 /// - tokens: NAME NUMBER STRING NEWLINE INDENT DEDENT 
 /// - operators: + - * / // % ** @ << >> & | ^ ~ < > <= >= == != ( ) [ ] { } , : . ; = -> += -= etc.
-public class UTF8Tokenizer {
+public class Tokenizer {
     private let source: String
     private let utf8: String.UTF8View
     private let bytes: [UInt8]          // O(1) indexed byte array

@@ -111,7 +111,7 @@ func main() {
     print("Iterations: \(iterations)\n")
     
     // Pre-tokenize
-    let tokens = try! UTF8Tokenizer(source: source).tokenize()
+    let tokens = try! Tokenizer(source: source).tokenize()
     print("Tokens: \(tokens.count)\n")
     
     // Run profiled parsing

@@ -18,8 +18,7 @@ func measure(_ block: () throws -> Void) rethrows -> TimeInterval {
 }
 
 enum BenchmarkMode: String {
-    case tokenize = "tokenize"           // Old tokenizer
-    case tokenizeUtf8 = "tokenize-utf8"  // UTF8 tokenizer
+    case tokenize = "tokenize"           // Tokenizer
     case parse = "parse"                 // Parsing only (pre-tokenized)
     case roundtrip = "roundtrip"         // Full tokenize + parse + codegen
     case codegen = "codegen"             // Code generation only
@@ -31,8 +30,7 @@ func main() {
         Usage: pyswift-benchmark <file> <iterations> <mode>
         
         Modes:
-          tokenize       - Old character-based tokenizer
-          tokenize-utf8  - UTF-8 byte-based tokenizer
+          tokenize       - UTF-8 byte-based tokenizer
           parse          - Parser only (pre-tokenized)
           roundtrip      - Full pipeline (tokenize + parse + codegen)
           codegen        - Code generation only (pre-parsed)
@@ -61,8 +59,8 @@ func main() {
     var cachedAST: Module?
     
     if mode == .parse || mode == .codegen {
-        // Use UTF8 tokenizer for pre-tokenization
-        cachedTokens = try! UTF8Tokenizer(source: source).tokenize()
+        // Pre-tokenize for parse/codegen modes
+        cachedTokens = try! Tokenizer(source: source).tokenize()
     }
     
     if mode == .codegen {
@@ -76,15 +74,9 @@ func main() {
         
         switch mode {
         case .tokenize:
-            // Old character-based tokenizer
+            // UTF-8 byte-based tokenizer
             time = measure {
                 _ = try! Tokenizer(source: source).tokenize()
-            }
-            
-        case .tokenizeUtf8:
-            // UTF8 tokenizer
-            time = measure {
-                _ = try! UTF8Tokenizer(source: source).tokenize()
             }
             
         case .parse:
@@ -96,7 +88,7 @@ func main() {
         case .roundtrip:
             // Full pipeline
             time = measure {
-                let tokens = try! UTF8Tokenizer(source: source).tokenize()
+                let tokens = try! Tokenizer(source: source).tokenize()
                 let ast = try! Parser(tokens: tokens).parse()
                 _ = generatePythonCode(from: ast)
             }

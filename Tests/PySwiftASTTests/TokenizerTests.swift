@@ -1,13 +1,13 @@
 import XCTest
 @testable import PySwiftAST
 
-final class UTF8TokenizerTests: XCTestCase {
+final class TokenizerTests: XCTestCase {
     
     // MARK: - Basic Tokenization Tests
     
     func testSimpleTokenization() throws {
         let source = "x = 42"
-        let tokenizer = UTF8Tokenizer(source: source)
+        let tokenizer = Tokenizer(source: source)
         let tokens = try tokenizer.tokenize()
         
         XCTAssertEqual(tokens.count, 4)
@@ -19,7 +19,7 @@ final class UTF8TokenizerTests: XCTestCase {
     
     func testKeywords() throws {
         let source = "def foo(): pass"
-        let tokenizer = UTF8Tokenizer(source: source)
+        let tokenizer = Tokenizer(source: source)
         let tokens = try tokenizer.tokenize()
         
         XCTAssertEqual(tokens[0].type, .def)
@@ -32,7 +32,7 @@ final class UTF8TokenizerTests: XCTestCase {
     
     func testOperators() throws {
         let source = "a + b - c * d / e // f ** g"
-        let tokenizer = UTF8Tokenizer(source: source)
+        let tokenizer = Tokenizer(source: source)
         let tokens = try tokenizer.tokenize()
         
         let expectedOps: [TokenType] = [.plus, .minus, .star, .slash, .doubleslash, .doublestar]
@@ -58,7 +58,7 @@ final class UTF8TokenizerTests: XCTestCase {
             y = 2
         """
         
-        let tokenizer = UTF8Tokenizer(source: source)
+        let tokenizer = Tokenizer(source: source)
         let tokens = try tokenizer.tokenize()
         
         // Find INDENT and DEDENT tokens
@@ -84,7 +84,7 @@ final class UTF8TokenizerTests: XCTestCase {
         z = """triple"""
         """#
         
-        let tokenizer = UTF8Tokenizer(source: source)
+        let tokenizer = Tokenizer(source: source)
         let tokens = try tokenizer.tokenize()
         
         var stringCount = 0
@@ -104,7 +104,7 @@ final class UTF8TokenizerTests: XCTestCase {
         y = 2
         """
         
-        let tokenizer = UTF8Tokenizer(source: source)
+        let tokenizer = Tokenizer(source: source)
         let tokens = try tokenizer.tokenize()
         
         var commentCount = 0
@@ -118,33 +118,6 @@ final class UTF8TokenizerTests: XCTestCase {
     }
     
     // MARK: - Compatibility Tests
-    
-    func testCompatibilityWithOldTokenizer() throws {
-        let sources = [
-            "x = 42",
-            "def foo(a, b): return a + b",
-            "class MyClass:\n    def __init__(self):\n        pass",
-            "[1, 2, 3, 4, 5]",
-            "{'key': 'value', 'number': 42}",
-            "x += 1\ny -= 2\nz *= 3",
-            "if x > 0 and y < 10:\n    print('ok')",
-        ]
-        
-        for source in sources {
-            let oldTokenizer = Tokenizer(source: source)
-            let newTokenizer = UTF8Tokenizer(source: source)
-            
-            let oldTokens = try oldTokenizer.tokenize()
-            let newTokens = try newTokenizer.tokenize()
-            
-            XCTAssertEqual(oldTokens.count, newTokens.count, "Token count mismatch for: \(source)")
-            
-            for (old, new) in zip(oldTokens, newTokens) {
-                XCTAssertEqual(old.type, new.type, "Token type mismatch for: \(source)")
-                XCTAssertEqual(old.value, new.value, "Token value mismatch for: \(source)")
-            }
-        }
-    }
     
     func testCompatibilityWithComplexCode() throws {
         let source = """
@@ -174,18 +147,11 @@ final class UTF8TokenizerTests: XCTestCase {
         }
         """
         
-        let oldTokenizer = Tokenizer(source: source)
-        let newTokenizer = UTF8Tokenizer(source: source)
+        let tokenizer = Tokenizer(source: source)
+        let tokens = try tokenizer.tokenize()
         
-        let oldTokens = try oldTokenizer.tokenize()
-        let newTokens = try newTokenizer.tokenize()
-        
-        XCTAssertEqual(oldTokens.count, newTokens.count)
-        
-        for (index, (old, new)) in zip(oldTokens, newTokens).enumerated() {
-            XCTAssertEqual(old.type, new.type, "Token type mismatch at index \(index)")
-            XCTAssertEqual(old.value, new.value, "Token value mismatch at index \(index)")
-        }
+        // Verify it tokenizes successfully
+        XCTAssertGreaterThan(tokens.count, 50)
     }
     
     // MARK: - Performance Tests
@@ -196,13 +162,13 @@ final class UTF8TokenizerTests: XCTestCase {
         let source = try String(contentsOfFile: testFile)
         
         // Warm up
-        _ = try UTF8Tokenizer(source: source).tokenize()
+        _ = try Tokenizer(source: source).tokenize()
         
         // Measure
         var times: [Double] = []
         for _ in 0..<100 {
             let start = DispatchTime.now()
-            _ = try UTF8Tokenizer(source: source).tokenize()
+            _ = try Tokenizer(source: source).tokenize()
             let end = DispatchTime.now()
             
             let elapsed = Double(end.uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000.0
@@ -212,51 +178,9 @@ final class UTF8TokenizerTests: XCTestCase {
         times.sort()
         let median = times[times.count / 2]
         
-        print("UTF8Tokenizer median time: \(String(format: "%.3f", median))ms")
+        print("Tokenizer median time: \(String(format: "%.3f", median))ms")
         
-        // Should be significantly faster than old tokenizer (target: < 10ms)
-        XCTAssertLessThan(median, 15.0, "UTF8 tokenizer should be fast")
-    }
-    
-    func testTokenizationPerformanceComparison() throws {
-        // Load test file
-        let testFile = "tests/ml_pipeline.py"
-        let source = try String(contentsOfFile: testFile)
-        
-        // Measure old tokenizer
-        var oldTimes: [Double] = []
-        for _ in 0..<50 {
-            let start = DispatchTime.now()
-            _ = try Tokenizer(source: source).tokenize()
-            let end = DispatchTime.now()
-            
-            let elapsed = Double(end.uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000.0
-            oldTimes.append(elapsed)
-        }
-        
-        // Measure new tokenizer
-        var newTimes: [Double] = []
-        for _ in 0..<50 {
-            let start = DispatchTime.now()
-            _ = try UTF8Tokenizer(source: source).tokenize()
-            let end = DispatchTime.now()
-            
-            let elapsed = Double(end.uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000.0
-            newTimes.append(elapsed)
-        }
-        
-        oldTimes.sort()
-        newTimes.sort()
-        
-        let oldMedian = oldTimes[oldTimes.count / 2]
-        let newMedian = newTimes[newTimes.count / 2]
-        let speedup = oldMedian / newMedian
-        
-        print("Old tokenizer: \(String(format: "%.3f", oldMedian))ms")
-        print("New tokenizer: \(String(format: "%.3f", newMedian))ms")
-        print("Speedup: \(String(format: "%.2f", speedup))x")
-        
-        // Expect at least 2x improvement based on micro-benchmarks
-        XCTAssertGreaterThan(speedup, 2.0, "UTF8 tokenizer should be at least 2x faster")
+        // Should be significantly fast (target: < 10ms)
+        XCTAssertLessThan(median, 15.0, "Tokenizer should be fast")
     }
 }
