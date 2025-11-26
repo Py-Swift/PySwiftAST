@@ -8,6 +8,7 @@ public class MonacoAnalyzer {
     private let source: String
     private let sourceLines: [String]
     private var ast: Module?
+    private var symbolTable: SymbolTable?
     
     public init(source: String) {
         self.source = source
@@ -21,6 +22,12 @@ public class MonacoAnalyzer {
     public func getDiagnostics() -> [Diagnostic] {
         let result = validator.validate()
         self.ast = result.ast
+        
+        // Build symbol table when AST is available
+        if let ast = result.ast {
+            self.symbolTable = SymbolTable(ast: ast)
+        }
+        
         return result.diagnostics
     }
     
@@ -42,13 +49,17 @@ public class MonacoAnalyzer {
     public func getHover(at position: Position) -> Hover? {
         guard let ast = ast else { return nil }
         
-        // Find the node at the given position
-        guard let node = findNodeAt(position: position, in: ast) else {
-            return nil
+        // Find the node at the given position (statement or expression)
+        if let node = findNodeAt(position: position, in: ast) {
+            return generateHover(for: node, at: position)
         }
         
-        // Generate hover content based on node type
-        return generateHover(for: node, at: position)
+        // Try to find expression-level hover info
+        if let exprHover = findExpressionHover(at: position, in: ast) {
+            return exprHover
+        }
+        
+        return nil
     }
     
     // MARK: - Completion
@@ -299,16 +310,277 @@ public class MonacoAnalyzer {
     private func generateHover(for node: Statement, at position: Position) -> Hover? {
         switch node {
         case .functionDef(let funcDef):
-            let params = funcDef.args.args.map { $0.arg }.joined(separator: ", ")
-            let code = "def \(funcDef.name)(\(params)):"
-            return Hover.code(code, language: "python")
+            return generateFunctionHover(funcDef, isAsync: false)
+            
+        case .asyncFunctionDef(let funcDef):
+            return generateAsyncFunctionHover(funcDef)
             
         case .classDef(let classDef):
-            let code = "class \(classDef.name):"
-            return Hover.code(code, language: "python")
+            return generateClassHover(classDef)
+            
+        case .assign(let assign):
+            return generateAssignmentHover(assign)
+            
+        case .annAssign(let annAssign):
+            return generateAnnotatedAssignmentHover(annAssign)
             
         default:
             return nil
+        }
+    }
+    
+    private func generateFunctionHover(_ funcDef: FunctionDef, isAsync: Bool) -> Hover? {
+        var parts: [String] = []
+        
+        // Build function signature
+        var signature = isAsync ? "async def " : "def "
+        signature += "\(funcDef.name)("
+        
+        // Build parameter list with type annotations
+        var paramParts: [String] = []
+        
+        // Position-only arguments
+        for arg in funcDef.args.posonlyArgs {
+            paramParts.append(formatParameter(arg))
+        }
+        if !funcDef.args.posonlyArgs.isEmpty {
+            paramParts.append("/")
+        }
+        
+        // Regular arguments
+        for (index, arg) in funcDef.args.args.enumerated() {
+            var param = formatParameter(arg)
+            let defaultIndex = funcDef.args.defaults.count - funcDef.args.args.count + index
+            if defaultIndex >= 0 && defaultIndex < funcDef.args.defaults.count {
+                param += " = ..."
+            }
+            paramParts.append(param)
+        }
+        
+        // *args
+        if let vararg = funcDef.args.vararg {
+            paramParts.append("*\(formatParameter(vararg))")
+        } else if !funcDef.args.kwonlyArgs.isEmpty {
+            paramParts.append("*")
+        }
+        
+        // Keyword-only arguments
+        for (index, arg) in funcDef.args.kwonlyArgs.enumerated() {
+            var param = formatParameter(arg)
+            if index < funcDef.args.kwDefaults.count, funcDef.args.kwDefaults[index] != nil {
+                param += " = ..."
+            }
+            paramParts.append(param)
+        }
+        
+        // **kwargs
+        if let kwarg = funcDef.args.kwarg {
+            paramParts.append("**\(formatParameter(kwarg))")
+        }
+        
+        signature += paramParts.joined(separator: ", ")
+        signature += ")"
+        
+        // Add return type if available
+        if let returns = funcDef.returns {
+            signature += " -> \(formatExpression(returns))"
+        }
+        signature += ":"
+        
+        parts.append("```python\n\(signature)\n```")
+        
+        // Extract docstring from function body
+        if let docstring = extractDocstring(from: funcDef.body) {
+            parts.append("---")
+            parts.append(docstring)
+        }
+        
+        return Hover.markdown(parts.joined(separator: "\n\n"))
+    }
+    
+    private func generateAsyncFunctionHover(_ funcDef: AsyncFunctionDef) -> Hover? {
+        let syncFuncDef = FunctionDef(
+            name: funcDef.name,
+            args: funcDef.args,
+            body: funcDef.body,
+            decoratorList: funcDef.decoratorList,
+            returns: funcDef.returns,
+            typeComment: funcDef.typeComment,
+            typeParams: funcDef.typeParams,
+            lineno: funcDef.lineno,
+            colOffset: funcDef.colOffset,
+            endLineno: funcDef.endLineno,
+            endColOffset: funcDef.endColOffset
+        )
+        return generateFunctionHover(syncFuncDef, isAsync: true)
+    }
+    
+    private func generateClassHover(_ classDef: ClassDef) -> Hover? {
+        var parts: [String] = []
+        
+        var signature = "class \(classDef.name)"
+        if !classDef.bases.isEmpty {
+            let bases = classDef.bases.map { formatExpression($0) }.joined(separator: ", ")
+            signature += "(\(bases))"
+        }
+        signature += ":"
+        
+        parts.append("```python\n\(signature)\n```")
+        
+        if let docstring = extractDocstring(from: classDef.body) {
+            parts.append("---")
+            parts.append(docstring)
+        }
+        
+        return Hover.markdown(parts.joined(separator: "\n\n"))
+    }
+    
+    private func generateAssignmentHover(_ assign: Assign) -> Hover? {
+        let targets = assign.targets.compactMap { target -> String? in
+            if case .name(let name) = target {
+                return name.id
+            }
+            return nil
+        }.joined(separator: ", ")
+        
+        if targets.isEmpty { return nil }
+        
+        let valuePreview = formatExpression(assign.value)
+        let code = "\(targets) = \(valuePreview)"
+        return Hover.code(code, language: "python")
+    }
+    
+    private func generateAnnotatedAssignmentHover(_ annAssign: AnnAssign) -> Hover? {
+        guard case .name(let name) = annAssign.target else { return nil }
+        
+        var code = "\(name.id): \(formatExpression(annAssign.annotation))"
+        if let value = annAssign.value {
+            code += " = \(formatExpression(value))"
+        }
+        
+        return Hover.code(code, language: "python")
+    }
+    
+    private func findExpressionHover(at position: Position, in module: Module) -> Hover? {
+        let statements = getStatements(from: module)
+        
+        for statement in statements {
+            if let hover = findExpressionHoverInStatement(statement, at: position) {
+                return hover
+            }
+        }
+        
+        return nil
+    }
+    
+    private func findExpressionHoverInStatement(_ statement: Statement, at position: Position) -> Hover? {
+        switch statement {
+        case .assign(let assign):
+            for target in assign.targets {
+                if let hover = findExpressionHoverInExpression(target, at: position) {
+                    return hover
+                }
+            }
+            if let hover = findExpressionHoverInExpression(assign.value, at: position) {
+                return hover
+            }
+            
+        case .expr(let expr):
+            if let hover = findExpressionHoverInExpression(expr.value, at: position) {
+                return hover
+            }
+            
+        default:
+            break
+        }
+        
+        return nil
+    }
+    
+    private func findExpressionHoverInExpression(_ expression: PySwiftAST.Expression, at position: Position) -> Hover? {
+        if expression.lineno == position.lineNumber {
+            switch expression {
+            case .name(let name):
+                return Hover.code(name.id, language: "python")
+                
+            case .constant(let constant):
+                return Hover.markdown("**Constant**: `\(formatConstant(constant.value))`")
+                
+            case .call(let call):
+                let funcName = formatExpression(call.fun)
+                return Hover.markdown("**Call**: `\(funcName)(...)`")
+                
+            default:
+                break
+            }
+        }
+        
+        return nil
+    }
+    
+    private func extractDocstring(from body: [Statement]) -> String? {
+        guard !body.isEmpty else { return nil }
+        
+        if case .expr(let expr) = body[0] {
+            if case .constant(let constant) = expr.value {
+                if case .string(let docstring) = constant.value {
+                    return docstring.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            }
+        }
+        
+        return nil
+    }
+    
+    private func formatParameter(_ arg: Arg) -> String {
+        var result = arg.arg
+        if let annotation = arg.annotation {
+            result += ": \(formatExpression(annotation))"
+        }
+        return result
+    }
+    
+    private func formatExpression(_ expression: PySwiftAST.Expression) -> String {
+        switch expression {
+        case .name(let name):
+            return name.id
+        case .constant(let constant):
+            return formatConstant(constant.value)
+        case .attribute(let attr):
+            return "\(formatExpression(attr.value)).\(attr.attr)"
+        case .subscriptExpr(let sub):
+            return "\(formatExpression(sub.value))[...]"
+        case .list:
+            return "[...]"
+        case .tuple:
+            return "(...)"
+        case .dict:
+            return "{...}"
+        case .set:
+            return "{...}"
+        default:
+            return "..."
+        }
+    }
+    
+    private func formatConstant(_ value: ConstantValue) -> String {
+        switch value {
+        case .none:
+            return "None"
+        case .bool(let b):
+            return b ? "True" : "False"
+        case .int(let i):
+            return "\(i)"
+        case .float(let f):
+            return "\(f)"
+        case .complex(let real, let imag):
+            return "\(real)+\(imag)j"
+        case .string(let s):
+            return "\"\"\"\n\(s)\n\"\"\""
+        case .bytes(let data):
+            return "b'\(data.prefix(20).map { String(format: "%02x", $0) }.joined())...'"
+        case .ellipsis:
+            return "..."
         }
     }
     
@@ -1006,6 +1278,51 @@ public class MonacoAnalyzer {
     
     private func getContextualCompletions(at position: Position, in module: Module) -> [CompletionItem] {
         var items: [CompletionItem] = []
+        
+        guard let symbolTable = symbolTable else {
+            // Fallback to basic AST traversal
+            return getBasicContextualCompletions(in: module)
+        }
+        
+        // Add all defined functions
+        for symbol in symbolTable.functions {
+            let params = symbol.parameters.map { $0.name }
+            items.append(CompletionItem.function(
+                name: symbol.name,
+                parameters: params,
+                documentation: symbol.docstring
+            ))
+        }
+        
+        // Add all defined classes
+        for symbol in symbolTable.classes {
+            items.append(CompletionItem.class(
+                name: symbol.name,
+                documentation: symbol.docstring
+            ))
+        }
+        
+        // Add all variables in scope
+        for symbol in symbolTable.variables {
+            items.append(CompletionItem.variable(
+                name: symbol.name,
+                type: symbol.typeAnnotation
+            ))
+        }
+        
+        // Add all imports
+        for symbol in symbolTable.imports {
+            items.append(CompletionItem.variable(
+                name: symbol.name,
+                type: "module"
+            ))
+        }
+        
+        return items
+    }
+    
+    private func getBasicContextualCompletions(in module: Module) -> [CompletionItem] {
+        var items: [CompletionItem] = []
         let statements = getStatements(from: module)
         
         // Extract defined functions
@@ -1020,6 +1337,24 @@ public class MonacoAnalyzer {
         for statement in statements {
             if case .classDef(let classDef) = statement {
                 items.append(CompletionItem.class(name: classDef.name))
+            }
+        }
+        
+        // Extract imports
+        for statement in statements {
+            switch statement {
+            case .importStmt(let imp):
+                for alias in imp.names {
+                    let name = alias.asName ?? alias.name
+                    items.append(CompletionItem.variable(name: name, type: "module"))
+                }
+            case .importFrom(let impFrom):
+                for alias in impFrom.names {
+                    let name = alias.asName ?? alias.name
+                    items.append(CompletionItem.variable(name: name, type: "module"))
+                }
+            default:
+                break
             }
         }
         
@@ -1244,24 +1579,141 @@ public class MonacoAnalyzer {
     // MARK: - Private Helpers - Definition Finding
     
     private func findDefinitionOf(symbol: SymbolInfo, in module: Module) -> Location? {
+        // Try symbol table first for faster lookup
+        if let symbolTable = symbolTable {
+            if symbol.kind == .function {
+                if let funcSym = symbolTable.functions.first(where: { $0.name == symbol.name }) {
+                    return Location(
+                        uri: "document",
+                        range: IDERange.from(line: funcSym.line, column: funcSym.column, length: funcSym.name.count)
+                    )
+                }
+            } else if symbol.kind == .class {
+                if let classSym = symbolTable.classes.first(where: { $0.name == symbol.name }) {
+                    return Location(
+                        uri: "document",
+                        range: IDERange.from(line: classSym.line, column: classSym.column, length: classSym.name.count)
+                    )
+                }
+            } else if symbol.kind == .variable {
+                if let varSym = symbolTable.variables.first(where: { $0.name == symbol.name }) {
+                    return Location(
+                        uri: "document",
+                        range: IDERange.from(line: varSym.line, column: varSym.column, length: varSym.name.count)
+                    )
+                }
+            }
+        }
+        
+        // Fallback to AST traversal
         let statements = getStatements(from: module)
         
         for statement in statements {
-            // Check for function definition
-            if case .functionDef(let funcDef) = statement, funcDef.name == symbol.name {
+            if let location = findDefinitionInStatement(statement, symbolName: symbol.name, kind: symbol.kind) {
+                return location
+            }
+        }
+        
+        return nil
+    }
+    
+    private func findDefinitionInStatement(_ statement: Statement, symbolName: String, kind: SymbolKind) -> Location? {
+        switch statement {
+        case .functionDef(let funcDef):
+            if funcDef.name == symbolName && kind == .function {
                 return Location(
                     uri: "document",
-                    range: IDERange.from(line: funcDef.lineno, column: 5, length: funcDef.name.count)
+                    range: IDERange.from(line: funcDef.lineno, column: funcDef.colOffset, length: funcDef.name.count)
+                )
+            }
+            // Search in nested statements
+            for stmt in funcDef.body {
+                if let location = findDefinitionInStatement(stmt, symbolName: symbolName, kind: kind) {
+                    return location
+                }
+            }
+            
+        case .asyncFunctionDef(let funcDef):
+            if funcDef.name == symbolName && kind == .function {
+                return Location(
+                    uri: "document",
+                    range: IDERange.from(line: funcDef.lineno, column: funcDef.colOffset, length: funcDef.name.count)
+                )
+            }
+            for stmt in funcDef.body {
+                if let location = findDefinitionInStatement(stmt, symbolName: symbolName, kind: kind) {
+                    return location
+                }
+            }
+            
+        case .classDef(let classDef):
+            if classDef.name == symbolName && kind == .class {
+                return Location(
+                    uri: "document",
+                    range: IDERange.from(line: classDef.lineno, column: classDef.colOffset, length: classDef.name.count)
+                )
+            }
+            for stmt in classDef.body {
+                if let location = findDefinitionInStatement(stmt, symbolName: symbolName, kind: kind) {
+                    return location
+                }
+            }
+            
+        case .assign(let assign):
+            if kind == .variable {
+                for target in assign.targets {
+                    if case .name(let name) = target, name.id == symbolName {
+                        return Location(
+                            uri: "document",
+                            range: IDERange.from(line: name.lineno, column: name.colOffset, length: name.id.count)
+                        )
+                    }
+                }
+            }
+            
+        case .annAssign(let annAssign):
+            if kind == .variable, case .name(let name) = annAssign.target, name.id == symbolName {
+                return Location(
+                    uri: "document",
+                    range: IDERange.from(line: name.lineno, column: name.colOffset, length: name.id.count)
                 )
             }
             
-            // Check for class definition
-            if case .classDef(let classDef) = statement, classDef.name == symbol.name {
-                return Location(
-                    uri: "document",
-                    range: IDERange.from(line: classDef.lineno, column: 7, length: classDef.name.count)
-                )
+        case .ifStmt(let ifStmt):
+            for stmt in ifStmt.body {
+                if let location = findDefinitionInStatement(stmt, symbolName: symbolName, kind: kind) {
+                    return location
+                }
             }
+            for stmt in ifStmt.orElse {
+                if let location = findDefinitionInStatement(stmt, symbolName: symbolName, kind: kind) {
+                    return location
+                }
+            }
+            
+        case .whileStmt(let whileStmt):
+            for stmt in whileStmt.body {
+                if let location = findDefinitionInStatement(stmt, symbolName: symbolName, kind: kind) {
+                    return location
+                }
+            }
+            
+        case .forStmt(let forStmt):
+            for stmt in forStmt.body {
+                if let location = findDefinitionInStatement(stmt, symbolName: symbolName, kind: kind) {
+                    return location
+                }
+            }
+            
+        case .withStmt(let withStmt):
+            for stmt in withStmt.body {
+                if let location = findDefinitionInStatement(stmt, symbolName: symbolName, kind: kind) {
+                    return location
+                }
+            }
+            
+        default:
+            break
         }
         
         return nil
@@ -1291,8 +1743,159 @@ public class MonacoAnalyzer {
     private func findReferencesInStatement(_ statement: Statement, symbol: SymbolInfo) -> [Location] {
         var locations: [Location] = []
         
-        // TODO: Traverse AST to find all name references matching symbol.name
-        // This would need proper expression traversal to find all Name nodes
+        // Helper to check expressions for name references
+        func checkExpression(_ expression: PySwiftAST.Expression) {
+            if case .name(let name) = expression, name.id == symbol.name {
+                locations.append(Location(
+                    uri: "document",
+                    range: IDERange.from(line: name.lineno, column: name.colOffset, length: name.id.count)
+                ))
+            }
+            
+            // Recursively check nested expressions
+            switch expression {
+            case .call(let call):
+                checkExpression(call.fun)
+                for arg in call.args {
+                    checkExpression(arg)
+                }
+                for keyword in call.keywords {
+                    checkExpression(keyword.value)
+                }
+                
+            case .attribute(let attr):
+                checkExpression(attr.value)
+                
+            case .subscriptExpr(let sub):
+                checkExpression(sub.value)
+                checkExpression(sub.slice)
+                
+            case .list(let list):
+                for elt in list.elts {
+                    checkExpression(elt)
+                }
+                
+            case .tuple(let tuple):
+                for elt in tuple.elts {
+                    checkExpression(elt)
+                }
+                
+            case .dict(let dict):
+                for key in dict.keys {
+                    if let key = key {
+                        checkExpression(key)
+                    }
+                }
+                for value in dict.values {
+                    checkExpression(value)
+                }
+                
+            case .set(let set):
+                for elt in set.elts {
+                    checkExpression(elt)
+                }
+                
+            case .binOp(let binOp):
+                checkExpression(binOp.left)
+                checkExpression(binOp.right)
+                
+            case .unaryOp(let unaryOp):
+                checkExpression(unaryOp.operand)
+                
+            case .compare(let compare):
+                checkExpression(compare.left)
+                for comparator in compare.comparators {
+                    checkExpression(comparator)
+                }
+                
+            case .boolOp(let boolOp):
+                for value in boolOp.values {
+                    checkExpression(value)
+                }
+                
+            case .ifExp(let ifExp):
+                checkExpression(ifExp.test)
+                checkExpression(ifExp.body)
+                checkExpression(ifExp.orElse)
+                
+            case .lambda(let lambda):
+                checkExpression(lambda.body)
+                
+            default:
+                break
+            }
+        }
+        
+        // Traverse statement structure
+        switch statement {
+        case .functionDef(let funcDef):
+            for stmt in funcDef.body {
+                locations.append(contentsOf: findReferencesInStatement(stmt, symbol: symbol))
+            }
+            
+        case .asyncFunctionDef(let funcDef):
+            for stmt in funcDef.body {
+                locations.append(contentsOf: findReferencesInStatement(stmt, symbol: symbol))
+            }
+            
+        case .classDef(let classDef):
+            for stmt in classDef.body {
+                locations.append(contentsOf: findReferencesInStatement(stmt, symbol: symbol))
+            }
+            
+        case .assign(let assign):
+            for target in assign.targets {
+                checkExpression(target)
+            }
+            checkExpression(assign.value)
+            
+        case .annAssign(let annAssign):
+            checkExpression(annAssign.target)
+            checkExpression(annAssign.annotation)
+            if let value = annAssign.value {
+                checkExpression(value)
+            }
+            
+        case .expr(let expr):
+            checkExpression(expr.value)
+            
+        case .returnStmt(let ret):
+            if let value = ret.value {
+                checkExpression(value)
+            }
+            
+        case .ifStmt(let ifStmt):
+            checkExpression(ifStmt.test)
+            for stmt in ifStmt.body {
+                locations.append(contentsOf: findReferencesInStatement(stmt, symbol: symbol))
+            }
+            for stmt in ifStmt.orElse {
+                locations.append(contentsOf: findReferencesInStatement(stmt, symbol: symbol))
+            }
+            
+        case .whileStmt(let whileStmt):
+            checkExpression(whileStmt.test)
+            for stmt in whileStmt.body {
+                locations.append(contentsOf: findReferencesInStatement(stmt, symbol: symbol))
+            }
+            
+        case .forStmt(let forStmt):
+            checkExpression(forStmt.iter)
+            for stmt in forStmt.body {
+                locations.append(contentsOf: findReferencesInStatement(stmt, symbol: symbol))
+            }
+            
+        case .withStmt(let withStmt):
+            for item in withStmt.items {
+                checkExpression(item.contextExpr)
+            }
+            for stmt in withStmt.body {
+                locations.append(contentsOf: findReferencesInStatement(stmt, symbol: symbol))
+            }
+            
+        default:
+            break
+        }
         
         return locations
     }
@@ -1451,8 +2054,24 @@ public class MonacoAnalyzer {
                 tokenModifiers: [.definition]
             )
             
-            // Parameters (Arg doesn't have lineno/colOffset, skip for now)
-            // TODO: Add parameter token classification when we have proper AST traversal
+            // Classify body statements
+            for stmt in funcDef.body {
+                classifyStatement(stmt, builder: builder)
+            }
+            
+        case .asyncFunctionDef(let funcDef):
+            let line = funcDef.lineno
+            builder.push(
+                line: line,
+                startChar: funcDef.colOffset,
+                length: funcDef.name.count,
+                tokenType: .function,
+                tokenModifiers: [.definition]
+            )
+            
+            for stmt in funcDef.body {
+                classifyStatement(stmt, builder: builder)
+            }
             
         case .classDef(let classDef):
             // Class name as class token
@@ -1464,6 +2083,16 @@ public class MonacoAnalyzer {
                 tokenType: .class,
                 tokenModifiers: [.definition]
             )
+            
+            // Classify base classes
+            for base in classDef.bases {
+                classifyExpression(base, builder: builder)
+            }
+            
+            // Classify body statements
+            for stmt in classDef.body {
+                classifyStatement(stmt, builder: builder)
+            }
             
         case .assign(let assign):
             // Variables
@@ -1480,11 +2109,215 @@ public class MonacoAnalyzer {
                 }
             }
             
+            // Classify the value expression
+            classifyExpression(assign.value, builder: builder)
+            
+        case .annAssign(let annAssign):
+            if case .name(let name) = annAssign.target {
+                builder.push(
+                    line: name.lineno,
+                    startChar: name.colOffset,
+                    length: name.id.count,
+                    tokenType: .variable,
+                    tokenModifiers: []
+                )
+            }
+            
+            classifyExpression(annAssign.annotation, builder: builder)
+            if let value = annAssign.value {
+                classifyExpression(value, builder: builder)
+            }
+            
+        case .importStmt(let importStmt):
+            for alias in importStmt.names {
+                let name = alias.asName ?? alias.name
+                builder.push(
+                    line: importStmt.lineno,
+                    startChar: importStmt.colOffset,
+                    length: name.count,
+                    tokenType: .namespace,
+                    tokenModifiers: []
+                )
+            }
+            
+        case .importFrom(let importFrom):
+            for alias in importFrom.names {
+                let name = alias.asName ?? alias.name
+                builder.push(
+                    line: importFrom.lineno,
+                    startChar: importFrom.colOffset,
+                    length: name.count,
+                    tokenType: .function,
+                    tokenModifiers: []
+                )
+            }
+            
+        case .expr(let expr):
+            classifyExpression(expr.value, builder: builder)
+            
+        case .ifStmt(let ifStmt):
+            classifyExpression(ifStmt.test, builder: builder)
+            for stmt in ifStmt.body {
+                classifyStatement(stmt, builder: builder)
+            }
+            for stmt in ifStmt.orElse {
+                classifyStatement(stmt, builder: builder)
+            }
+            
+        case .whileStmt(let whileStmt):
+            classifyExpression(whileStmt.test, builder: builder)
+            for stmt in whileStmt.body {
+                classifyStatement(stmt, builder: builder)
+            }
+            for stmt in whileStmt.orElse {
+                classifyStatement(stmt, builder: builder)
+            }
+            
+        case .forStmt(let forStmt):
+            classifyExpression(forStmt.iter, builder: builder)
+            for stmt in forStmt.body {
+                classifyStatement(stmt, builder: builder)
+            }
+            for stmt in forStmt.orElse {
+                classifyStatement(stmt, builder: builder)
+            }
+            
+        case .withStmt(let withStmt):
+            for item in withStmt.items {
+                classifyExpression(item.contextExpr, builder: builder)
+            }
+            for stmt in withStmt.body {
+                classifyStatement(stmt, builder: builder)
+            }
+            
+        case .returnStmt(let ret):
+            if let value = ret.value {
+                classifyExpression(value, builder: builder)
+            }
+            
         default:
             break
         }
-        
-        // TODO: Add more token classification for expressions, imports, etc.
+    }
+    
+    private func classifyExpression(_ expression: PySwiftAST.Expression, builder: SemanticTokensBuilder) {
+        switch expression {
+        case .name(let name):
+            builder.push(
+                line: name.lineno,
+                startChar: name.colOffset,
+                length: name.id.count,
+                tokenType: .variable,
+                tokenModifiers: []
+            )
+            
+        case .call(let call):
+            // Classify the function being called
+            if case .name(let name) = call.fun {
+                builder.push(
+                    line: name.lineno,
+                    startChar: name.colOffset,
+                    length: name.id.count,
+                    tokenType: .function,
+                    tokenModifiers: []
+                )
+            } else {
+                classifyExpression(call.fun, builder: builder)
+            }
+            
+            // Classify arguments
+            for arg in call.args {
+                classifyExpression(arg, builder: builder)
+            }
+            
+            for keyword in call.keywords {
+                classifyExpression(keyword.value, builder: builder)
+            }
+            
+        case .attribute(let attr):
+            classifyExpression(attr.value, builder: builder)
+            
+            // Attribute name
+            let line = attr.value.lineno
+            builder.push(
+                line: line,
+                startChar: attr.colOffset,
+                length: attr.attr.count,
+                tokenType: .property,
+                tokenModifiers: []
+            )
+            
+        case .subscriptExpr(let sub):
+            classifyExpression(sub.value, builder: builder)
+            classifyExpression(sub.slice, builder: builder)
+            
+        case .list(let list):
+            for elt in list.elts {
+                classifyExpression(elt, builder: builder)
+            }
+            
+        case .tuple(let tuple):
+            for elt in tuple.elts {
+                classifyExpression(elt, builder: builder)
+            }
+            
+        case .dict(let dict):
+            for key in dict.keys {
+                if let key = key {
+                    classifyExpression(key, builder: builder)
+                }
+            }
+            for value in dict.values {
+                classifyExpression(value, builder: builder)
+            }
+            
+        case .set(let set):
+            for elt in set.elts {
+                classifyExpression(elt, builder: builder)
+            }
+            
+        case .binOp(let binOp):
+            classifyExpression(binOp.left, builder: builder)
+            classifyExpression(binOp.right, builder: builder)
+            
+        case .unaryOp(let unaryOp):
+            classifyExpression(unaryOp.operand, builder: builder)
+            
+        case .compare(let compare):
+            classifyExpression(compare.left, builder: builder)
+            for comparator in compare.comparators {
+                classifyExpression(comparator, builder: builder)
+            }
+            
+        case .boolOp(let boolOp):
+            for value in boolOp.values {
+                classifyExpression(value, builder: builder)
+            }
+            
+        case .lambda(let lambda):
+            classifyExpression(lambda.body, builder: builder)
+            
+        case .ifExp(let ifExp):
+            classifyExpression(ifExp.test, builder: builder)
+            classifyExpression(ifExp.body, builder: builder)
+            classifyExpression(ifExp.orElse, builder: builder)
+            
+        case .listComp(let listComp):
+            classifyExpression(listComp.elt, builder: builder)
+            
+        case .dictComp(let dictComp):
+            classifyExpression(dictComp.key, builder: builder)
+            classifyExpression(dictComp.value, builder: builder)
+            
+        case .setComp(let setComp):
+            classifyExpression(setComp.elt, builder: builder)
+            
+        case .generatorExp(let genExp):
+            classifyExpression(genExp.elt, builder: builder)
+            
+        default:
+            break
+        }
     }
     
     // MARK: - Document Formatting Provider
@@ -1597,10 +2430,14 @@ public class MonacoAnalyzer {
     }
     
     private func calculateIndentation(at line: Int) -> Int {
-        // TODO: Calculate expected indentation based on AST structure
-        // For now, use simple heuristic
         guard line > 1 && line <= sourceLines.count else { return 0 }
         
+        // Try AST-based indentation first
+        if let ast = ast, let astIndent = calculateIndentationFromAST(at: line, in: ast) {
+            return astIndent
+        }
+        
+        // Fallback to simple heuristic
         let prevLine = sourceLines[line - 2]
         let prevIndent = prevLine.prefix(while: { $0 == " " || $0 == "\t" }).count
         
@@ -1609,6 +2446,126 @@ public class MonacoAnalyzer {
         }
         
         return prevIndent
+    }
+    
+    private func calculateIndentationFromAST(at line: Int, in module: Module) -> Int? {
+        let statements = getStatements(from: module)
+        
+        for statement in statements {
+            if let indent = indentationForStatement(statement, targetLine: line) {
+                return indent
+            }
+        }
+        
+        return nil
+    }
+    
+    private func indentationForStatement(_ statement: Statement, targetLine: Int) -> Int? {
+        let stmtLine = statement.lineno
+        let baseIndent = (stmtLine > 0 && stmtLine <= sourceLines.count) 
+            ? sourceLines[stmtLine - 1].prefix(while: { $0 == " " || $0 == "\t" }).count 
+            : 0
+        
+        switch statement {
+        case .functionDef(let funcDef):
+            if funcDef.lineno < targetLine && (funcDef.endLineno ?? 0) >= targetLine {
+                // Inside function body
+                return baseIndent + 4
+            }
+            for stmt in funcDef.body {
+                if let indent = indentationForStatement(stmt, targetLine: targetLine) {
+                    return indent
+                }
+            }
+            
+        case .asyncFunctionDef(let funcDef):
+            if funcDef.lineno < targetLine && (funcDef.endLineno ?? 0) >= targetLine {
+                return baseIndent + 4
+            }
+            for stmt in funcDef.body {
+                if let indent = indentationForStatement(stmt, targetLine: targetLine) {
+                    return indent
+                }
+            }
+            
+        case .classDef(let classDef):
+            if classDef.lineno < targetLine && (classDef.endLineno ?? 0) >= targetLine {
+                // Inside class body
+                return baseIndent + 4
+            }
+            for stmt in classDef.body {
+                if let indent = indentationForStatement(stmt, targetLine: targetLine) {
+                    return indent
+                }
+            }
+            
+        case .ifStmt(let ifStmt):
+            if ifStmt.lineno < targetLine && (ifStmt.endLineno ?? 0) >= targetLine {
+                return baseIndent + 4
+            }
+            for stmt in ifStmt.body {
+                if let indent = indentationForStatement(stmt, targetLine: targetLine) {
+                    return indent
+                }
+            }
+            for stmt in ifStmt.orElse {
+                if let indent = indentationForStatement(stmt, targetLine: targetLine) {
+                    return indent
+                }
+            }
+            
+        case .whileStmt(let whileStmt):
+            if whileStmt.lineno < targetLine && (whileStmt.endLineno ?? 0) >= targetLine {
+                return baseIndent + 4
+            }
+            for stmt in whileStmt.body {
+                if let indent = indentationForStatement(stmt, targetLine: targetLine) {
+                    return indent
+                }
+            }
+            
+        case .forStmt(let forStmt):
+            if forStmt.lineno < targetLine && (forStmt.endLineno ?? 0) >= targetLine {
+                return baseIndent + 4
+            }
+            for stmt in forStmt.body {
+                if let indent = indentationForStatement(stmt, targetLine: targetLine) {
+                    return indent
+                }
+            }
+            
+        case .withStmt(let withStmt):
+            if withStmt.lineno < targetLine && (withStmt.endLineno ?? 0) >= targetLine {
+                return baseIndent + 4
+            }
+            for stmt in withStmt.body {
+                if let indent = indentationForStatement(stmt, targetLine: targetLine) {
+                    return indent
+                }
+            }
+            
+        case .tryStmt(let tryStmt):
+            if tryStmt.lineno < targetLine && (tryStmt.endLineno ?? 0) >= targetLine {
+                return baseIndent + 4
+            }
+            for stmt in tryStmt.body {
+                if let indent = indentationForStatement(stmt, targetLine: targetLine) {
+                    return indent
+                }
+            }
+            for handler in tryStmt.handlers {
+                for stmt in handler.body {
+                    if let indent = indentationForStatement(stmt, targetLine: targetLine) {
+                        return indent
+                    }
+                }
+            }
+            
+        default:
+            break
+        }
+        
+        return nil
     }
     
     // MARK: - Document Link Provider
@@ -1879,4 +2836,251 @@ public class MonacoAnalyzer {
         
         return inlineValues
     }
+}
+
+// MARK: - Symbol Table
+
+/// Symbol information collected from AST
+private class SymbolTable {
+    var functions: [FunctionSymbol] = []
+    var classes: [ClassSymbol] = []
+    var variables: [VariableSymbol] = []
+    var imports: [ImportSymbol] = []
+    
+    init(ast: Module) {
+        buildSymbolTable(from: ast)
+    }
+    
+    private func buildSymbolTable(from module: Module) {
+        let statements = getStatements(from: module)
+        
+        for statement in statements {
+            switch statement {
+            case .functionDef(let funcDef):
+                extractFunction(funcDef, isAsync: false)
+                
+            case .asyncFunctionDef(let funcDef):
+                extractAsyncFunction(funcDef)
+                
+            case .classDef(let classDef):
+                extractClass(classDef)
+                
+            case .assign(let assign):
+                extractAssignments(assign)
+                
+            case .annAssign(let annAssign):
+                extractAnnotatedAssignment(annAssign)
+                
+            case .importStmt(let imp):
+                extractImport(imp)
+                
+            case .importFrom(let impFrom):
+                extractImportFrom(impFrom)
+                
+            default:
+                break
+            }
+        }
+    }
+    
+    private func extractFunction(_ funcDef: FunctionDef, isAsync: Bool) {
+        let params = funcDef.args.args.map { arg in
+            ParameterInfo(
+                name: arg.arg,
+                typeAnnotation: arg.annotation.map { formatExpressionSimple($0) }
+            )
+        }
+        
+        let returnType = funcDef.returns.map { formatExpressionSimple($0) }
+        let docstring = extractDocstringFromBody(funcDef.body)
+        
+        functions.append(FunctionSymbol(
+            name: funcDef.name,
+            parameters: params,
+            returnType: returnType,
+            isAsync: isAsync,
+            docstring: docstring,
+            line: funcDef.lineno,
+            column: funcDef.colOffset
+        ))
+    }
+    
+    private func extractAsyncFunction(_ funcDef: AsyncFunctionDef) {
+        let params = funcDef.args.args.map { arg in
+            ParameterInfo(
+                name: arg.arg,
+                typeAnnotation: arg.annotation.map { formatExpressionSimple($0) }
+            )
+        }
+        
+        let returnType = funcDef.returns.map { formatExpressionSimple($0) }
+        let docstring = extractDocstringFromBody(funcDef.body)
+        
+        functions.append(FunctionSymbol(
+            name: funcDef.name,
+            parameters: params,
+            returnType: returnType,
+            isAsync: true,
+            docstring: docstring,
+            line: funcDef.lineno,
+            column: funcDef.colOffset
+        ))
+    }
+    
+    private func extractClass(_ classDef: ClassDef) {
+        let docstring = extractDocstringFromBody(classDef.body)
+        let baseClasses = classDef.bases.map { formatExpressionSimple($0) }
+        
+        classes.append(ClassSymbol(
+            name: classDef.name,
+            baseClasses: baseClasses,
+            docstring: docstring,
+            line: classDef.lineno,
+            column: classDef.colOffset
+        ))
+    }
+    
+    private func extractAssignments(_ assign: Assign) {
+        for target in assign.targets {
+            if case .name(let name) = target {
+                variables.append(VariableSymbol(
+                    name: name.id,
+                    typeAnnotation: nil,
+                    line: name.lineno,
+                    column: name.colOffset
+                ))
+            }
+        }
+    }
+    
+    private func extractAnnotatedAssignment(_ annAssign: AnnAssign) {
+        if case .name(let name) = annAssign.target {
+            variables.append(VariableSymbol(
+                name: name.id,
+                typeAnnotation: formatExpressionSimple(annAssign.annotation),
+                line: name.lineno,
+                column: name.colOffset
+            ))
+        }
+    }
+    
+    private func extractImport(_ imp: Import) {
+        for alias in imp.names {
+            let name = alias.asName ?? alias.name
+            imports.append(ImportSymbol(
+                name: name,
+                originalName: alias.name,
+                line: imp.lineno,
+                column: imp.colOffset
+            ))
+        }
+    }
+    
+    private func extractImportFrom(_ impFrom: ImportFrom) {
+        for alias in impFrom.names {
+            let name = alias.asName ?? alias.name
+            imports.append(ImportSymbol(
+                name: name,
+                originalName: alias.name,
+                fromModule: impFrom.module,
+                line: impFrom.lineno,
+                column: impFrom.colOffset
+            ))
+        }
+    }
+    
+    private func getStatements(from module: Module) -> [Statement] {
+        switch module {
+        case .module(let statements), .interactive(let statements):
+            return statements
+        default:
+            return []
+        }
+    }
+    
+    private func extractDocstringFromBody(_ body: [Statement]) -> String? {
+        guard !body.isEmpty else { return nil }
+        
+        if case .expr(let expr) = body[0] {
+            if case .constant(let constant) = expr.value {
+                if case .string(let docstring) = constant.value {
+                    return docstring.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            }
+        }
+        
+        return nil
+    }
+    
+    private func formatExpressionSimple(_ expression: PySwiftAST.Expression) -> String {
+        switch expression {
+        case .name(let name):
+            return name.id
+        case .constant(let constant):
+            switch constant.value {
+            case .string(let s): return s
+            case .int(let i): return "\(i)"
+            case .bool(let b): return b ? "True" : "False"
+            default: return "..."
+            }
+        case .attribute(let attr):
+            return "\(formatExpressionSimple(attr.value)).\(attr.attr)"
+        case .subscriptExpr(let sub):
+            return "\(formatExpressionSimple(sub.value))[...]"
+        case .list:
+            return "[...]"
+        case .tuple:
+            return "(...)"
+        default:
+            return "..."
+        }
+    }
+}
+
+// MARK: - Symbol Types
+
+private struct FunctionSymbol {
+    let name: String
+    let parameters: [ParameterInfo]
+    let returnType: String?
+    let isAsync: Bool
+    let docstring: String?
+    let line: Int
+    let column: Int
+}
+
+private struct ClassSymbol {
+    let name: String
+    let baseClasses: [String]
+    let docstring: String?
+    let line: Int
+    let column: Int
+}
+
+private struct VariableSymbol {
+    let name: String
+    let typeAnnotation: String?
+    let line: Int
+    let column: Int
+}
+
+private struct ImportSymbol {
+    let name: String
+    let originalName: String
+    let fromModule: String?
+    let line: Int
+    let column: Int
+    
+    init(name: String, originalName: String, fromModule: String? = nil, line: Int, column: Int) {
+        self.name = name
+        self.originalName = originalName
+        self.fromModule = fromModule
+        self.line = line
+        self.column = column
+    }
+}
+
+private struct ParameterInfo {
+    let name: String
+    let typeAnnotation: String?
 }
