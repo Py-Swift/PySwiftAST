@@ -66,6 +66,9 @@ public class MonacoAnalyzer {
         // Add math module completions
         items.append(contentsOf: getMathModuleCompletions())
         
+        // Add built-in type methods (str, list, dict, set, etc.)
+        items.append(contentsOf: getBuiltinTypeCompletions())
+        
         // If we have AST, add context-aware completions
         if let ast = ast {
             items.append(contentsOf: getContextualCompletions(at: position, in: ast))
@@ -440,6 +443,228 @@ public class MonacoAnalyzer {
         for (name, params, doc) in allFunctions {
             items.append(CompletionItem.function(
                 name: "math.\(name)",
+                parameters: params,
+                documentation: doc
+            ))
+        }
+        
+        return items
+    }
+    
+    private func getBuiltinTypeCompletions() -> [CompletionItem] {
+        var items: [CompletionItem] = []
+        
+        // String methods
+        let strMethods: [(String, [String], String)] = [
+            ("capitalize", [], "Return a capitalized version of the string"),
+            ("casefold", [], "Return a casefolded copy suitable for caseless comparisons"),
+            ("center", ["width", "fillchar=' '"], "Return a centered string of length width"),
+            ("count", ["sub", "start=0", "end=len"], "Return the number of non-overlapping occurrences of substring sub"),
+            ("encode", ["encoding='utf-8'", "errors='strict'"], "Encode the string using the codec registered for encoding"),
+            ("endswith", ["suffix", "start=0", "end=len"], "Return True if the string ends with the specified suffix"),
+            ("expandtabs", ["tabsize=8"], "Return a copy where all tab characters are expanded"),
+            ("find", ["sub", "start=0", "end=len"], "Return the lowest index where substring sub is found"),
+            ("format", ["*args", "**kwargs"], "Perform a string formatting operation"),
+            ("format_map", ["mapping"], "Similar to format(**mapping)"),
+            ("index", ["sub", "start=0", "end=len"], "Like find(), but raise ValueError when not found"),
+            ("isalnum", [], "Return True if all characters are alphanumeric"),
+            ("isalpha", [], "Return True if all characters are alphabetic"),
+            ("isascii", [], "Return True if all characters are ASCII"),
+            ("isdecimal", [], "Return True if all characters are decimal"),
+            ("isdigit", [], "Return True if all characters are digits"),
+            ("isidentifier", [], "Return True if the string is a valid Python identifier"),
+            ("islower", [], "Return True if all cased characters are lowercase"),
+            ("isnumeric", [], "Return True if all characters are numeric"),
+            ("isprintable", [], "Return True if all characters are printable"),
+            ("isspace", [], "Return True if all characters are whitespace"),
+            ("istitle", [], "Return True if the string is titlecased"),
+            ("isupper", [], "Return True if all cased characters are uppercase"),
+            ("join", ["iterable"], "Concatenate strings in iterable with separator"),
+            ("ljust", ["width", "fillchar=' '"], "Return a left-justified string of length width"),
+            ("lower", [], "Return a copy with all characters converted to lowercase"),
+            ("lstrip", ["chars=None"], "Return a copy with leading whitespace removed"),
+            ("maketrans", ["x", "y=None", "z=None"], "Return a translation table"),
+            ("partition", ["sep"], "Split at the first occurrence of sep"),
+            ("removeprefix", ["prefix"], "Remove prefix if present (Python 3.9+)"),
+            ("removesuffix", ["suffix"], "Remove suffix if present (Python 3.9+)"),
+            ("replace", ["old", "new", "count=-1"], "Return a copy with all occurrences of old replaced by new"),
+            ("rfind", ["sub", "start=0", "end=len"], "Return the highest index where substring sub is found"),
+            ("rindex", ["sub", "start=0", "end=len"], "Like rfind(), but raise ValueError when not found"),
+            ("rjust", ["width", "fillchar=' '"], "Return a right-justified string of length width"),
+            ("rpartition", ["sep"], "Split at the last occurrence of sep"),
+            ("rsplit", ["sep=None", "maxsplit=-1"], "Return a list of words, splitting from the right"),
+            ("rstrip", ["chars=None"], "Return a copy with trailing whitespace removed"),
+            ("split", ["sep=None", "maxsplit=-1"], "Return a list of words in the string"),
+            ("splitlines", ["keepends=False"], "Return a list of lines in the string"),
+            ("startswith", ["prefix", "start=0", "end=len"], "Return True if string starts with the prefix"),
+            ("strip", ["chars=None"], "Return a copy with leading and trailing whitespace removed"),
+            ("swapcase", [], "Return a copy with uppercase converted to lowercase and vice versa"),
+            ("title", [], "Return a titlecased version"),
+            ("translate", ["table"], "Replace characters using translation table"),
+            ("upper", [], "Return a copy with all characters converted to uppercase"),
+            ("zfill", ["width"], "Pad a numeric string with zeros on the left")
+        ]
+        
+        // List methods
+        let listMethods: [(String, [String], String)] = [
+            ("append", ["object"], "Append object to the end of the list"),
+            ("clear", [], "Remove all items from the list"),
+            ("copy", [], "Return a shallow copy of the list"),
+            ("count", ["value"], "Return number of occurrences of value"),
+            ("extend", ["iterable"], "Extend list by appending elements from the iterable"),
+            ("index", ["value", "start=0", "stop=len"], "Return first index of value"),
+            ("insert", ["index", "object"], "Insert object before index"),
+            ("pop", ["index=-1"], "Remove and return item at index (default last)"),
+            ("remove", ["value"], "Remove first occurrence of value"),
+            ("reverse", [], "Reverse the list in place"),
+            ("sort", ["key=None", "reverse=False"], "Sort the list in ascending order")
+        ]
+        
+        // Dict methods
+        let dictMethods: [(String, [String], String)] = [
+            ("clear", [], "Remove all items from the dictionary"),
+            ("copy", [], "Return a shallow copy of the dictionary"),
+            ("fromkeys", ["iterable", "value=None"], "Create a new dictionary with keys from iterable"),
+            ("get", ["key", "default=None"], "Return value for key if key is in dictionary"),
+            ("items", [], "Return a view of the dictionary's (key, value) pairs"),
+            ("keys", [], "Return a view of the dictionary's keys"),
+            ("pop", ["key", "default=None"], "Remove key and return value, or default if key not found"),
+            ("popitem", [], "Remove and return a (key, value) pair"),
+            ("setdefault", ["key", "default=None"], "Get value of key, set to default if not present"),
+            ("update", ["other"], "Update dictionary with key/value pairs from other"),
+            ("values", [], "Return a view of the dictionary's values")
+        ]
+        
+        // Set methods
+        let setMethods: [(String, [String], String)] = [
+            ("add", ["elem"], "Add element elem to the set"),
+            ("clear", [], "Remove all elements from the set"),
+            ("copy", [], "Return a shallow copy of the set"),
+            ("difference", ["*others"], "Return the difference of two or more sets"),
+            ("difference_update", ["*others"], "Remove all elements of other sets from this set"),
+            ("discard", ["elem"], "Remove element elem from the set if present"),
+            ("intersection", ["*others"], "Return the intersection of two or more sets"),
+            ("intersection_update", ["*others"], "Update set with intersection of itself and others"),
+            ("isdisjoint", ["other"], "Return True if two sets have a null intersection"),
+            ("issubset", ["other"], "Test whether every element is in other"),
+            ("issuperset", ["other"], "Test whether every element of other is in the set"),
+            ("pop", [], "Remove and return an arbitrary element"),
+            ("remove", ["elem"], "Remove element elem from the set, raise KeyError if not found"),
+            ("symmetric_difference", ["other"], "Return symmetric difference of two sets"),
+            ("symmetric_difference_update", ["other"], "Update set with symmetric difference"),
+            ("union", ["*others"], "Return the union of sets"),
+            ("update", ["*others"], "Update set with union of itself and others")
+        ]
+        
+        // Bytes/bytearray methods (common subset)
+        let bytesMethods: [(String, [String], String)] = [
+            ("count", ["sub", "start=0", "end=len"], "Return the number of non-overlapping occurrences"),
+            ("decode", ["encoding='utf-8'", "errors='strict'"], "Decode bytes to string"),
+            ("endswith", ["suffix", "start=0", "end=len"], "Return True if bytes ends with suffix"),
+            ("find", ["sub", "start=0", "end=len"], "Return the lowest index where sub is found"),
+            ("hex", ["sep=''", "bytes_per_sep=1"], "Return hexadecimal representation"),
+            ("index", ["sub", "start=0", "end=len"], "Like find(), but raise ValueError when not found"),
+            ("join", ["iterable"], "Concatenate bytes objects in iterable"),
+            ("replace", ["old", "new", "count=-1"], "Return a copy with occurrences of old replaced by new"),
+            ("split", ["sep=None", "maxsplit=-1"], "Return a list of bytes"),
+            ("startswith", ["prefix", "start=0", "end=len"], "Return True if bytes starts with prefix"),
+            ("strip", ["bytes=None"], "Return bytes with leading and trailing bytes removed")
+        ]
+        
+        // Add string methods
+        for (name, params, doc) in strMethods {
+            items.append(CompletionItem.function(
+                name: "str.\(name)",
+                parameters: params,
+                documentation: doc
+            ))
+        }
+        
+        // Add list methods
+        for (name, params, doc) in listMethods {
+            items.append(CompletionItem.function(
+                name: "list.\(name)",
+                parameters: params,
+                documentation: doc
+            ))
+        }
+        
+        // Add dict methods
+        for (name, params, doc) in dictMethods {
+            items.append(CompletionItem.function(
+                name: "dict.\(name)",
+                parameters: params,
+                documentation: doc
+            ))
+        }
+        
+        // Add set methods
+        for (name, params, doc) in setMethods {
+            items.append(CompletionItem.function(
+                name: "set.\(name)",
+                parameters: params,
+                documentation: doc
+            ))
+        }
+        
+        // Add frozenset methods (subset of set methods that don't modify)
+        let frozensetMethods = ["copy", "difference", "intersection", "isdisjoint", "issubset", "issuperset", "symmetric_difference", "union"]
+        for method in frozensetMethods {
+            if let setMethod = setMethods.first(where: { $0.0 == method }) {
+                items.append(CompletionItem.function(
+                    name: "frozenset.\(setMethod.0)",
+                    parameters: setMethod.1,
+                    documentation: setMethod.2
+                ))
+            }
+        }
+        
+        // Add bytes methods
+        for (name, params, doc) in bytesMethods {
+            items.append(CompletionItem.function(
+                name: "bytes.\(name)",
+                parameters: params,
+                documentation: doc
+            ))
+        }
+        
+        // Add bytearray methods (includes bytes methods + mutating methods)
+        for (name, params, doc) in bytesMethods {
+            items.append(CompletionItem.function(
+                name: "bytearray.\(name)",
+                parameters: params,
+                documentation: doc
+            ))
+        }
+        
+        // Additional bytearray-only methods (mutating)
+        let bytearrayOnly: [(String, [String], String)] = [
+            ("append", ["item"], "Append a single byte"),
+            ("clear", [], "Remove all items from the bytearray"),
+            ("extend", ["iterable"], "Extend bytearray by appending elements"),
+            ("insert", ["index", "item"], "Insert a single byte before index"),
+            ("pop", ["index=-1"], "Remove and return byte at index"),
+            ("remove", ["value"], "Remove first occurrence of value"),
+            ("reverse", [], "Reverse the bytearray in place")
+        ]
+        
+        for (name, params, doc) in bytearrayOnly {
+            items.append(CompletionItem.function(
+                name: "bytearray.\(name)",
+                parameters: params,
+                documentation: doc
+            ))
+        }
+        
+        // Tuple methods (immutable, so minimal)
+        let tupleMethods: [(String, [String], String)] = [
+            ("count", ["value"], "Return number of occurrences of value"),
+            ("index", ["value", "start=0", "stop=len"], "Return first index of value")
+        ]
+        
+        for (name, params, doc) in tupleMethods {
+            items.append(CompletionItem.function(
+                name: "tuple.\(name)",
                 parameters: params,
                 documentation: doc
             ))
