@@ -754,4 +754,475 @@ public class MonacoAnalyzer {
         }
         return true
     }
+    
+    // MARK: - Semantic Tokens Provider
+    
+    /// Get semantic tokens for syntax highlighting
+    public func getSemanticTokens() -> SemanticTokens? {
+        guard let ast = ast else { return nil }
+        
+        let builder = SemanticTokensBuilder()
+        
+        // Walk the AST and generate tokens
+        let statements = getStatements(from: ast)
+        for statement in statements {
+            classifyStatement(statement, builder: builder)
+        }
+        
+        return SemanticTokens(resultId: nil, data: builder.build())
+    }
+    
+    private func classifyStatement(_ statement: Statement, builder: SemanticTokensBuilder) {
+        switch statement {
+        case .functionDef(let funcDef):
+            // Function name as function token
+            if let line = funcDef.lineno {
+                builder.push(
+                    line: line,
+                    startChar: funcDef.colOffset,
+                    length: funcDef.name.count,
+                    tokenType: .function,
+                    tokenModifiers: [.definition]
+                )
+            }
+            
+            // Parameters
+            for arg in funcDef.args.args {
+                if let line = arg.lineno {
+                    builder.push(
+                        line: line,
+                        startChar: arg.colOffset,
+                        length: arg.arg.count,
+                        tokenType: .parameter,
+                        tokenModifiers: []
+                    )
+                }
+            }
+            
+        case .classDef(let classDef):
+            // Class name as class token
+            if let line = classDef.lineno {
+                builder.push(
+                    line: line,
+                    startChar: classDef.colOffset,
+                    length: classDef.name.count,
+                    tokenType: .class,
+                    tokenModifiers: [.definition]
+                )
+            }
+            
+        case .assign(let assign):
+            // Variables
+            for target in assign.targets {
+                if case .name(let name) = target, let line = name.lineno {
+                    builder.push(
+                        line: line,
+                        startChar: name.colOffset,
+                        length: name.id.count,
+                        tokenType: .variable,
+                        tokenModifiers: []
+                    )
+                }
+            }
+            
+        default:
+            break
+        }
+        
+        // TODO: Add more token classification for expressions, imports, etc.
+    }
+    
+    // MARK: - Document Formatting Provider
+    
+    /// Format the entire document
+    public func formatDocument(options: FormattingOptions) -> [TextEdit] {
+        // TODO: Implement PEP 8 formatting
+        // This would integrate with Black, autopep8, or yapf
+        var edits: [TextEdit] = []
+        
+        // Example: Fix indentation issues
+        for (index, line) in sourceLines.enumerated() {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty { continue }
+            
+            // Calculate expected indentation
+            let expectedIndent = calculateIndentation(at: index + 1)
+            let currentIndent = line.prefix(while: { $0 == " " || $0 == "\t" }).count
+            
+            if currentIndent != expectedIndent {
+                let newIndent = String(repeating: options.insertSpaces ? " " : "\t", 
+                                      count: options.insertSpaces ? expectedIndent : expectedIndent / options.tabSize)
+                
+                edits.append(TextEdit(
+                    range: IDERange(
+                        startLineNumber: index + 1,
+                        startColumn: 1,
+                        endLineNumber: index + 1,
+                        endColumn: currentIndent + 1
+                    ),
+                    newText: newIndent
+                ))
+            }
+        }
+        
+        return edits
+    }
+    
+    /// Format a range of the document
+    public func formatRange(_ range: IDERange, options: FormattingOptions) -> [TextEdit] {
+        // TODO: Implement range formatting
+        // Similar to formatDocument but only for selected lines
+        let startLine = range.startLineNumber - 1
+        let endLine = min(range.endLineNumber, sourceLines.count) - 1
+        
+        var edits: [TextEdit] = []
+        
+        for lineIndex in startLine...endLine {
+            guard lineIndex < sourceLines.count else { break }
+            let line = sourceLines[lineIndex]
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty { continue }
+            
+            // Apply formatting to this line
+            let expectedIndent = calculateIndentation(at: lineIndex + 1)
+            let currentIndent = line.prefix(while: { $0 == " " || $0 == "\t" }).count
+            
+            if currentIndent != expectedIndent {
+                let newIndent = String(repeating: options.insertSpaces ? " " : "\t",
+                                      count: options.insertSpaces ? expectedIndent : expectedIndent / options.tabSize)
+                
+                edits.append(TextEdit(
+                    range: IDERange(
+                        startLineNumber: lineIndex + 1,
+                        startColumn: 1,
+                        endLineNumber: lineIndex + 1,
+                        endColumn: currentIndent + 1
+                    ),
+                    newText: newIndent
+                ))
+            }
+        }
+        
+        return edits
+    }
+    
+    /// Format on typing (auto-format after certain characters)
+    public func formatOnType(at position: Position, character: String, options: FormattingOptions) -> [TextEdit] {
+        // Auto-format after typing colon, newline, etc.
+        var edits: [TextEdit] = []
+        
+        if character == ":" {
+            // After colon in function def, class def, if/for/while, etc.
+            // Ensure proper spacing
+            let lineIndex = position.lineNumber - 1
+            guard lineIndex < sourceLines.count else { return [] }
+            
+            let line = sourceLines[lineIndex]
+            if line.hasSuffix(":") && !line.hasSuffix(" :") {
+                // TODO: Add spacing before colon if needed
+            }
+        } else if character == "\n" {
+            // Auto-indent new line
+            let lineIndex = position.lineNumber - 1
+            let indent = calculateIndentation(at: position.lineNumber)
+            let indentString = String(repeating: options.insertSpaces ? " " : "\t",
+                                     count: options.insertSpaces ? indent : indent / options.tabSize)
+            
+            edits.append(TextEdit(
+                range: IDERange(
+                    startLineNumber: position.lineNumber,
+                    startColumn: 1,
+                    endLineNumber: position.lineNumber,
+                    endColumn: 1
+                ),
+                newText: indentString
+            ))
+        }
+        
+        return edits
+    }
+    
+    private func calculateIndentation(at line: Int) -> Int {
+        // TODO: Calculate expected indentation based on AST structure
+        // For now, use simple heuristic
+        guard line > 1 && line <= sourceLines.count else { return 0 }
+        
+        let prevLine = sourceLines[line - 2]
+        let prevIndent = prevLine.prefix(while: { $0 == " " || $0 == "\t" }).count
+        
+        if prevLine.trimmingCharacters(in: .whitespaces).hasSuffix(":") {
+            return prevIndent + 4 // Increase indent after colon
+        }
+        
+        return prevIndent
+    }
+    
+    // MARK: - Document Link Provider
+    
+    /// Get document links (clickable imports)
+    public func getLinks() -> [DocumentLink] {
+        var links: [DocumentLink] = []
+        
+        guard let ast = ast else { return [] }
+        
+        let statements = getStatements(from: ast)
+        for statement in statements {
+            switch statement {
+            case .import(let imp):
+                for alias in imp.names {
+                    if let line = imp.lineno {
+                        let range = IDERange(
+                            startLineNumber: line,
+                            startColumn: imp.colOffset + 7, // After "import "
+                            endLineNumber: line,
+                            endColumn: imp.colOffset + 7 + alias.name.count
+                        )
+                        
+                        links.append(DocumentLink(
+                            range: range,
+                            url: "file://\(alias.name.replacingOccurrences(of: ".", with: "/")).py",
+                            tooltip: "Open \(alias.name)"
+                        ))
+                    }
+                }
+                
+            case .importFrom(let impFrom):
+                if let moduleName = impFrom.module, let line = impFrom.lineno {
+                    let range = IDERange(
+                        startLineNumber: line,
+                        startColumn: impFrom.colOffset + 5, // After "from "
+                        endLineNumber: line,
+                        endColumn: impFrom.colOffset + 5 + moduleName.count
+                    )
+                    
+                    links.append(DocumentLink(
+                        range: range,
+                        url: "file://\(moduleName.replacingOccurrences(of: ".", with: "/")).py",
+                        tooltip: "Open \(moduleName)"
+                    ))
+                }
+                
+            default:
+                break
+            }
+        }
+        
+        return links
+    }
+    
+    // MARK: - Color Provider
+    
+    /// Get color information from the document
+    public func getColors() -> [ColorInformation] {
+        var colors: [ColorInformation] = []
+        
+        // Find color literals in the source (hex colors, RGB, etc.)
+        for (index, line) in sourceLines.enumerated() {
+            // Match hex colors like "#FF0000" or "#FF0000FF"
+            let hexPattern = #"#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?"#
+            if let regex = try? NSRegularExpression(pattern: hexPattern) {
+                let nsLine = line as NSString
+                let matches = regex.matches(in: line, range: NSRange(location: 0, length: nsLine.length))
+                
+                for match in matches {
+                    let hexString = nsLine.substring(with: match.range)
+                    if let color = Color.fromHex(hexString) {
+                        colors.append(ColorInformation(
+                            range: IDERange(
+                                startLineNumber: index + 1,
+                                startColumn: match.range.location + 1,
+                                endLineNumber: index + 1,
+                                endColumn: match.range.location + match.range.length + 1
+                            ),
+                            color: color
+                        ))
+                    }
+                }
+            }
+        }
+        
+        // TODO: Also match rgb(), rgba(), color names, etc.
+        
+        return colors
+    }
+    
+    /// Get color presentations for a color at a given range
+    public func getColorPresentations(color: Color, at range: IDERange) -> [ColorPresentation] {
+        var presentations: [ColorPresentation] = []
+        
+        // Hex format
+        presentations.append(ColorPresentation(
+            label: color.toHex(includeAlpha: false),
+            textEdit: TextEdit(range: range, newText: color.toHex(includeAlpha: false))
+        ))
+        
+        // Hex with alpha
+        if color.alpha < 1.0 {
+            presentations.append(ColorPresentation(
+                label: color.toHex(includeAlpha: true),
+                textEdit: TextEdit(range: range, newText: color.toHex(includeAlpha: true))
+            ))
+        }
+        
+        // RGB format
+        let r = Int(color.red * 255)
+        let g = Int(color.green * 255)
+        let b = Int(color.blue * 255)
+        presentations.append(ColorPresentation(
+            label: "rgb(\(r), \(g), \(b))",
+            textEdit: TextEdit(range: range, newText: "rgb(\(r), \(g), \(b))")
+        ))
+        
+        // RGBA format if alpha < 1
+        if color.alpha < 1.0 {
+            presentations.append(ColorPresentation(
+                label: "rgba(\(r), \(g), \(b), \(color.alpha))",
+                textEdit: TextEdit(range: range, newText: "rgba(\(r), \(g), \(b), \(color.alpha))")
+            ))
+        }
+        
+        return presentations
+    }
+    
+    // MARK: - Call Hierarchy Provider
+    
+    /// Prepare call hierarchy for a position
+    public func prepareCallHierarchy(at position: Position) -> [CallHierarchyItem]? {
+        guard let ast = ast else { return nil }
+        
+        // Find the function at the given position
+        let statements = getStatements(from: ast)
+        for statement in statements {
+            if case .functionDef(let funcDef) = statement,
+               let line = funcDef.lineno,
+               line == position.lineNumber {
+                
+                let range = IDERange(
+                    startLineNumber: line,
+                    startColumn: funcDef.colOffset,
+                    endLineNumber: line + funcDef.body.count,
+                    endColumn: 1
+                )
+                
+                return [CallHierarchyItem(
+                    name: funcDef.name,
+                    kind: .function,
+                    detail: "def \(funcDef.name)(...)",
+                    uri: "document",
+                    range: range,
+                    selectionRange: IDERange(
+                        startLineNumber: line,
+                        startColumn: funcDef.colOffset,
+                        endLineNumber: line,
+                        endColumn: funcDef.colOffset + funcDef.name.count
+                    )
+                )]
+            }
+        }
+        
+        return nil
+    }
+    
+    /// Get incoming calls (who calls this function)
+    public func getIncomingCalls(for item: CallHierarchyItem) -> [CallHierarchyIncomingCall] {
+        // TODO: Implement call graph analysis
+        // Would need to scan entire codebase for calls to this function
+        return []
+    }
+    
+    /// Get outgoing calls (what this function calls)
+    public func getOutgoingCalls(for item: CallHierarchyItem) -> [CallHierarchyOutgoingCall] {
+        // TODO: Implement call analysis
+        // Would need to analyze function body for function calls
+        return []
+    }
+    
+    // MARK: - Type Hierarchy Provider
+    
+    /// Prepare type hierarchy for a position
+    public func prepareTypeHierarchy(at position: Position) -> [TypeHierarchyItem]? {
+        guard let ast = ast else { return nil }
+        
+        // Find the class at the given position
+        let statements = getStatements(from: ast)
+        for statement in statements {
+            if case .classDef(let classDef) = statement,
+               let line = classDef.lineno,
+               line == position.lineNumber {
+                
+                let range = IDERange(
+                    startLineNumber: line,
+                    startColumn: classDef.colOffset,
+                    endLineNumber: line + classDef.body.count,
+                    endColumn: 1
+                )
+                
+                return [TypeHierarchyItem(
+                    name: classDef.name,
+                    kind: .class,
+                    detail: "class \(classDef.name)",
+                    uri: "document",
+                    range: range,
+                    selectionRange: IDERange(
+                        startLineNumber: line,
+                        startColumn: classDef.colOffset,
+                        endLineNumber: line,
+                        endColumn: classDef.colOffset + classDef.name.count
+                    )
+                )]
+            }
+        }
+        
+        return nil
+    }
+    
+    /// Get supertypes (base classes)
+    public func getSupertypes(for item: TypeHierarchyItem) -> [TypeHierarchyItem] {
+        // TODO: Implement class hierarchy analysis
+        // Would need to resolve base classes from the class definition
+        return []
+    }
+    
+    /// Get subtypes (derived classes)
+    public func getSubtypes(for item: TypeHierarchyItem) -> [TypeHierarchyItem] {
+        // TODO: Implement subclass search
+        // Would need to scan codebase for classes that inherit from this class
+        return []
+    }
+    
+    // MARK: - Inline Values Provider
+    
+    /// Get inline values for debugging
+    public func getInlineValues(at range: IDERange) -> [InlineValue] {
+        var inlineValues: [InlineValue] = []
+        
+        // Find variables in the given range
+        guard let ast = ast else { return [] }
+        
+        let statements = getStatements(from: ast)
+        for statement in statements {
+            // Look for variable assignments
+            if case .assign(let assign) = statement,
+               let line = assign.lineno,
+               line >= range.startLineNumber && line <= range.endLineNumber {
+                
+                for target in assign.targets {
+                    if case .name(let name) = target {
+                        inlineValues.append(.variableLookup(InlineValueVariableLookup(
+                            range: IDERange(
+                                startLineNumber: line,
+                                startColumn: name.colOffset,
+                                endLineNumber: line,
+                                endColumn: name.colOffset + name.id.count
+                            ),
+                            variableName: name.id,
+                            caseSensitiveLookup: true
+                        )))
+                    }
+                }
+            }
+        }
+        
+        return inlineValues
+    }
 }

@@ -151,6 +151,61 @@ public struct SemanticTokens: Codable, Sendable {
     }
 }
 
+/// Standard semantic token types
+public enum SemanticTokenType: String, Codable, Sendable, CaseIterable {
+    case namespace, type, `class`, `enum`, interface, `struct`, typeParameter
+    case parameter, variable, property, enumMember, event
+    case function, method, macro, keyword, modifier, comment
+    case string, number, regexp, `operator`, decorator
+    
+    public var index: Int {
+        Self.allCases.firstIndex(of: self) ?? 0
+    }
+}
+
+/// Standard semantic token modifiers
+public enum SemanticTokenModifier: String, Codable, Sendable, CaseIterable {
+    case declaration, definition, readonly, `static`, deprecated
+    case abstract, async, modification, documentation, defaultLibrary
+    
+    public var bit: Int {
+        1 << Self.allCases.firstIndex(of: self)!
+    }
+}
+
+/// Helper for building semantic tokens
+public final class SemanticTokensBuilder {
+    private var tokens: [(line: Int, startChar: Int, length: Int, tokenType: Int, tokenModifiers: Int)] = []
+    
+    public init() {}
+    
+    public func push(line: Int, startChar: Int, length: Int, tokenType: SemanticTokenType, tokenModifiers: [SemanticTokenModifier] = []) {
+        let modifierBits = tokenModifiers.reduce(0) { $0 | $1.bit }
+        tokens.append((line, startChar, length, tokenType.index, modifierBits))
+    }
+    
+    public func build() -> [Int] {
+        let sorted = tokens.sorted { a, b in
+            a.line != b.line ? a.line < b.line : a.startChar < b.startChar
+        }
+        
+        var result: [Int] = []
+        var prevLine = 0, prevStartChar = 0
+        
+        for token in sorted {
+            let deltaLine = token.line - prevLine
+            let deltaStartChar = deltaLine == 0 ? token.startChar - prevStartChar : token.startChar
+            
+            result.append(contentsOf: [deltaLine, deltaStartChar, token.length, token.tokenType, token.tokenModifiers])
+            
+            prevLine = token.line
+            prevStartChar = token.startChar
+        }
+        
+        return result
+    }
+}
+
 // MARK: - Inlay Hints Provider Types
 
 /// Inlay hints provide additional information inline with the code
@@ -297,3 +352,324 @@ extension FoldingRange {
         FoldingRange(start: start, end: end, kind: .imports)
     }
 }
+
+// MARK: - Document Link Provider Types
+
+/// A document link represents a clickable link in the editor
+/// Corresponds to Monaco's `monaco.languages.ILink`
+public struct DocumentLink: Codable, Sendable {
+    /// The range this link applies to
+    public let range: IDERange
+    
+    /// The uri this link points to
+    public let url: String?
+    
+    /// The tooltip text when hovering over this link
+    public let tooltip: String?
+    
+    public init(range: IDERange, url: String? = nil, tooltip: String? = nil) {
+        self.range = range
+        self.url = url
+        self.tooltip = tooltip
+    }
+}
+
+// MARK: - Color Provider Types
+
+/// Color information represents a color in the document
+/// Corresponds to Monaco's `monaco.languages.IColorInformation`
+public struct ColorInformation: Codable, Sendable {
+    /// The range in the document where this color appears
+    public let range: IDERange
+    
+    /// The color value
+    public let color: Color
+    
+    public init(range: IDERange, color: Color) {
+        self.range = range
+        self.color = color
+    }
+}
+
+/// Represents a color
+/// Corresponds to Monaco's `monaco.languages.IColor`
+public struct Color: Codable, Sendable {
+    /// Red component in the range [0, 1]
+    public let red: Double
+    
+    /// Green component in the range [0, 1]
+    public let green: Double
+    
+    /// Blue component in the range [0, 1]
+    public let blue: Double
+    
+    /// Alpha component in the range [0, 1]
+    public let alpha: Double
+    
+    public init(red: Double, green: Double, blue: Double, alpha: Double = 1.0) {
+        self.red = red
+        self.green = green
+        self.blue = blue
+        self.alpha = alpha
+    }
+}
+
+/// Color presentation represents how a color should be displayed
+/// Corresponds to Monaco's `monaco.languages.IColorPresentation`
+public struct ColorPresentation: Codable, Sendable {
+    /// The label of this color presentation
+    public let label: String
+    
+    /// An optional text edit
+    public let textEdit: TextEdit?
+    
+    /// Additional text edits
+    public let additionalTextEdits: [TextEdit]?
+    
+    public init(label: String, textEdit: TextEdit? = nil, additionalTextEdits: [TextEdit]? = nil) {
+        self.label = label
+        self.textEdit = textEdit
+        self.additionalTextEdits = additionalTextEdits
+    }
+}
+
+// MARK: - Call Hierarchy Provider Types
+
+/// Call hierarchy item represents a function or method in the call hierarchy
+/// Corresponds to Monaco's `monaco.languages.CallHierarchyItem`
+public struct CallHierarchyItem: Codable, Sendable {
+    /// The name of this item
+    public let name: String
+    
+    /// The kind of this item
+    public let kind: SymbolKind
+    
+    /// Tags for this item
+    public let tags: [Int]?
+    
+    /// More detail for this item
+    public let detail: String?
+    
+    /// The resource identifier of this item
+    public let uri: String
+    
+    /// The range enclosing this symbol
+    public let range: IDERange
+    
+    /// The range that should be selected
+    public let selectionRange: IDERange
+    
+    /// Data that should be preserved between calls
+    public let data: String?
+    
+    public init(
+        name: String,
+        kind: SymbolKind,
+        tags: [Int]? = nil,
+        detail: String? = nil,
+        uri: String,
+        range: IDERange,
+        selectionRange: IDERange,
+        data: String? = nil
+    ) {
+        self.name = name
+        self.kind = kind
+        self.tags = tags
+        self.detail = detail
+        self.uri = uri
+        self.range = range
+        self.selectionRange = selectionRange
+        self.data = data
+    }
+}
+
+/// Represents an incoming call in the call hierarchy
+/// Corresponds to Monaco's `monaco.languages.CallHierarchyIncomingCall`
+public struct CallHierarchyIncomingCall: Codable, Sendable {
+    /// The item that makes the call
+    public let from: CallHierarchyItem
+    
+    /// The ranges at which the calls appear
+    public let fromRanges: [IDERange]
+    
+    public init(from: CallHierarchyItem, fromRanges: [IDERange]) {
+        self.from = from
+        self.fromRanges = fromRanges
+    }
+}
+
+/// Represents an outgoing call in the call hierarchy
+/// Corresponds to Monaco's `monaco.languages.CallHierarchyOutgoingCall`
+public struct CallHierarchyOutgoingCall: Codable, Sendable {
+    /// The item that is called
+    public let to: CallHierarchyItem
+    
+    /// The ranges at which the calls appear
+    public let fromRanges: [IDERange]
+    
+    public init(to: CallHierarchyItem, fromRanges: [IDERange]) {
+        self.to = to
+        self.fromRanges = fromRanges
+    }
+}
+
+// MARK: - Type Hierarchy Provider Types
+
+/// Type hierarchy item represents a type in the hierarchy
+/// Corresponds to Monaco's `monaco.languages.TypeHierarchyItem`
+public struct TypeHierarchyItem: Codable, Sendable {
+    /// The name of this item
+    public let name: String
+    
+    /// The kind of this item
+    public let kind: SymbolKind
+    
+    /// Tags for this item
+    public let tags: [Int]?
+    
+    /// More detail for this item
+    public let detail: String?
+    
+    /// The resource identifier of this item
+    public let uri: String
+    
+    /// The range enclosing this symbol
+    public let range: IDERange
+    
+    /// The range that should be selected
+    public let selectionRange: IDERange
+    
+    /// Data that should be preserved between calls
+    public let data: String?
+    
+    public init(
+        name: String,
+        kind: SymbolKind,
+        tags: [Int]? = nil,
+        detail: String? = nil,
+        uri: String,
+        range: IDERange,
+        selectionRange: IDERange,
+        data: String? = nil
+    ) {
+        self.name = name
+        self.kind = kind
+        self.tags = tags
+        self.detail = detail
+        self.uri = uri
+        self.range = range
+        self.selectionRange = selectionRange
+        self.data = data
+    }
+}
+
+// MARK: - Inline Values Provider Types
+
+/// Inline value represents a value shown inline during debugging
+/// Corresponds to Monaco's `monaco.languages.InlineValue`
+public enum InlineValue: Codable, Sendable {
+    case text(InlineValueText)
+    case variableLookup(InlineValueVariableLookup)
+    case evaluatableExpression(InlineValueEvaluatableExpression)
+}
+
+/// Inline value as text
+public struct InlineValueText: Codable, Sendable {
+    /// The document range for which the inline value applies
+    public let range: IDERange
+    
+    /// The text of the inline value
+    public let text: String
+    
+    public init(range: IDERange, text: String) {
+        self.range = range
+        self.text = text
+    }
+}
+
+/// Inline value through a variable lookup
+public struct InlineValueVariableLookup: Codable, Sendable {
+    /// The document range for which the inline value applies
+    public let range: IDERange
+    
+    /// The variable name to look up
+    public let variableName: String?
+    
+    /// If true, case-sensitive lookup
+    public let caseSensitiveLookup: Bool
+    
+    public init(range: IDERange, variableName: String? = nil, caseSensitiveLookup: Bool = true) {
+        self.range = range
+        self.variableName = variableName
+        self.caseSensitiveLookup = caseSensitiveLookup
+    }
+}
+
+/// Inline value through an expression evaluation
+public struct InlineValueEvaluatableExpression: Codable, Sendable {
+    /// The document range for which the inline value applies
+    public let range: IDERange
+    
+    /// The expression to evaluate
+    public let expression: String?
+    
+    public init(range: IDERange, expression: String? = nil) {
+        self.range = range
+        self.expression = expression
+    }
+}
+
+extension SemanticTokensLegend {
+    /// Create a standard legend with all token types and modifiers
+    public static var standard: SemanticTokensLegend {
+        SemanticTokensLegend(
+            tokenTypes: SemanticTokenType.allCases.map(\.rawValue),
+            tokenModifiers: SemanticTokenModifier.allCases.map(\.rawValue)
+        )
+    }
+}
+
+extension Color {
+    /// Create color from hex string (e.g., "#FF0000" or "#FF0000FF")
+    public static func fromHex(_ hex: String) -> Color? {
+        var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        hexSanitized = hexSanitized.replacingOccurrences(of: "#", with: "")
+        
+        var rgb: UInt64 = 0
+        guard Scanner(string: hexSanitized).scanHexInt64(&rgb) else { return nil }
+        
+        let length = hexSanitized.count
+        let r, g, b, a: Double
+        
+        if length == 6 {
+            r = Double((rgb & 0xFF0000) >> 16) / 255.0
+            g = Double((rgb & 0x00FF00) >> 8) / 255.0
+            b = Double(rgb & 0x0000FF) / 255.0
+            a = 1.0
+        } else if length == 8 {
+            r = Double((rgb & 0xFF000000) >> 24) / 255.0
+            g = Double((rgb & 0x00FF0000) >> 16) / 255.0
+            b = Double((rgb & 0x0000FF00) >> 8) / 255.0
+            a = Double(rgb & 0x000000FF) / 255.0
+        } else {
+            return nil
+        }
+        
+        return Color(red: r, green: g, blue: b, alpha: a)
+    }
+    
+    /// Convert to hex string
+    public func toHex(includeAlpha: Bool = false) -> String {
+        let r = Int(red * 255)
+        let g = Int(green * 255)
+        let b = Int(blue * 255)
+        let a = Int(alpha * 255)
+        
+        if includeAlpha {
+            return String(format: "#%02X%02X%02X%02X", r, g, b, a)
+        } else {
+            return String(format: "#%02X%02X%02X", r, g, b)
+        }
+    }
+}
+
