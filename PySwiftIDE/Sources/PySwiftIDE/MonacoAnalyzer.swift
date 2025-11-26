@@ -69,6 +69,9 @@ public class MonacoAnalyzer {
         // Add built-in type methods (str, list, dict, set, etc.)
         items.append(contentsOf: getBuiltinTypeCompletions())
         
+        // Add sequence operations and utilities
+        items.append(contentsOf: getSequenceOperations())
+        
         // If we have AST, add context-aware completions
         if let ast = ast {
             items.append(contentsOf: getContextualCompletions(at: position, in: ast))
@@ -319,28 +322,28 @@ public class MonacoAnalyzer {
     }
     
     private func getBuiltinCompletions() -> [CompletionItem] {
-        let builtins = [
-            ("print", ["*args", "sep=' '", "end='\\n'"]),
-            ("len", ["obj"]),
-            ("range", ["start", "stop", "step=1"]),
-            ("str", ["object"]),
-            ("int", ["x", "base=10"]),
-            ("float", ["x"]),
-            ("list", ["iterable"]),
-            ("dict", ["**kwargs"]),
-            ("set", ["iterable"]),
-            ("tuple", ["iterable"]),
-            ("open", ["file", "mode='r'"]),
-            ("type", ["object"]),
-            ("isinstance", ["obj", "classinfo"]),
-            ("enumerate", ["iterable", "start=0"]),
-            ("zip", ["*iterables"]),
-            ("map", ["function", "iterable"]),
-            ("filter", ["function", "iterable"])
+        let builtins: [(String, [String], String?)] = [
+            ("print", ["*args", "sep=' '", "end='\\n'"], "Print values to stdout"),
+            ("len", ["seq"], "Return the length (number of items) of a sequence"),
+            ("range", ["start", "stop=None", "step=1"], "Create an immutable sequence of numbers"),
+            ("str", ["object"], "Convert object to string"),
+            ("int", ["x", "base=10"], "Convert to integer"),
+            ("float", ["x"], "Convert to floating point number"),
+            ("list", ["iterable"], "Create a list from an iterable"),
+            ("dict", ["**kwargs"], "Create a dictionary"),
+            ("set", ["iterable"], "Create a set from an iterable"),
+            ("tuple", ["iterable"], "Create a tuple from an iterable"),
+            ("open", ["file", "mode='r'"], "Open a file and return a file object"),
+            ("type", ["object"], "Return the type of an object"),
+            ("isinstance", ["obj", "classinfo"], "Check if object is an instance of a class"),
+            ("enumerate", ["iterable", "start=0"], "Return an enumerate object yielding (index, value) pairs"),
+            ("zip", ["*iterables", "strict=False"], "Iterate over several iterables in parallel"),
+            ("map", ["function", "iterable", "*iterables"], "Apply function to every item of iterable"),
+            ("filter", ["function", "iterable"], "Construct an iterator from elements of iterable for which function returns true")
         ]
         
-        return builtins.map { name, params in
-            CompletionItem.function(name: name, parameters: params)
+        return builtins.map { name, params, doc in
+            CompletionItem.function(name: name, parameters: params, documentation: doc)
         }
     }
     
@@ -672,6 +675,100 @@ public class MonacoAnalyzer {
         
         return items
     }
+    
+    // MARK: - Sequence Operations and Iterator Protocol
+    
+    /// Returns completions for sequence operations, range type, and iterator protocol
+    private func getSequenceOperations() -> [CompletionItem] {
+        var items: [CompletionItem] = []
+        
+        // Range type (Python 3.x)
+        let rangeMethods: [(String, [String], String)] = [
+            ("start", [], "The start value of the range"),
+            ("stop", [], "The stop value of the range"),
+            ("step", [], "The step value of the range"),
+            ("count", ["value"], "Return number of occurrences of value"),
+            ("index", ["value"], "Return first index of value")
+        ]
+        
+        for (name, params, doc) in rangeMethods {
+            if params.isEmpty {
+                // Properties accessed as attributes, not methods
+                items.append(CompletionItem.variable(name: "range.\(name)", type: "int"))
+            } else {
+                items.append(CompletionItem.function(
+                    name: "range.\(name)",
+                    parameters: params,
+                    documentation: doc
+                ))
+            }
+        }
+        
+        // Common sequence operations (work on list, tuple, str, range, bytes, etc.)
+        let sequenceOps: [(String, [String], String)] = [
+            ("len", ["seq"], "Return the length (number of items) of a sequence"),
+            ("min", ["seq", "key=None", "default=None"], "Return the smallest item in a sequence"),
+            ("max", ["seq", "key=None", "default=None"], "Return the largest item in a sequence"),
+            ("sum", ["iterable", "start=0"], "Return the sum of items in an iterable"),
+            ("any", ["iterable"], "Return True if any element is true"),
+            ("all", ["iterable"], "Return True if all elements are true"),
+            ("sorted", ["iterable", "key=None", "reverse=False"], "Return a sorted list from items in iterable"),
+            ("reversed", ["seq"], "Return a reverse iterator"),
+            ("enumerate", ["iterable", "start=0"], "Return an enumerate object yielding (index, value) pairs"),
+            ("zip", ["*iterables", "strict=False"], "Iterate over several iterables in parallel"),
+            ("filter", ["function", "iterable"], "Construct an iterator from elements of iterable for which function returns true"),
+            ("map", ["function", "iterable", "*iterables"], "Apply function to every item of iterable"),
+            ("slice", ["start", "stop=None", "step=None"], "Create a slice object")
+        ]
+        
+        for (name, params, doc) in sequenceOps {
+            // These are already in builtins but adding docs
+            if !items.contains(where: { $0.label == name }) {
+                items.append(CompletionItem.function(
+                    name: name,
+                    parameters: params,
+                    documentation: doc
+                ))
+            }
+        }
+        
+        // Iterator protocol methods (dunder methods)
+        let iteratorMethods: [(String, [String], String)] = [
+            ("__iter__", [], "Return an iterator object. Required for iterables"),
+            ("__next__", [], "Return the next item from the iterator. Raise StopIteration when exhausted"),
+            ("__reversed__", [], "Return a reverse iterator"),
+            ("__length_hint__", [], "Return an estimated length for the object (optional)")
+        ]
+        
+        for (name, params, doc) in iteratorMethods {
+            items.append(CompletionItem.function(
+                name: name,
+                parameters: params,
+                documentation: doc
+            ))
+        }
+        
+        // Iterable utility functions
+        let iterableUtils: [(String, [String], String)] = [
+            ("iter", ["object", "sentinel=None"], "Return an iterator object. With two arguments, creates a sentinel iterator"),
+            ("next", ["iterator", "default=None"], "Retrieve the next item from the iterator by calling __next__()"),
+            ("range", ["start", "stop=None", "step=1"], "Create an immutable sequence of numbers")
+        ]
+        
+        for (name, params, doc) in iterableUtils {
+            if !items.contains(where: { $0.label == name }) {
+                items.append(CompletionItem.function(
+                    name: name,
+                    parameters: params,
+                    documentation: doc
+                ))
+            }
+        }
+        
+        return items
+    }
+    
+    // MARK: - Contextual Completions
     
     private func getContextualCompletions(at position: Position, in module: Module) -> [CompletionItem] {
         var items: [CompletionItem] = []
