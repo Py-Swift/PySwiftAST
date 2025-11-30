@@ -134,8 +134,9 @@ struct SequenceCompletionsTests {
         #expect(rangeCompletions >= 5, "Should have at least 5 range completions, got \(rangeCompletions)")
         #expect(iteratorMethods >= 4, "Should have at least 4 iterator protocol methods, got \(iteratorMethods)")
         
-        // Total should be significantly increased (was ~235, now should be 250+)
-        #expect(completions.suggestions.count > 250, "Total completions should exceed 250, got \(completions.suggestions.count)")
+        // Total should include keywords, builtins, math, sequence operations, and iterator protocol
+        // (Type method completions removed - they require type inference to be context-aware)
+        #expect(completions.suggestions.count > 180, "Total completions should exceed 180, got \(completions.suggestions.count)")
         
         print("Sequence completions breakdown:")
         print("  Range items: \(rangeCompletions)")

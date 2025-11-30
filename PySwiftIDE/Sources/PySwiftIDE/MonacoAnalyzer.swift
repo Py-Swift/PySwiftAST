@@ -78,7 +78,8 @@ public class MonacoAnalyzer {
         items.append(contentsOf: getMathModuleCompletions())
         
         // Add built-in type methods (str, list, dict, set, etc.)
-        items.append(contentsOf: getBuiltinTypeCompletions())
+        // NOTE: Currently disabled - should be context-aware attribute completions
+        // items.append(contentsOf: _getBuiltinTypeCompletions())
         
         // Add sequence operations and utilities
         items.append(contentsOf: getSequenceOperations())
@@ -587,372 +588,417 @@ public class MonacoAnalyzer {
     // MARK: - Private Helpers - Completion
     
     private func getPythonKeywordCompletions() -> [CompletionItem] {
-        let keywords = [
-            "def", "class", "if", "elif", "else", "for", "while",
-            "return", "yield", "import", "from", "as", "try", "except",
-            "finally", "with", "async", "await", "lambda", "pass",
-            "break", "continue", "raise", "assert", "del", "global",
-            "nonlocal", "True", "False", "None", "and", "or", "not",
-            "in", "is"
-        ]
-        
-        return keywords.map { CompletionItem.keyword($0) }
+        return Self.pythonKeywords
     }
     
+    private static let pythonKeywords: [CompletionItem] = [
+        .keyword("def"), .keyword("class"), .keyword("if"), .keyword("elif"), 
+        .keyword("else"), .keyword("for"), .keyword("while"), .keyword("return"), 
+        .keyword("yield"), .keyword("import"), .keyword("from"), .keyword("as"), 
+        .keyword("try"), .keyword("except"), .keyword("finally"), .keyword("with"), 
+        .keyword("async"), .keyword("await"), .keyword("lambda"), .keyword("pass"),
+        .keyword("break"), .keyword("continue"), .keyword("raise"), .keyword("assert"), 
+        .keyword("del"), .keyword("global"), .keyword("nonlocal"), .keyword("True"), 
+        .keyword("False"), .keyword("None"), .keyword("and"), .keyword("or"), 
+        .keyword("not"), .keyword("in"), .keyword("is")
+    ]
+    
     private func getBuiltinCompletions() -> [CompletionItem] {
-        let builtins: [(String, [String], String?)] = [
-            ("print", ["*args", "sep=' '", "end='\\n'"], "Print values to stdout"),
-            ("len", ["seq"], "Return the length (number of items) of a sequence"),
-            ("range", ["start", "stop=None", "step=1"], "Create an immutable sequence of numbers"),
-            ("str", ["object"], "Convert object to string"),
-            ("int", ["x", "base=10"], "Convert to integer"),
-            ("float", ["x"], "Convert to floating point number"),
-            ("list", ["iterable"], "Create a list from an iterable"),
-            ("dict", ["**kwargs"], "Create a dictionary"),
-            ("set", ["iterable"], "Create a set from an iterable"),
-            ("tuple", ["iterable"], "Create a tuple from an iterable"),
-            ("open", ["file", "mode='r'"], "Open a file and return a file object"),
-            ("type", ["object"], "Return the type of an object"),
-            ("isinstance", ["obj", "classinfo"], "Check if object is an instance of a class"),
-            ("enumerate", ["iterable", "start=0"], "Return an enumerate object yielding (index, value) pairs"),
-            ("zip", ["*iterables", "strict=False"], "Iterate over several iterables in parallel"),
-            ("map", ["function", "iterable", "*iterables"], "Apply function to every item of iterable"),
-            ("filter", ["function", "iterable"], "Construct an iterator from elements of iterable for which function returns true")
+        return Self.builtinFunctions
+    }
+    
+    private static let builtinFunctions: [CompletionItem] = [
+        .function(name: "abs", parameters: ["x"], documentation: "Return the absolute value of the argument."),
+        .function(name: "all", parameters: ["iterable"], documentation: "Return True if bool(x) is True for all values x in the iterable."),
+        .function(name: "any", parameters: ["iterable"], documentation: "Return True if bool(x) is True for any x in the iterable."),
+        .function(name: "ascii", parameters: ["obj"], documentation: "Return an ASCII-only representation of an object."),
+        .function(name: "bin", parameters: ["number"], documentation: "Return the binary representation of an integer."),
+        .function(name: "bool", parameters: ["object=False"], documentation: "Returns True when the argument is true, False otherwise. The builtins True and False are the only two instances of the class bool. The class bool is a subclass of the class int, and cannot be subclassed."),
+        .function(name: "breakpoint", parameters: ["*args", "**kws"], documentation: "Call sys.breakpointhook(*args, **kws). sys.breakpointhook() must accept whatever arguments are passed."),
+        .function(name: "bytearray", parameters: [], documentation: "bytearray(iterable_of_ints) -> bytearray bytearray(string, encoding[, errors]) -> bytearray bytearray(bytes_or_buffer) -> mutable copy of bytes_or_buffer bytearray(int) -> bytes array of size given by the parameter initialized with null bytes bytearray() -> empty bytes array"),
+        .function(name: "bytes", parameters: [], documentation: "bytes(iterable_of_ints) -> bytes bytes(string, encoding[, errors]) -> bytes bytes(bytes_or_buffer) -> immutable copy of bytes_or_buffer bytes(int) -> bytes object of size given by the parameter initialized with null bytes bytes() -> empty bytes object"),
+        .function(name: "callable", parameters: ["obj"], documentation: "Return whether the object is callable (i.e., some kind of function)."),
+        .function(name: "chr", parameters: ["i"], documentation: "Return a Unicode string of one character with ordinal i; 0 <= i <= 0x10ffff."),
+        .function(name: "classmethod", parameters: ["function"], documentation: "Convert a function to be a class method."),
+        .function(name: "compile", parameters: ["source", "filename", "mode", "flags=0", "dont_inherit=False", "optimize=-1", "_feature_version=-1"], documentation: "Compile source into a code object that can be executed by exec() or eval()."),
+        .function(name: "complex", parameters: ["real=0", "imag=0"], documentation: "Create a complex number from a string or numbers."),
+        .function(name: "delattr", parameters: ["obj", "name"], documentation: "Deletes the named attribute from the given object."),
+        .function(name: "dict", parameters: [], documentation: "dict() -> new empty dictionary dict(mapping) -> new dictionary initialized from a mapping object's (key, value) pairs dict(iterable) -> new dictionary initialized as if via: d = {} for k, v in iterable: d[k] = v dict(**kwargs) -> new dictionary initialized with the name=value pairs in the keyword argument list. For example: dict(one=1, two=2)"),
+        .function(name: "dir", parameters: [], documentation: "dir([object]) -> list of strings"),
+        .function(name: "divmod", parameters: ["x", "y"], documentation: "Return the tuple (x//y, x%y). Invariant: div*y + mod == x."),
+        .function(name: "enumerate", parameters: ["iterable", "start=0"], documentation: "Return an enumerate object."),
+        .function(name: "eval", parameters: ["source", "globals=None", "locals=None"], documentation: "Evaluate the given source in the context of globals and locals."),
+        .function(name: "exec", parameters: ["source", "globals=None", "locals=None", "closure=None"], documentation: "Execute the given source in the context of globals and locals."),
+        .function(name: "filter", parameters: ["function", "iterable"], documentation: "Return an iterator yielding those items of iterable for which function(item) is true. If function is None, return the items that are true."),
+        .function(name: "float", parameters: ["x=0"], documentation: "Convert a string or number to a floating-point number, if possible."),
+        .function(name: "format", parameters: ["value", "format_spec=''"], documentation: "Return type(value).__format__(value, format_spec)"),
+        .function(name: "frozenset", parameters: ["iterable=()"], documentation: "Build an immutable unordered collection of unique elements."),
+        .function(name: "getattr", parameters: [], documentation: "getattr(object, name[, default]) -> value"),
+        .function(name: "globals", parameters: [], documentation: "Return the dictionary containing the current scope's global variables."),
+        .function(name: "hasattr", parameters: ["obj", "name"], documentation: "Return whether the object has an attribute with the given name."),
+        .function(name: "hash", parameters: ["obj"], documentation: "Return the hash value for the given object."),
+        .function(name: "help", parameters: [], documentation: "Define the builtin 'help'."),
+        .function(name: "hex", parameters: ["number"], documentation: "Return the hexadecimal representation of an integer."),
+        .function(name: "id", parameters: ["obj"], documentation: "Return the identity of an object."),
+        .function(name: "input", parameters: ["prompt=''"], documentation: "Read a string from standard input. The trailing newline is stripped."),
+        .function(name: "int", parameters: [], documentation: "int([x]) -> integer int(x, base=10) -> integer"),
+        .function(name: "isinstance", parameters: ["obj", "class_or_tuple"], documentation: "Return whether an object is an instance of a class or of a subclass thereof."),
+        .function(name: "issubclass", parameters: ["cls", "class_or_tuple"], documentation: "Return whether 'cls' is derived from another class or is the same class."),
+        .function(name: "iter", parameters: [], documentation: "iter(iterable) -> iterator iter(callable, sentinel) -> iterator"),
+        .function(name: "len", parameters: ["obj"], documentation: "Return the number of items in a container."),
+        .function(name: "list", parameters: ["iterable=()"], documentation: "Built-in mutable sequence."),
+        .function(name: "locals", parameters: [], documentation: "Return a dictionary containing the current scope's local variables."),
+        .function(name: "map", parameters: ["function", "iterable", "*iterables"], documentation: "Make an iterator that computes the function using arguments from each of the iterables. Stops when the shortest iterable is exhausted."),
+        .function(name: "max", parameters: [], documentation: "max(iterable, *[, default=obj, key=func]) -> value max(arg1, arg2, *args, *[, key=func]) -> value"),
+        .function(name: "memoryview", parameters: ["object"], documentation: "Create a new memoryview object which references the given object."),
+        .function(name: "min", parameters: [], documentation: "min(iterable, *[, default=obj, key=func]) -> value min(arg1, arg2, *args, *[, key=func]) -> value"),
+        .function(name: "next", parameters: [], documentation: "next(iterator[, default])"),
+        .function(name: "object", parameters: [], documentation: "The base class of the class hierarchy."),
+        .function(name: "oct", parameters: ["number"], documentation: "Return the octal representation of an integer."),
+        .function(name: "open", parameters: ["file", "mode='r'", "buffering=-1", "encoding=None", "errors=None", "newline=None", "closefd=True", "opener=None"], documentation: "Open file and return a stream. Raise OSError upon failure."),
+        .function(name: "ord", parameters: ["character"], documentation: "Return the ordinal value of a character."),
+        .function(name: "pow", parameters: ["base", "exp", "mod=None"], documentation: "Equivalent to base**exp with 2 arguments or base**exp % mod with 3 arguments"),
+        .function(name: "print", parameters: ["*args", "sep=' '", "end='\\n'", "file=None", "flush=False"], documentation: "Prints the values to a stream, or to sys.stdout by default."),
+        .function(name: "property", parameters: ["fget=None", "fset=None", "fdel=None", "doc=None"], documentation: "Property attribute."),
+        .function(name: "range", parameters: [], documentation: "range(stop) -> range object range(start, stop[, step]) -> range object"),
+        .function(name: "repr", parameters: ["obj"], documentation: "Return the canonical string representation of the object."),
+        .function(name: "reversed", parameters: ["sequence"], documentation: "Return a reverse iterator over the values of the given sequence."),
+        .function(name: "round", parameters: ["number", "ndigits=None"], documentation: "Round a number to a given precision in decimal digits."),
+        .function(name: "set", parameters: ["iterable=()"], documentation: "Build an unordered collection of unique elements."),
+        .function(name: "setattr", parameters: ["obj", "name", "value"], documentation: "Sets the named attribute on the given object to the specified value."),
+        .function(name: "slice", parameters: [], documentation: "slice(stop) slice(start, stop[, step])"),
+        .function(name: "sorted", parameters: ["iterable", "key=None", "reverse=False"], documentation: "Return a new list containing all items from the iterable in ascending order."),
+        .function(name: "staticmethod", parameters: ["function"], documentation: "Convert a function to be a static method."),
+        .function(name: "str", parameters: [], documentation: "str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str"),
+        .function(name: "sum", parameters: ["iterable", "start=0"], documentation: "Return the sum of a 'start' value (default: 0) plus an iterable of numbers"),
+        .function(name: "super", parameters: [], documentation: "super() -> same as super(__class__, <first argument>) super(type) -> unbound super object super(type, obj) -> bound super object; requires isinstance(obj, type) super(type, type2) -> bound super object; requires issubclass(type2, type) Typical use to call a cooperative superclass method: class C(B): def meth(self, arg):"),
+        .function(name: "tuple", parameters: ["iterable=()"], documentation: "Built-in immutable sequence."),
+        .function(name: "type", parameters: [], documentation: "type(object) -> the object's type type(name, bases, dict, **kwds) -> a new type"),
+        .function(name: "vars", parameters: [], documentation: "vars([object]) -> dictionary"),
+        .function(name: "zip", parameters: ["*iterables", "strict=False"], documentation: "The zip object yields n-length tuples, where n is the number of iterables passed as positional arguments to zip(). The i-th element in every tuple comes from the i-th iterable argument to zip(). This continues until the shortest argument is exhausted."),
+    ]
+    
+    // MARK: - Built-in Type Method Definitions (for future type-aware completions)
+    
+    /// NOTE: These type method definitions are kept for future implementation of type-aware completions.
+    /// They should only be used when:
+    /// 1. Detecting attribute access (dot notation) 
+    /// 2. Type inference determines the object's type
+    /// 3. Filtering methods based on inferred type (e.g., only show str methods for string objects)
+    
+    /// String type methods - for use when type inference determines an object is a string
+    struct StringMethods {
+        static let methods: [CompletionItem] = [
+            .function(name: "capitalize", parameters: [], documentation: "Return a capitalized version of the string."),
+            .function(name: "casefold", parameters: [], documentation: "Return a version of the string suitable for caseless comparisons."),
+            .function(name: "center", parameters: ["width", "fillchar=' '"], documentation: "Return a centered string of length width."),
+            .function(name: "count", parameters: [], documentation: "Return the number of non-overlapping occurrences of substring sub in string S[start:end]."),
+            .function(name: "encode", parameters: ["encoding='utf-8'", "errors='strict'"], documentation: "Encode the string using the codec registered for encoding."),
+            .function(name: "endswith", parameters: [], documentation: "Return True if the string ends with the specified suffix, False otherwise."),
+            .function(name: "expandtabs", parameters: ["tabsize=8"], documentation: "Return a copy where all tab characters are expanded using spaces."),
+            .function(name: "find", parameters: [], documentation: "Return the lowest index in S where substring sub is found, such that sub is contained within S[start:end]."),
+            .function(name: "format", parameters: ["*args", "**kwargs"], documentation: "Return a formatted version of the string, using substitutions from args and kwargs. The substitutions are identified by braces ('{' and '}')."),
+            .function(name: "format_map", parameters: ["mapping"], documentation: "Return a formatted version of the string, using substitutions from mapping. The substitutions are identified by braces ('{' and '}')."),
+            .function(name: "index", parameters: [], documentation: "Return the lowest index in S where substring sub is found, such that sub is contained within S[start:end]."),
+            .function(name: "isalnum", parameters: [], documentation: "Return True if the string is an alpha-numeric string, False otherwise."),
+            .function(name: "isalpha", parameters: [], documentation: "Return True if the string is an alphabetic string, False otherwise."),
+            .function(name: "isascii", parameters: [], documentation: "Return True if all characters in the string are ASCII, False otherwise."),
+            .function(name: "isdecimal", parameters: [], documentation: "Return True if the string is a decimal string, False otherwise."),
+            .function(name: "isdigit", parameters: [], documentation: "Return True if the string is a digit string, False otherwise."),
+            .function(name: "isidentifier", parameters: [], documentation: "Return True if the string is a valid Python identifier, False otherwise."),
+            .function(name: "islower", parameters: [], documentation: "Return True if the string is a lowercase string, False otherwise."),
+            .function(name: "isnumeric", parameters: [], documentation: "Return True if the string is a numeric string, False otherwise."),
+            .function(name: "isprintable", parameters: [], documentation: "Return True if all characters in the string are printable, False otherwise."),
+            .function(name: "isspace", parameters: [], documentation: "Return True if the string is a whitespace string, False otherwise."),
+            .function(name: "istitle", parameters: [], documentation: "Return True if the string is a title-cased string, False otherwise."),
+            .function(name: "isupper", parameters: [], documentation: "Return True if the string is an uppercase string, False otherwise."),
+            .function(name: "join", parameters: ["iterable"], documentation: "Concatenate any number of strings."),
+            .function(name: "ljust", parameters: ["width", "fillchar=' '"], documentation: "Return a left-justified string of length width."),
+            .function(name: "lower", parameters: [], documentation: "Return a copy of the string converted to lowercase."),
+            .function(name: "lstrip", parameters: ["chars=None"], documentation: "Return a copy of the string with leading whitespace removed."),
+            .function(name: "maketrans", parameters: [], documentation: "Return a translation table usable for str.translate()."),
+            .function(name: "partition", parameters: ["sep"], documentation: "Partition the string into three parts using the given separator."),
+            .function(name: "removeprefix", parameters: ["prefix"], documentation: "Return a str with the given prefix string removed if present."),
+            .function(name: "removesuffix", parameters: ["suffix"], documentation: "Return a str with the given suffix string removed if present."),
+            .function(name: "replace", parameters: ["old", "new", "count=-1"], documentation: "Return a copy with all occurrences of substring old replaced by new."),
+            .function(name: "rfind", parameters: [], documentation: "Return the highest index in S where substring sub is found, such that sub is contained within S[start:end]."),
+            .function(name: "rindex", parameters: [], documentation: "Return the highest index in S where substring sub is found, such that sub is contained within S[start:end]."),
+            .function(name: "rjust", parameters: ["width", "fillchar=' '"], documentation: "Return a right-justified string of length width."),
+            .function(name: "rpartition", parameters: ["sep"], documentation: "Partition the string into three parts using the given separator."),
+            .function(name: "rsplit", parameters: ["sep=None", "maxsplit=-1"], documentation: "Return a list of the substrings in the string, using sep as the separator string."),
+            .function(name: "rstrip", parameters: ["chars=None"], documentation: "Return a copy of the string with trailing whitespace removed."),
+            .function(name: "split", parameters: ["sep=None", "maxsplit=-1"], documentation: "Return a list of the substrings in the string, using sep as the separator string."),
+            .function(name: "splitlines", parameters: ["keepends=False"], documentation: "Return a list of the lines in the string, breaking at line boundaries."),
+            .function(name: "startswith", parameters: [], documentation: "Return True if the string starts with the specified prefix, False otherwise."),
+            .function(name: "strip", parameters: ["chars=None"], documentation: "Return a copy of the string with leading and trailing whitespace removed."),
+            .function(name: "swapcase", parameters: [], documentation: "Convert uppercase characters to lowercase and lowercase characters to uppercase."),
+            .function(name: "title", parameters: [], documentation: "Return a version of the string where each word is titlecased."),
+            .function(name: "translate", parameters: ["table"], documentation: "Replace each character in the string using the given translation table."),
+            .function(name: "upper", parameters: [], documentation: "Return a copy of the string converted to uppercase."),
+            .function(name: "zfill", parameters: ["width"], documentation: "Pad a numeric string with zeros on the left, to fill a field of the given width.")
+        ]
+    }
+    
+    /// List type methods - for use when type inference determines an object is a list
+    struct ListMethods {
+        static let methods: [CompletionItem] = [
+            .function(name: "append", parameters: ["object"], documentation: "Append object to the end of the list."),
+            .function(name: "clear", parameters: [], documentation: "Remove all items from list."),
+            .function(name: "copy", parameters: [], documentation: "Return a shallow copy of the list."),
+            .function(name: "count", parameters: ["value"], documentation: "Return number of occurrences of value."),
+            .function(name: "extend", parameters: ["iterable"], documentation: "Extend list by appending elements from the iterable."),
+            .function(name: "index", parameters: ["value", "start=0", "stop=9223372036854775807"], documentation: "Return first index of value."),
+            .function(name: "insert", parameters: ["index", "object"], documentation: "Insert object before index."),
+            .function(name: "pop", parameters: ["index=-1"], documentation: "Remove and return item at index (default last)."),
+            .function(name: "remove", parameters: ["value"], documentation: "Remove first occurrence of value."),
+            .function(name: "reverse", parameters: [], documentation: "Reverse *IN PLACE*."),
+            .function(name: "sort", parameters: ["key=None", "reverse=False"], documentation: "Sort the list in ascending order and return None.")
+        ]
+    }
+    
+    /// Dict type methods - for use when type inference determines an object is a dict
+    struct DictMethods {
+        static let methods: [CompletionItem] = [
+            .function(name: "clear", parameters: [], documentation: "Remove all items from the dict."),
+            .function(name: "copy", parameters: [], documentation: "Return a shallow copy of the dict."),
+            .function(name: "fromkeys", parameters: ["iterable", "value=None"], documentation: "Create a new dictionary with keys from iterable and values set to value."),
+            .function(name: "get", parameters: ["key", "default=None"], documentation: "Return the value for key if key is in the dictionary, else default."),
+            .function(name: "items", parameters: [], documentation: "Return a set-like object providing a view on the dict's items."),
+            .function(name: "keys", parameters: [], documentation: "Return a set-like object providing a view on the dict's keys."),
+            .function(name: "pop", parameters: [], documentation: "D.pop(k[,d]) -> v, remove specified key and return the corresponding value."),
+            .function(name: "popitem", parameters: [], documentation: "Remove and return a (key, value) pair as a 2-tuple."),
+            .function(name: "setdefault", parameters: ["key", "default=None"], documentation: "Insert key with a value of default if key is not in the dictionary."),
+            .function(name: "update", parameters: [], documentation: "D.update([E, ]**F) -> None. Update D from mapping/iterable E and F. If E is present and has a .keys() method, then does: for k in E.keys(): D[k] = E[k] If E is present and lacks a .keys() method, then does: for k, v in E: D[k] = v In either case, this is followed by: for k in F: D[k] = F[k]"),
+            .function(name: "values", parameters: [], documentation: "Return an object providing a view on the dict's values.")
+        ]
+    }
+    
+    /// Set type methods - for use when type inference determines an object is a set
+    struct SetMethods {
+        static let methods: [CompletionItem] = [
+            .function(name: "add", parameters: ["object"], documentation: "Add an element to a set."),
+            .function(name: "clear", parameters: [], documentation: "Remove all elements from this set."),
+            .function(name: "copy", parameters: [], documentation: "Return a shallow copy of a set."),
+            .function(name: "difference", parameters: ["*others"], documentation: "Return a new set with elements in the set that are not in the others."),
+            .function(name: "difference_update", parameters: ["*others"], documentation: "Update the set, removing elements found in others."),
+            .function(name: "discard", parameters: ["object"], documentation: "Remove an element from a set if it is a member."),
+            .function(name: "intersection", parameters: ["*others"], documentation: "Return a new set with elements common to the set and all others."),
+            .function(name: "intersection_update", parameters: ["*others"], documentation: "Update the set, keeping only elements found in it and all others."),
+            .function(name: "isdisjoint", parameters: ["other"], documentation: "Return True if two sets have a null intersection."),
+            .function(name: "issubset", parameters: ["other"], documentation: "Report whether another set contains this set."),
+            .function(name: "issuperset", parameters: ["other"], documentation: "Report whether this set contains another set."),
+            .function(name: "pop", parameters: [], documentation: "Remove and return an arbitrary set element."),
+            .function(name: "remove", parameters: ["object"], documentation: "Remove an element from a set; it must be a member."),
+            .function(name: "symmetric_difference", parameters: ["other"], documentation: "Return a new set with elements in either the set or other but not both."),
+            .function(name: "symmetric_difference_update", parameters: ["other"], documentation: "Update the set, keeping only elements found in either set, but not in both."),
+            .function(name: "union", parameters: ["*others"], documentation: "Return a new set with elements from the set and all others."),
+            .function(name: "update", parameters: ["*others"], documentation: "Update the set, adding elements from all others.")
         ]
         
-        return builtins.map { name, params, doc in
-            CompletionItem.function(name: name, parameters: params, documentation: doc)
-        }
+        /// Frozenset methods (subset of set methods that don't modify) - names only for filtering
+        static let frozensetMethodNames: [String] = [
+            "copy", "difference", "intersection", "isdisjoint", 
+            "issubset", "issuperset", "symmetric_difference", "union"
+        ]
+    }
+    
+    /// Frozenset type methods - for use when type inference determines an object is a frozenset
+    struct FrozensetMethods {
+        static let methods: [CompletionItem] = [
+            .function(name: "copy", parameters: [], documentation: "Return a shallow copy of a set."),
+            .function(name: "difference", parameters: ["*others"], documentation: "Return a new set with elements in the set that are not in the others."),
+            .function(name: "intersection", parameters: ["*others"], documentation: "Return a new set with elements common to the set and all others."),
+            .function(name: "isdisjoint", parameters: ["other"], documentation: "Return True if two sets have a null intersection."),
+            .function(name: "issubset", parameters: ["other"], documentation: "Report whether another set contains this set."),
+            .function(name: "issuperset", parameters: ["other"], documentation: "Report whether this set contains another set."),
+            .function(name: "symmetric_difference", parameters: ["other"], documentation: "Return a new set with elements in either the set or other but not both."),
+            .function(name: "union", parameters: ["*others"], documentation: "Return a new set with elements from the set and all others.")
+        ]
+    }
+    
+    /// Bytes type methods - for use when type inference determines an object is bytes
+    struct BytesMethods {
+        static let methods: [CompletionItem] = [
+            .function(name: "capitalize", parameters: [], documentation: "B.capitalize() -> copy of B"),
+            .function(name: "center", parameters: ["width", "fillchar=b' '"], documentation: "Return a centered string of length width."),
+            .function(name: "count", parameters: [], documentation: "Return the number of non-overlapping occurrences of subsection 'sub' in bytes B[start:end]."),
+            .function(name: "decode", parameters: ["encoding='utf-8'", "errors='strict'"], documentation: "Decode the bytes using the codec registered for encoding."),
+            .function(name: "endswith", parameters: [], documentation: "Return True if the bytes ends with the specified suffix, False otherwise."),
+            .function(name: "expandtabs", parameters: ["tabsize=8"], documentation: "Return a copy where all tab characters are expanded using spaces."),
+            .function(name: "find", parameters: [], documentation: "Return the lowest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start,end]."),
+            .function(name: "fromhex", parameters: ["string"], documentation: "Create a bytes object from a string of hexadecimal numbers."),
+            .function(name: "hex", parameters: [], documentation: "Create a string of hexadecimal numbers from a bytes object."),
+            .function(name: "index", parameters: [], documentation: "Return the lowest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start,end]."),
+            .function(name: "isalnum", parameters: [], documentation: "B.isalnum() -> bool"),
+            .function(name: "isalpha", parameters: [], documentation: "B.isalpha() -> bool"),
+            .function(name: "isascii", parameters: [], documentation: "B.isascii() -> bool"),
+            .function(name: "isdigit", parameters: [], documentation: "B.isdigit() -> bool"),
+            .function(name: "islower", parameters: [], documentation: "B.islower() -> bool"),
+            .function(name: "isspace", parameters: [], documentation: "B.isspace() -> bool"),
+            .function(name: "istitle", parameters: [], documentation: "B.istitle() -> bool"),
+            .function(name: "isupper", parameters: [], documentation: "B.isupper() -> bool"),
+            .function(name: "join", parameters: ["iterable_of_bytes"], documentation: "Concatenate any number of bytes objects."),
+            .function(name: "ljust", parameters: ["width", "fillchar=b' '"], documentation: "Return a left-justified string of length width."),
+            .function(name: "lower", parameters: [], documentation: "B.lower() -> copy of B"),
+            .function(name: "lstrip", parameters: ["bytes=None"], documentation: "Strip leading bytes contained in the argument."),
+            .function(name: "maketrans", parameters: ["frm", "to"], documentation: "Return a translation table usable for the bytes or bytearray translate method."),
+            .function(name: "partition", parameters: ["sep"], documentation: "Partition the bytes into three parts using the given separator."),
+            .function(name: "removeprefix", parameters: ["prefix"], documentation: "Return a bytes object with the given prefix string removed if present."),
+            .function(name: "removesuffix", parameters: ["suffix"], documentation: "Return a bytes object with the given suffix string removed if present."),
+            .function(name: "replace", parameters: ["old", "new", "count=-1"], documentation: "Return a copy with all occurrences of substring old replaced by new."),
+            .function(name: "rfind", parameters: [], documentation: "Return the highest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start,end]."),
+            .function(name: "rindex", parameters: [], documentation: "Return the highest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start,end]."),
+            .function(name: "rjust", parameters: ["width", "fillchar=b' '"], documentation: "Return a right-justified string of length width."),
+            .function(name: "rpartition", parameters: ["sep"], documentation: "Partition the bytes into three parts using the given separator."),
+            .function(name: "rsplit", parameters: ["sep=None", "maxsplit=-1"], documentation: "Return a list of the sections in the bytes, using sep as the delimiter."),
+            .function(name: "rstrip", parameters: ["bytes=None"], documentation: "Strip trailing bytes contained in the argument."),
+            .function(name: "split", parameters: ["sep=None", "maxsplit=-1"], documentation: "Return a list of the sections in the bytes, using sep as the delimiter."),
+            .function(name: "splitlines", parameters: ["keepends=False"], documentation: "Return a list of the lines in the bytes, breaking at line boundaries."),
+            .function(name: "startswith", parameters: [], documentation: "Return True if the bytes starts with the specified prefix, False otherwise."),
+            .function(name: "strip", parameters: ["bytes=None"], documentation: "Strip leading and trailing bytes contained in the argument."),
+            .function(name: "swapcase", parameters: [], documentation: "B.swapcase() -> copy of B"),
+            .function(name: "title", parameters: [], documentation: "B.title() -> copy of B"),
+            .function(name: "translate", parameters: ["table", "delete=b''"], documentation: "Return a copy with each character mapped by the given translation table."),
+            .function(name: "upper", parameters: [], documentation: "B.upper() -> copy of B"),
+            .function(name: "zfill", parameters: ["width"], documentation: "Pad a numeric string with zeros on the left, to fill a field of the given width.")
+        ]
+    }
+    
+    /// Bytearray type methods - for use when type inference determines an object is bytearray
+    struct BytearrayMethods {
+        static let methods: [CompletionItem] = [
+            .function(name: "append", parameters: ["item"], documentation: "Append a single item to the end of the bytearray."),
+            .function(name: "capitalize", parameters: [], documentation: "B.capitalize() -> copy of B"),
+            .function(name: "center", parameters: ["width", "fillchar=b' '"], documentation: "Return a centered string of length width."),
+            .function(name: "clear", parameters: [], documentation: "Remove all items from the bytearray."),
+            .function(name: "copy", parameters: [], documentation: "Return a copy of B."),
+            .function(name: "count", parameters: [], documentation: "Return the number of non-overlapping occurrences of subsection 'sub' in bytes B[start:end]."),
+            .function(name: "decode", parameters: ["encoding='utf-8'", "errors='strict'"], documentation: "Decode the bytearray using the codec registered for encoding."),
+            .function(name: "endswith", parameters: [], documentation: "Return True if the bytearray ends with the specified suffix, False otherwise."),
+            .function(name: "expandtabs", parameters: ["tabsize=8"], documentation: "Return a copy where all tab characters are expanded using spaces."),
+            .function(name: "extend", parameters: ["iterable_of_ints"], documentation: "Append all the items from the iterator or sequence to the end of the bytearray."),
+            .function(name: "find", parameters: [], documentation: "Return the lowest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start:end]."),
+            .function(name: "fromhex", parameters: ["string"], documentation: "Create a bytearray object from a string of hexadecimal numbers."),
+            .function(name: "hex", parameters: [], documentation: "Create a string of hexadecimal numbers from a bytearray object."),
+            .function(name: "index", parameters: [], documentation: "Return the lowest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start:end]."),
+            .function(name: "insert", parameters: ["index", "item"], documentation: "Insert a single item into the bytearray before the given index."),
+            .function(name: "isalnum", parameters: [], documentation: "B.isalnum() -> bool"),
+            .function(name: "isalpha", parameters: [], documentation: "B.isalpha() -> bool"),
+            .function(name: "isascii", parameters: [], documentation: "B.isascii() -> bool"),
+            .function(name: "isdigit", parameters: [], documentation: "B.isdigit() -> bool"),
+            .function(name: "islower", parameters: [], documentation: "B.islower() -> bool"),
+            .function(name: "isspace", parameters: [], documentation: "B.isspace() -> bool"),
+            .function(name: "istitle", parameters: [], documentation: "B.istitle() -> bool"),
+            .function(name: "isupper", parameters: [], documentation: "B.isupper() -> bool"),
+            .function(name: "join", parameters: ["iterable_of_bytes"], documentation: "Concatenate any number of bytes/bytearray objects."),
+            .function(name: "ljust", parameters: ["width", "fillchar=b' '"], documentation: "Return a left-justified string of length width."),
+            .function(name: "lower", parameters: [], documentation: "B.lower() -> copy of B"),
+            .function(name: "lstrip", parameters: ["bytes=None"], documentation: "Strip leading bytes contained in the argument."),
+            .function(name: "maketrans", parameters: ["frm", "to"], documentation: "Return a translation table usable for the bytes or bytearray translate method."),
+            .function(name: "partition", parameters: ["sep"], documentation: "Partition the bytearray into three parts using the given separator."),
+            .function(name: "pop", parameters: ["index=-1"], documentation: "Remove and return a single item from B."),
+            .function(name: "remove", parameters: ["value"], documentation: "Remove the first occurrence of a value in the bytearray."),
+            .function(name: "removeprefix", parameters: ["prefix"], documentation: "Return a bytearray with the given prefix string removed if present."),
+            .function(name: "removesuffix", parameters: ["suffix"], documentation: "Return a bytearray with the given suffix string removed if present."),
+            .function(name: "replace", parameters: ["old", "new", "count=-1"], documentation: "Return a copy with all occurrences of substring old replaced by new."),
+            .function(name: "reverse", parameters: [], documentation: "Reverse the order of the values in B in place."),
+            .function(name: "rfind", parameters: [], documentation: "Return the highest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start,end]."),
+            .function(name: "rindex", parameters: [], documentation: "Return the highest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start,end]."),
+            .function(name: "rjust", parameters: ["width", "fillchar=b' '"], documentation: "Return a right-justified string of length width."),
+            .function(name: "rpartition", parameters: ["sep"], documentation: "Partition the bytearray into three parts using the given separator."),
+            .function(name: "rsplit", parameters: ["sep=None", "maxsplit=-1"], documentation: "Return a list of the sections in the bytearray, using sep as the delimiter."),
+            .function(name: "rstrip", parameters: ["bytes=None"], documentation: "Strip trailing bytes contained in the argument."),
+            .function(name: "split", parameters: ["sep=None", "maxsplit=-1"], documentation: "Return a list of the sections in the bytearray, using sep as the delimiter."),
+            .function(name: "splitlines", parameters: ["keepends=False"], documentation: "Return a list of the lines in the bytearray, breaking at line boundaries."),
+            .function(name: "startswith", parameters: [], documentation: "Return True if the bytearray starts with the specified prefix, False otherwise."),
+            .function(name: "strip", parameters: ["bytes=None"], documentation: "Strip leading and trailing bytes contained in the argument."),
+            .function(name: "swapcase", parameters: [], documentation: "B.swapcase() -> copy of B"),
+            .function(name: "title", parameters: [], documentation: "B.title() -> copy of B"),
+            .function(name: "translate", parameters: ["table", "delete=b''"], documentation: "Return a copy with each character mapped by the given translation table."),
+            .function(name: "upper", parameters: [], documentation: "B.upper() -> copy of B"),
+            .function(name: "zfill", parameters: ["width"], documentation: "Pad a numeric string with zeros on the left, to fill a field of the given width.")
+        ]
+    }
+    
+    /// Tuple type methods - for use when type inference determines an object is a tuple
+    struct TupleMethods {
+        static let methods: [CompletionItem] = [
+            .function(name: "count", parameters: ["value"], documentation: "Return number of occurrences of value."),
+            .function(name: "index", parameters: ["value", "start=0", "stop=None"], documentation: "Return first index of value.")
+        ]
     }
     
     private func getMathModuleCompletions() -> [CompletionItem] {
-        var items: [CompletionItem] = []
-        
-        // Math module constants
-        let constants = [
-            ("pi", "3.141592653589793", "The mathematical constant π"),
-            ("e", "2.718281828459045", "The mathematical constant e"),
-            ("tau", "6.283185307179586", "The mathematical constant τ = 2π"),
-            ("inf", "Positive infinity", "Floating-point positive infinity"),
-            ("nan", "Not a number", "Floating-point 'not a number' (NaN)")
-        ]
-        
-        for (name, value, doc) in constants {
-            items.append(CompletionItem.constant(name: "math.\(name)", value: value, documentation: doc))
-        }
-        
-        // Number-theoretic and representation functions
-        let numberTheory: [(String, [String], String)] = [
-            ("ceil", ["x"], "Return the ceiling of x, the smallest integer >= x"),
-            ("comb", ["n", "k"], "Return n! / (k! * (n-k)!), the number of ways to choose k items from n"),
-            ("copysign", ["x", "y"], "Return a float with the magnitude of x and the sign of y"),
-            ("fabs", ["x"], "Return the absolute value of x"),
-            ("factorial", ["n"], "Return n factorial as an integer"),
-            ("floor", ["x"], "Return the floor of x, the largest integer <= x"),
-            ("fmod", ["x", "y"], "Return x modulo y as defined by the platform C library"),
-            ("frexp", ["x"], "Return the mantissa and exponent of x as the pair (m, e)"),
-            ("fsum", ["iterable"], "Return an accurate floating point sum of values in the iterable"),
-            ("gcd", ["*integers"], "Return the greatest common divisor of the specified integer arguments"),
-            ("isclose", ["a", "b", "rel_tol=1e-09", "abs_tol=0.0"], "Return True if a is close in value to b"),
-            ("isfinite", ["x"], "Return True if x is neither an infinity nor a NaN"),
-            ("isinf", ["x"], "Return True if x is a positive or negative infinity"),
-            ("isnan", ["x"], "Return True if x is a NaN (not a number)"),
-            ("isqrt", ["n"], "Return the integer square root of n"),
-            ("lcm", ["*integers"], "Return the least common multiple of the specified integer arguments"),
-            ("ldexp", ["x", "i"], "Return x * (2**i), the inverse of frexp()"),
-            ("modf", ["x"], "Return the fractional and integer parts of x"),
-            ("nextafter", ["x", "y"], "Return the next floating-point value after x towards y"),
-            ("perm", ["n", "k=None"], "Return n! / (n-k)!, the number of ways to choose and arrange k items from n"),
-            ("remainder", ["x", "y"], "Return the IEEE 754-style remainder of x with respect to y"),
-            ("trunc", ["x"], "Return x truncated to an Integral")
-        ]
-        
-        // Power and logarithmic functions
-        let powerLog: [(String, [String], String)] = [
-            ("cbrt", ["x"], "Return the cube root of x"),
-            ("exp", ["x"], "Return e raised to the power x"),
-            ("exp2", ["x"], "Return 2 raised to the power x"),
-            ("expm1", ["x"], "Return e**x - 1, computed in a way that is accurate for small x"),
-            ("log", ["x", "base=e"], "Return the logarithm of x to the given base"),
-            ("log1p", ["x"], "Return the natural logarithm of 1+x (base e)"),
-            ("log2", ["x"], "Return the base-2 logarithm of x"),
-            ("log10", ["x"], "Return the base-10 logarithm of x"),
-            ("pow", ["x", "y"], "Return x raised to the power y"),
-            ("sqrt", ["x"], "Return the square root of x")
-        ]
-        
-        // Trigonometric functions
-        let trig: [(String, [String], String)] = [
-            ("acos", ["x"], "Return the arc cosine of x, in radians"),
-            ("asin", ["x"], "Return the arc sine of x, in radians"),
-            ("atan", ["x"], "Return the arc tangent of x, in radians"),
-            ("atan2", ["y", "x"], "Return atan(y / x), in radians"),
-            ("cos", ["x"], "Return the cosine of x radians"),
-            ("dist", ["p", "q"], "Return the Euclidean distance between two points p and q"),
-            ("hypot", ["*coordinates"], "Return the Euclidean norm, sqrt(sum(x**2 for x in coordinates))"),
-            ("sin", ["x"], "Return the sine of x radians"),
-            ("tan", ["x"], "Return the tangent of x radians")
-        ]
-        
-        // Hyperbolic functions
-        let hyperbolic: [(String, [String], String)] = [
-            ("acosh", ["x"], "Return the inverse hyperbolic cosine of x"),
-            ("asinh", ["x"], "Return the inverse hyperbolic sine of x"),
-            ("atanh", ["x"], "Return the inverse hyperbolic tangent of x"),
-            ("cosh", ["x"], "Return the hyperbolic cosine of x"),
-            ("sinh", ["x"], "Return the hyperbolic sine of x"),
-            ("tanh", ["x"], "Return the hyperbolic tangent of x")
-        ]
-        
-        // Angular conversion
-        let angular: [(String, [String], String)] = [
-            ("degrees", ["x"], "Convert angle x from radians to degrees"),
-            ("radians", ["x"], "Convert angle x from degrees to radians")
-        ]
-        
-        // Special functions
-        let special: [(String, [String], String)] = [
-            ("erf", ["x"], "Return the error function at x"),
-            ("erfc", ["x"], "Return the complementary error function at x"),
-            ("gamma", ["x"], "Return the Gamma function at x"),
-            ("lgamma", ["x"], "Return the natural logarithm of the absolute value of the Gamma function at x")
-        ]
-        
-        // Combine all function groups
-        let allFunctions = numberTheory + powerLog + trig + hyperbolic + angular + special
-        
-        for (name, params, doc) in allFunctions {
-            items.append(CompletionItem.function(
-                name: "math.\(name)",
-                parameters: params,
-                documentation: doc
-            ))
-        }
-        
-        return items
+        return Self.mathModuleCompletions
     }
     
-    private func getBuiltinTypeCompletions() -> [CompletionItem] {
-        var items: [CompletionItem] = []
-        
-        // String methods
-        let strMethods: [(String, [String], String)] = [
-            ("capitalize", [], "Return a capitalized version of the string"),
-            ("casefold", [], "Return a casefolded copy suitable for caseless comparisons"),
-            ("center", ["width", "fillchar=' '"], "Return a centered string of length width"),
-            ("count", ["sub", "start=0", "end=len"], "Return the number of non-overlapping occurrences of substring sub"),
-            ("encode", ["encoding='utf-8'", "errors='strict'"], "Encode the string using the codec registered for encoding"),
-            ("endswith", ["suffix", "start=0", "end=len"], "Return True if the string ends with the specified suffix"),
-            ("expandtabs", ["tabsize=8"], "Return a copy where all tab characters are expanded"),
-            ("find", ["sub", "start=0", "end=len"], "Return the lowest index where substring sub is found"),
-            ("format", ["*args", "**kwargs"], "Perform a string formatting operation"),
-            ("format_map", ["mapping"], "Similar to format(**mapping)"),
-            ("index", ["sub", "start=0", "end=len"], "Like find(), but raise ValueError when not found"),
-            ("isalnum", [], "Return True if all characters are alphanumeric"),
-            ("isalpha", [], "Return True if all characters are alphabetic"),
-            ("isascii", [], "Return True if all characters are ASCII"),
-            ("isdecimal", [], "Return True if all characters are decimal"),
-            ("isdigit", [], "Return True if all characters are digits"),
-            ("isidentifier", [], "Return True if the string is a valid Python identifier"),
-            ("islower", [], "Return True if all cased characters are lowercase"),
-            ("isnumeric", [], "Return True if all characters are numeric"),
-            ("isprintable", [], "Return True if all characters are printable"),
-            ("isspace", [], "Return True if all characters are whitespace"),
-            ("istitle", [], "Return True if the string is titlecased"),
-            ("isupper", [], "Return True if all cased characters are uppercase"),
-            ("join", ["iterable"], "Concatenate strings in iterable with separator"),
-            ("ljust", ["width", "fillchar=' '"], "Return a left-justified string of length width"),
-            ("lower", [], "Return a copy with all characters converted to lowercase"),
-            ("lstrip", ["chars=None"], "Return a copy with leading whitespace removed"),
-            ("maketrans", ["x", "y=None", "z=None"], "Return a translation table"),
-            ("partition", ["sep"], "Split at the first occurrence of sep"),
-            ("removeprefix", ["prefix"], "Remove prefix if present (Python 3.9+)"),
-            ("removesuffix", ["suffix"], "Remove suffix if present (Python 3.9+)"),
-            ("replace", ["old", "new", "count=-1"], "Return a copy with all occurrences of old replaced by new"),
-            ("rfind", ["sub", "start=0", "end=len"], "Return the highest index where substring sub is found"),
-            ("rindex", ["sub", "start=0", "end=len"], "Like rfind(), but raise ValueError when not found"),
-            ("rjust", ["width", "fillchar=' '"], "Return a right-justified string of length width"),
-            ("rpartition", ["sep"], "Split at the last occurrence of sep"),
-            ("rsplit", ["sep=None", "maxsplit=-1"], "Return a list of words, splitting from the right"),
-            ("rstrip", ["chars=None"], "Return a copy with trailing whitespace removed"),
-            ("split", ["sep=None", "maxsplit=-1"], "Return a list of words in the string"),
-            ("splitlines", ["keepends=False"], "Return a list of lines in the string"),
-            ("startswith", ["prefix", "start=0", "end=len"], "Return True if string starts with the prefix"),
-            ("strip", ["chars=None"], "Return a copy with leading and trailing whitespace removed"),
-            ("swapcase", [], "Return a copy with uppercase converted to lowercase and vice versa"),
-            ("title", [], "Return a titlecased version"),
-            ("translate", ["table"], "Replace characters using translation table"),
-            ("upper", [], "Return a copy with all characters converted to uppercase"),
-            ("zfill", ["width"], "Pad a numeric string with zeros on the left")
-        ]
-        
-        // List methods
-        let listMethods: [(String, [String], String)] = [
-            ("append", ["object"], "Append object to the end of the list"),
-            ("clear", [], "Remove all items from the list"),
-            ("copy", [], "Return a shallow copy of the list"),
-            ("count", ["value"], "Return number of occurrences of value"),
-            ("extend", ["iterable"], "Extend list by appending elements from the iterable"),
-            ("index", ["value", "start=0", "stop=len"], "Return first index of value"),
-            ("insert", ["index", "object"], "Insert object before index"),
-            ("pop", ["index=-1"], "Remove and return item at index (default last)"),
-            ("remove", ["value"], "Remove first occurrence of value"),
-            ("reverse", [], "Reverse the list in place"),
-            ("sort", ["key=None", "reverse=False"], "Sort the list in ascending order")
-        ]
-        
-        // Dict methods
-        let dictMethods: [(String, [String], String)] = [
-            ("clear", [], "Remove all items from the dictionary"),
-            ("copy", [], "Return a shallow copy of the dictionary"),
-            ("fromkeys", ["iterable", "value=None"], "Create a new dictionary with keys from iterable"),
-            ("get", ["key", "default=None"], "Return value for key if key is in dictionary"),
-            ("items", [], "Return a view of the dictionary's (key, value) pairs"),
-            ("keys", [], "Return a view of the dictionary's keys"),
-            ("pop", ["key", "default=None"], "Remove key and return value, or default if key not found"),
-            ("popitem", [], "Remove and return a (key, value) pair"),
-            ("setdefault", ["key", "default=None"], "Get value of key, set to default if not present"),
-            ("update", ["other"], "Update dictionary with key/value pairs from other"),
-            ("values", [], "Return a view of the dictionary's values")
-        ]
-        
-        // Set methods
-        let setMethods: [(String, [String], String)] = [
-            ("add", ["elem"], "Add element elem to the set"),
-            ("clear", [], "Remove all elements from the set"),
-            ("copy", [], "Return a shallow copy of the set"),
-            ("difference", ["*others"], "Return the difference of two or more sets"),
-            ("difference_update", ["*others"], "Remove all elements of other sets from this set"),
-            ("discard", ["elem"], "Remove element elem from the set if present"),
-            ("intersection", ["*others"], "Return the intersection of two or more sets"),
-            ("intersection_update", ["*others"], "Update set with intersection of itself and others"),
-            ("isdisjoint", ["other"], "Return True if two sets have a null intersection"),
-            ("issubset", ["other"], "Test whether every element is in other"),
-            ("issuperset", ["other"], "Test whether every element of other is in the set"),
-            ("pop", [], "Remove and return an arbitrary element"),
-            ("remove", ["elem"], "Remove element elem from the set, raise KeyError if not found"),
-            ("symmetric_difference", ["other"], "Return symmetric difference of two sets"),
-            ("symmetric_difference_update", ["other"], "Update set with symmetric difference"),
-            ("union", ["*others"], "Return the union of sets"),
-            ("update", ["*others"], "Update set with union of itself and others")
-        ]
-        
-        // Bytes/bytearray methods (common subset)
-        let bytesMethods: [(String, [String], String)] = [
-            ("count", ["sub", "start=0", "end=len"], "Return the number of non-overlapping occurrences"),
-            ("decode", ["encoding='utf-8'", "errors='strict'"], "Decode bytes to string"),
-            ("endswith", ["suffix", "start=0", "end=len"], "Return True if bytes ends with suffix"),
-            ("find", ["sub", "start=0", "end=len"], "Return the lowest index where sub is found"),
-            ("hex", ["sep=''", "bytes_per_sep=1"], "Return hexadecimal representation"),
-            ("index", ["sub", "start=0", "end=len"], "Like find(), but raise ValueError when not found"),
-            ("join", ["iterable"], "Concatenate bytes objects in iterable"),
-            ("replace", ["old", "new", "count=-1"], "Return a copy with occurrences of old replaced by new"),
-            ("split", ["sep=None", "maxsplit=-1"], "Return a list of bytes"),
-            ("startswith", ["prefix", "start=0", "end=len"], "Return True if bytes starts with prefix"),
-            ("strip", ["bytes=None"], "Return bytes with leading and trailing bytes removed")
-        ]
-        
-        // Add string methods
-        for (name, params, doc) in strMethods {
-            items.append(CompletionItem.function(
-                name: "str.\(name)",
-                parameters: params,
-                documentation: doc
-            ))
-        }
-        
-        // Add list methods
-        for (name, params, doc) in listMethods {
-            items.append(CompletionItem.function(
-                name: "list.\(name)",
-                parameters: params,
-                documentation: doc
-            ))
-        }
-        
-        // Add dict methods
-        for (name, params, doc) in dictMethods {
-            items.append(CompletionItem.function(
-                name: "dict.\(name)",
-                parameters: params,
-                documentation: doc
-            ))
-        }
-        
-        // Add set methods
-        for (name, params, doc) in setMethods {
-            items.append(CompletionItem.function(
-                name: "set.\(name)",
-                parameters: params,
-                documentation: doc
-            ))
-        }
-        
-        // Add frozenset methods (subset of set methods that don't modify)
-        let frozensetMethods = ["copy", "difference", "intersection", "isdisjoint", "issubset", "issuperset", "symmetric_difference", "union"]
-        for method in frozensetMethods {
-            if let setMethod = setMethods.first(where: { $0.0 == method }) {
-                items.append(CompletionItem.function(
-                    name: "frozenset.\(setMethod.0)",
-                    parameters: setMethod.1,
-                    documentation: setMethod.2
-                ))
-            }
-        }
-        
-        // Add bytes methods
-        for (name, params, doc) in bytesMethods {
-            items.append(CompletionItem.function(
-                name: "bytes.\(name)",
-                parameters: params,
-                documentation: doc
-            ))
-        }
-        
-        // Add bytearray methods (includes bytes methods + mutating methods)
-        for (name, params, doc) in bytesMethods {
-            items.append(CompletionItem.function(
-                name: "bytearray.\(name)",
-                parameters: params,
-                documentation: doc
-            ))
-        }
-        
-        // Additional bytearray-only methods (mutating)
-        let bytearrayOnly: [(String, [String], String)] = [
-            ("append", ["item"], "Append a single byte"),
-            ("clear", [], "Remove all items from the bytearray"),
-            ("extend", ["iterable"], "Extend bytearray by appending elements"),
-            ("insert", ["index", "item"], "Insert a single byte before index"),
-            ("pop", ["index=-1"], "Remove and return byte at index"),
-            ("remove", ["value"], "Remove first occurrence of value"),
-            ("reverse", [], "Reverse the bytearray in place")
-        ]
-        
-        for (name, params, doc) in bytearrayOnly {
-            items.append(CompletionItem.function(
-                name: "bytearray.\(name)",
-                parameters: params,
-                documentation: doc
-            ))
-        }
-        
-        // Tuple methods (immutable, so minimal)
-        let tupleMethods: [(String, [String], String)] = [
-            ("count", ["value"], "Return number of occurrences of value"),
-            ("index", ["value", "start=0", "stop=len"], "Return first index of value")
-        ]
-        
-        for (name, params, doc) in tupleMethods {
-            items.append(CompletionItem.function(
-                name: "tuple.\(name)",
-                parameters: params,
-                documentation: doc
-            ))
-        }
-        
-        return items
-    }
+    private static let mathModuleCompletions: [CompletionItem] = [
+        // Math module constants
+        .constant(name: "math.e", value: "2.718281828459045", documentation: "The mathematical constant e = 2.718281..."),
+        .constant(name: "math.inf", value: "inf", documentation: "A floating-point positive infinity"),
+        .constant(name: "math.nan", value: "nan", documentation: "A floating-point 'not a number' (NaN) value"),
+        .constant(name: "math.pi", value: "3.141592653589793", documentation: "The mathematical constant π = 3.141592..."),
+        .constant(name: "math.tau", value: "6.283185307179586", documentation: "The mathematical constant τ = 6.283185..."),
+
+        // Math module functions
+        .function(name: "math.acos", parameters: ["x"], documentation: "Return the arc cosine (measured in radians) of x."),
+        .function(name: "math.acosh", parameters: ["x"], documentation: "Return the inverse hyperbolic cosine of x."),
+        .function(name: "math.asin", parameters: ["x"], documentation: "Return the arc sine (measured in radians) of x."),
+        .function(name: "math.asinh", parameters: ["x"], documentation: "Return the inverse hyperbolic sine of x."),
+        .function(name: "math.atan", parameters: ["x"], documentation: "Return the arc tangent (measured in radians) of x."),
+        .function(name: "math.atan2", parameters: ["y", "x"], documentation: "Return the arc tangent (measured in radians) of y/x."),
+        .function(name: "math.atanh", parameters: ["x"], documentation: "Return the inverse hyperbolic tangent of x."),
+        .function(name: "math.cbrt", parameters: ["x"], documentation: "Return the cube root of x."),
+        .function(name: "math.ceil", parameters: ["x"], documentation: "Return the ceiling of x as an Integral."),
+        .function(name: "math.comb", parameters: ["n", "k"], documentation: "Number of ways to choose k items from n items without repetition and without order."),
+        .function(name: "math.copysign", parameters: ["x", "y"], documentation: "Return a float with the magnitude (absolute value) of x but the sign of y."),
+        .function(name: "math.cos", parameters: ["x"], documentation: "Return the cosine of x (measured in radians)."),
+        .function(name: "math.cosh", parameters: ["x"], documentation: "Return the hyperbolic cosine of x."),
+        .function(name: "math.degrees", parameters: ["x"], documentation: "Convert angle x from radians to degrees."),
+        .function(name: "math.dist", parameters: ["p", "q"], documentation: "Return the Euclidean distance between two points p and q."),
+        .function(name: "math.erf", parameters: ["x"], documentation: "Error function at x."),
+        .function(name: "math.erfc", parameters: ["x"], documentation: "Complementary error function at x."),
+        .function(name: "math.exp", parameters: ["x"], documentation: "Return e raised to the power of x."),
+        .function(name: "math.exp2", parameters: ["x"], documentation: "Return 2 raised to the power of x."),
+        .function(name: "math.expm1", parameters: ["x"], documentation: "Return exp(x)-1."),
+        .function(name: "math.fabs", parameters: ["x"], documentation: "Return the absolute value of the float x."),
+        .function(name: "math.factorial", parameters: ["n"], documentation: "Find n!."),
+        .function(name: "math.floor", parameters: ["x"], documentation: "Return the floor of x as an Integral."),
+        .function(name: "math.fma", parameters: ["x", "y", "z"], documentation: "Fused multiply-add operation."),
+        .function(name: "math.fmod", parameters: ["x", "y"], documentation: "Return fmod(x, y), according to platform C."),
+        .function(name: "math.frexp", parameters: ["x"], documentation: "Return the mantissa and exponent of x, as pair (m, e)."),
+        .function(name: "math.fsum", parameters: ["seq"], documentation: "Return an accurate floating-point sum of values in the iterable seq."),
+        .function(name: "math.gamma", parameters: ["x"], documentation: "Gamma function at x."),
+        .function(name: "math.gcd", parameters: ["*integers"], documentation: "Greatest Common Divisor."),
+        .function(name: "math.hypot", parameters: [], documentation: "hypot(*coordinates) -> value"),
+        .function(name: "math.isclose", parameters: ["a", "b", "rel_tol=1e-09", "abs_tol=0.0"], documentation: "Determine whether two floating-point numbers are close in value."),
+        .function(name: "math.isfinite", parameters: ["x"], documentation: "Return True if x is neither an infinity nor a NaN, and False otherwise."),
+        .function(name: "math.isinf", parameters: ["x"], documentation: "Return True if x is a positive or negative infinity, and False otherwise."),
+        .function(name: "math.isnan", parameters: ["x"], documentation: "Return True if x is a NaN (not a number), and False otherwise."),
+        .function(name: "math.isqrt", parameters: ["n"], documentation: "Return the integer part of the square root of the input."),
+        .function(name: "math.lcm", parameters: ["*integers"], documentation: "Least Common Multiple."),
+        .function(name: "math.ldexp", parameters: ["x", "i"], documentation: "Return x * (2**i)."),
+        .function(name: "math.lgamma", parameters: ["x"], documentation: "Natural logarithm of absolute value of Gamma function at x."),
+        .function(name: "math.log", parameters: [], documentation: "log(x, [base=math.e]) Return the logarithm of x to the given base."),
+        .function(name: "math.log10", parameters: ["x"], documentation: "Return the base 10 logarithm of x."),
+        .function(name: "math.log1p", parameters: ["x"], documentation: "Return the natural logarithm of 1+x (base e)."),
+        .function(name: "math.log2", parameters: ["x"], documentation: "Return the base 2 logarithm of x."),
+        .function(name: "math.modf", parameters: ["x"], documentation: "Return the fractional and integer parts of x."),
+        .function(name: "math.nextafter", parameters: ["x", "y", "steps=None"], documentation: "Return the floating-point value the given number of steps after x towards y."),
+        .function(name: "math.perm", parameters: ["n", "k=None"], documentation: "Number of ways to choose k items from n items without repetition and with order."),
+        .function(name: "math.pow", parameters: ["x", "y"], documentation: "Return x**y (x to the power of y)."),
+        .function(name: "math.prod", parameters: ["iterable", "start=1"], documentation: "Calculate the product of all the elements in the input iterable."),
+        .function(name: "math.radians", parameters: ["x"], documentation: "Convert angle x from degrees to radians."),
+        .function(name: "math.remainder", parameters: ["x", "y"], documentation: "Difference between x and the closest integer multiple of y."),
+        .function(name: "math.sin", parameters: ["x"], documentation: "Return the sine of x (measured in radians)."),
+        .function(name: "math.sinh", parameters: ["x"], documentation: "Return the hyperbolic sine of x."),
+        .function(name: "math.sqrt", parameters: ["x"], documentation: "Return the square root of x."),
+        .function(name: "math.sumprod", parameters: ["p", "q"], documentation: "Return the sum of products of values from two iterables p and q."),
+        .function(name: "math.tan", parameters: ["x"], documentation: "Return the tangent of x (measured in radians)."),
+        .function(name: "math.tanh", parameters: ["x"], documentation: "Return the hyperbolic tangent of x."),
+        .function(name: "math.trunc", parameters: ["x"], documentation: "Truncates the Real x to the nearest Integral toward 0."),
+        .function(name: "math.ulp", parameters: ["x"], documentation: "Return the value of the least significant bit of the float x.")
+    ]
     
     // MARK: - Sequence Operations and Iterator Protocol
     

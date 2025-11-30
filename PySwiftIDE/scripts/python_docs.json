@@ -1,0 +1,2190 @@
+{
+  "python_version": "3.13.8 (v3.13.8:a15ae614deb, Oct  7 2025, 08:28:01) [Clang 16.0.0 (clang-1600.0.26.6)]",
+  "builtin_functions": [
+    {
+      "name": "abs",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the absolute value of the argument."
+    },
+    {
+      "name": "all",
+      "params": [
+        "iterable"
+      ],
+      "doc": "Return True if bool(x) is True for all values x in the iterable."
+    },
+    {
+      "name": "any",
+      "params": [
+        "iterable"
+      ],
+      "doc": "Return True if bool(x) is True for any x in the iterable."
+    },
+    {
+      "name": "ascii",
+      "params": [
+        "obj"
+      ],
+      "doc": "Return an ASCII-only representation of an object."
+    },
+    {
+      "name": "bin",
+      "params": [
+        "number"
+      ],
+      "doc": "Return the binary representation of an integer."
+    },
+    {
+      "name": "bool",
+      "params": [
+        "object=False"
+      ],
+      "doc": "Returns True when the argument is true, False otherwise. The builtins True and False are the only two instances of the class bool. The class bool is a subclass of the class int, and cannot be subclassed."
+    },
+    {
+      "name": "breakpoint",
+      "params": [
+        "*args",
+        "**kws"
+      ],
+      "doc": "Call sys.breakpointhook(*args, **kws). sys.breakpointhook() must accept whatever arguments are passed."
+    },
+    {
+      "name": "bytearray",
+      "params": [],
+      "doc": "bytearray(iterable_of_ints) -> bytearray bytearray(string, encoding[, errors]) -> bytearray bytearray(bytes_or_buffer) -> mutable copy of bytes_or_buffer bytearray(int) -> bytes array of size given by the parameter initialized with null bytes bytearray() -> empty bytes array"
+    },
+    {
+      "name": "bytes",
+      "params": [],
+      "doc": "bytes(iterable_of_ints) -> bytes bytes(string, encoding[, errors]) -> bytes bytes(bytes_or_buffer) -> immutable copy of bytes_or_buffer bytes(int) -> bytes object of size given by the parameter initialized with null bytes bytes() -> empty bytes object"
+    },
+    {
+      "name": "callable",
+      "params": [
+        "obj"
+      ],
+      "doc": "Return whether the object is callable (i.e., some kind of function)."
+    },
+    {
+      "name": "chr",
+      "params": [
+        "i"
+      ],
+      "doc": "Return a Unicode string of one character with ordinal i; 0 <= i <= 0x10ffff."
+    },
+    {
+      "name": "classmethod",
+      "params": [
+        "function"
+      ],
+      "doc": "Convert a function to be a class method."
+    },
+    {
+      "name": "compile",
+      "params": [
+        "source",
+        "filename",
+        "mode",
+        "flags=0",
+        "dont_inherit=False",
+        "optimize=-1",
+        "_feature_version=-1"
+      ],
+      "doc": "Compile source into a code object that can be executed by exec() or eval()."
+    },
+    {
+      "name": "complex",
+      "params": [
+        "real=0",
+        "imag=0"
+      ],
+      "doc": "Create a complex number from a string or numbers."
+    },
+    {
+      "name": "delattr",
+      "params": [
+        "obj",
+        "name"
+      ],
+      "doc": "Deletes the named attribute from the given object."
+    },
+    {
+      "name": "dict",
+      "params": [],
+      "doc": "dict() -> new empty dictionary dict(mapping) -> new dictionary initialized from a mapping object's (key, value) pairs dict(iterable) -> new dictionary initialized as if via: d = {} for k, v in iterable: d[k] = v dict(**kwargs) -> new dictionary initialized with the name=value pairs in the keyword argument list. For example: dict(one=1, two=2)"
+    },
+    {
+      "name": "dir",
+      "params": [],
+      "doc": "dir([object]) -> list of strings"
+    },
+    {
+      "name": "divmod",
+      "params": [
+        "x",
+        "y"
+      ],
+      "doc": "Return the tuple (x//y, x%y). Invariant: div*y + mod == x."
+    },
+    {
+      "name": "enumerate",
+      "params": [
+        "iterable",
+        "start=0"
+      ],
+      "doc": "Return an enumerate object."
+    },
+    {
+      "name": "eval",
+      "params": [
+        "source",
+        "globals=None",
+        "locals=None"
+      ],
+      "doc": "Evaluate the given source in the context of globals and locals."
+    },
+    {
+      "name": "exec",
+      "params": [
+        "source",
+        "globals=None",
+        "locals=None",
+        "closure=None"
+      ],
+      "doc": "Execute the given source in the context of globals and locals."
+    },
+    {
+      "name": "filter",
+      "params": [
+        "function",
+        "iterable"
+      ],
+      "doc": "Return an iterator yielding those items of iterable for which function(item) is true. If function is None, return the items that are true."
+    },
+    {
+      "name": "float",
+      "params": [
+        "x=0"
+      ],
+      "doc": "Convert a string or number to a floating-point number, if possible."
+    },
+    {
+      "name": "format",
+      "params": [
+        "value",
+        "format_spec=''"
+      ],
+      "doc": "Return type(value).__format__(value, format_spec)"
+    },
+    {
+      "name": "frozenset",
+      "params": [
+        "iterable=()"
+      ],
+      "doc": "Build an immutable unordered collection of unique elements."
+    },
+    {
+      "name": "getattr",
+      "params": [],
+      "doc": "getattr(object, name[, default]) -> value"
+    },
+    {
+      "name": "globals",
+      "params": [],
+      "doc": "Return the dictionary containing the current scope's global variables."
+    },
+    {
+      "name": "hasattr",
+      "params": [
+        "obj",
+        "name"
+      ],
+      "doc": "Return whether the object has an attribute with the given name."
+    },
+    {
+      "name": "hash",
+      "params": [
+        "obj"
+      ],
+      "doc": "Return the hash value for the given object."
+    },
+    {
+      "name": "help",
+      "params": [],
+      "doc": "Define the builtin 'help'."
+    },
+    {
+      "name": "hex",
+      "params": [
+        "number"
+      ],
+      "doc": "Return the hexadecimal representation of an integer."
+    },
+    {
+      "name": "id",
+      "params": [
+        "obj"
+      ],
+      "doc": "Return the identity of an object."
+    },
+    {
+      "name": "input",
+      "params": [
+        "prompt=''"
+      ],
+      "doc": "Read a string from standard input. The trailing newline is stripped."
+    },
+    {
+      "name": "int",
+      "params": [],
+      "doc": "int([x]) -> integer int(x, base=10) -> integer"
+    },
+    {
+      "name": "isinstance",
+      "params": [
+        "obj",
+        "class_or_tuple"
+      ],
+      "doc": "Return whether an object is an instance of a class or of a subclass thereof."
+    },
+    {
+      "name": "issubclass",
+      "params": [
+        "cls",
+        "class_or_tuple"
+      ],
+      "doc": "Return whether 'cls' is derived from another class or is the same class."
+    },
+    {
+      "name": "iter",
+      "params": [],
+      "doc": "iter(iterable) -> iterator iter(callable, sentinel) -> iterator"
+    },
+    {
+      "name": "len",
+      "params": [
+        "obj"
+      ],
+      "doc": "Return the number of items in a container."
+    },
+    {
+      "name": "list",
+      "params": [
+        "iterable=()"
+      ],
+      "doc": "Built-in mutable sequence."
+    },
+    {
+      "name": "locals",
+      "params": [],
+      "doc": "Return a dictionary containing the current scope's local variables."
+    },
+    {
+      "name": "map",
+      "params": [
+        "function",
+        "iterable",
+        "*iterables"
+      ],
+      "doc": "Make an iterator that computes the function using arguments from each of the iterables. Stops when the shortest iterable is exhausted."
+    },
+    {
+      "name": "max",
+      "params": [],
+      "doc": "max(iterable, *[, default=obj, key=func]) -> value max(arg1, arg2, *args, *[, key=func]) -> value"
+    },
+    {
+      "name": "memoryview",
+      "params": [
+        "object"
+      ],
+      "doc": "Create a new memoryview object which references the given object."
+    },
+    {
+      "name": "min",
+      "params": [],
+      "doc": "min(iterable, *[, default=obj, key=func]) -> value min(arg1, arg2, *args, *[, key=func]) -> value"
+    },
+    {
+      "name": "next",
+      "params": [],
+      "doc": "next(iterator[, default])"
+    },
+    {
+      "name": "object",
+      "params": [],
+      "doc": "The base class of the class hierarchy."
+    },
+    {
+      "name": "oct",
+      "params": [
+        "number"
+      ],
+      "doc": "Return the octal representation of an integer."
+    },
+    {
+      "name": "open",
+      "params": [
+        "file",
+        "mode='r'",
+        "buffering=-1",
+        "encoding=None",
+        "errors=None",
+        "newline=None",
+        "closefd=True",
+        "opener=None"
+      ],
+      "doc": "Open file and return a stream. Raise OSError upon failure."
+    },
+    {
+      "name": "ord",
+      "params": [
+        "character"
+      ],
+      "doc": "Return the ordinal value of a character."
+    },
+    {
+      "name": "pow",
+      "params": [
+        "base",
+        "exp",
+        "mod=None"
+      ],
+      "doc": "Equivalent to base**exp with 2 arguments or base**exp % mod with 3 arguments"
+    },
+    {
+      "name": "print",
+      "params": [
+        "*args",
+        "sep=' '",
+        "end='\n'",
+        "file=None",
+        "flush=False"
+      ],
+      "doc": "Prints the values to a stream, or to sys.stdout by default."
+    },
+    {
+      "name": "property",
+      "params": [
+        "fget=None",
+        "fset=None",
+        "fdel=None",
+        "doc=None"
+      ],
+      "doc": "Property attribute."
+    },
+    {
+      "name": "range",
+      "params": [],
+      "doc": "range(stop) -> range object range(start, stop[, step]) -> range object"
+    },
+    {
+      "name": "repr",
+      "params": [
+        "obj"
+      ],
+      "doc": "Return the canonical string representation of the object."
+    },
+    {
+      "name": "reversed",
+      "params": [
+        "sequence"
+      ],
+      "doc": "Return a reverse iterator over the values of the given sequence."
+    },
+    {
+      "name": "round",
+      "params": [
+        "number",
+        "ndigits=None"
+      ],
+      "doc": "Round a number to a given precision in decimal digits."
+    },
+    {
+      "name": "set",
+      "params": [
+        "iterable=()"
+      ],
+      "doc": "Build an unordered collection of unique elements."
+    },
+    {
+      "name": "setattr",
+      "params": [
+        "obj",
+        "name",
+        "value"
+      ],
+      "doc": "Sets the named attribute on the given object to the specified value."
+    },
+    {
+      "name": "slice",
+      "params": [],
+      "doc": "slice(stop) slice(start, stop[, step])"
+    },
+    {
+      "name": "sorted",
+      "params": [
+        "iterable",
+        "key=None",
+        "reverse=False"
+      ],
+      "doc": "Return a new list containing all items from the iterable in ascending order."
+    },
+    {
+      "name": "staticmethod",
+      "params": [
+        "function"
+      ],
+      "doc": "Convert a function to be a static method."
+    },
+    {
+      "name": "str",
+      "params": [],
+      "doc": "str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str"
+    },
+    {
+      "name": "sum",
+      "params": [
+        "iterable",
+        "start=0"
+      ],
+      "doc": "Return the sum of a 'start' value (default: 0) plus an iterable of numbers"
+    },
+    {
+      "name": "super",
+      "params": [],
+      "doc": "super() -> same as super(__class__, <first argument>) super(type) -> unbound super object super(type, obj) -> bound super object; requires isinstance(obj, type) super(type, type2) -> bound super object; requires issubclass(type2, type) Typical use to call a cooperative superclass method: class C(B): def meth(self, arg):"
+    },
+    {
+      "name": "tuple",
+      "params": [
+        "iterable=()"
+      ],
+      "doc": "Built-in immutable sequence."
+    },
+    {
+      "name": "type",
+      "params": [],
+      "doc": "type(object) -> the object's type type(name, bases, dict, **kwds) -> a new type"
+    },
+    {
+      "name": "vars",
+      "params": [],
+      "doc": "vars([object]) -> dictionary"
+    },
+    {
+      "name": "zip",
+      "params": [
+        "*iterables",
+        "strict=False"
+      ],
+      "doc": "The zip object yields n-length tuples, where n is the number of iterables passed as positional arguments to zip(). The i-th element in every tuple comes from the i-th iterable argument to zip(). This continues until the shortest argument is exhausted."
+    }
+  ],
+  "type_methods": {
+    "str": [
+      {
+        "name": "capitalize",
+        "params": [],
+        "doc": "Return a capitalized version of the string."
+      },
+      {
+        "name": "casefold",
+        "params": [],
+        "doc": "Return a version of the string suitable for caseless comparisons."
+      },
+      {
+        "name": "center",
+        "params": [
+          "width",
+          "fillchar=' '"
+        ],
+        "doc": "Return a centered string of length width."
+      },
+      {
+        "name": "count",
+        "params": [],
+        "doc": "Return the number of non-overlapping occurrences of substring sub in string S[start:end]."
+      },
+      {
+        "name": "encode",
+        "params": [
+          "encoding='utf-8'",
+          "errors='strict'"
+        ],
+        "doc": "Encode the string using the codec registered for encoding."
+      },
+      {
+        "name": "endswith",
+        "params": [],
+        "doc": "Return True if the string ends with the specified suffix, False otherwise."
+      },
+      {
+        "name": "expandtabs",
+        "params": [
+          "tabsize=8"
+        ],
+        "doc": "Return a copy where all tab characters are expanded using spaces."
+      },
+      {
+        "name": "find",
+        "params": [],
+        "doc": "Return the lowest index in S where substring sub is found, such that sub is contained within S[start:end]."
+      },
+      {
+        "name": "format",
+        "params": [
+          "*args",
+          "**kwargs"
+        ],
+        "doc": "Return a formatted version of the string, using substitutions from args and kwargs. The substitutions are identified by braces ('{' and '}')."
+      },
+      {
+        "name": "format_map",
+        "params": [
+          "mapping"
+        ],
+        "doc": "Return a formatted version of the string, using substitutions from mapping. The substitutions are identified by braces ('{' and '}')."
+      },
+      {
+        "name": "index",
+        "params": [],
+        "doc": "Return the lowest index in S where substring sub is found, such that sub is contained within S[start:end]."
+      },
+      {
+        "name": "isalnum",
+        "params": [],
+        "doc": "Return True if the string is an alpha-numeric string, False otherwise."
+      },
+      {
+        "name": "isalpha",
+        "params": [],
+        "doc": "Return True if the string is an alphabetic string, False otherwise."
+      },
+      {
+        "name": "isascii",
+        "params": [],
+        "doc": "Return True if all characters in the string are ASCII, False otherwise."
+      },
+      {
+        "name": "isdecimal",
+        "params": [],
+        "doc": "Return True if the string is a decimal string, False otherwise."
+      },
+      {
+        "name": "isdigit",
+        "params": [],
+        "doc": "Return True if the string is a digit string, False otherwise."
+      },
+      {
+        "name": "isidentifier",
+        "params": [],
+        "doc": "Return True if the string is a valid Python identifier, False otherwise."
+      },
+      {
+        "name": "islower",
+        "params": [],
+        "doc": "Return True if the string is a lowercase string, False otherwise."
+      },
+      {
+        "name": "isnumeric",
+        "params": [],
+        "doc": "Return True if the string is a numeric string, False otherwise."
+      },
+      {
+        "name": "isprintable",
+        "params": [],
+        "doc": "Return True if all characters in the string are printable, False otherwise."
+      },
+      {
+        "name": "isspace",
+        "params": [],
+        "doc": "Return True if the string is a whitespace string, False otherwise."
+      },
+      {
+        "name": "istitle",
+        "params": [],
+        "doc": "Return True if the string is a title-cased string, False otherwise."
+      },
+      {
+        "name": "isupper",
+        "params": [],
+        "doc": "Return True if the string is an uppercase string, False otherwise."
+      },
+      {
+        "name": "join",
+        "params": [
+          "iterable"
+        ],
+        "doc": "Concatenate any number of strings."
+      },
+      {
+        "name": "ljust",
+        "params": [
+          "width",
+          "fillchar=' '"
+        ],
+        "doc": "Return a left-justified string of length width."
+      },
+      {
+        "name": "lower",
+        "params": [],
+        "doc": "Return a copy of the string converted to lowercase."
+      },
+      {
+        "name": "lstrip",
+        "params": [
+          "chars=None"
+        ],
+        "doc": "Return a copy of the string with leading whitespace removed."
+      },
+      {
+        "name": "maketrans",
+        "params": [],
+        "doc": "Return a translation table usable for str.translate()."
+      },
+      {
+        "name": "partition",
+        "params": [
+          "sep"
+        ],
+        "doc": "Partition the string into three parts using the given separator."
+      },
+      {
+        "name": "removeprefix",
+        "params": [
+          "prefix"
+        ],
+        "doc": "Return a str with the given prefix string removed if present."
+      },
+      {
+        "name": "removesuffix",
+        "params": [
+          "suffix"
+        ],
+        "doc": "Return a str with the given suffix string removed if present."
+      },
+      {
+        "name": "replace",
+        "params": [
+          "old",
+          "new",
+          "count=-1"
+        ],
+        "doc": "Return a copy with all occurrences of substring old replaced by new."
+      },
+      {
+        "name": "rfind",
+        "params": [],
+        "doc": "Return the highest index in S where substring sub is found, such that sub is contained within S[start:end]."
+      },
+      {
+        "name": "rindex",
+        "params": [],
+        "doc": "Return the highest index in S where substring sub is found, such that sub is contained within S[start:end]."
+      },
+      {
+        "name": "rjust",
+        "params": [
+          "width",
+          "fillchar=' '"
+        ],
+        "doc": "Return a right-justified string of length width."
+      },
+      {
+        "name": "rpartition",
+        "params": [
+          "sep"
+        ],
+        "doc": "Partition the string into three parts using the given separator."
+      },
+      {
+        "name": "rsplit",
+        "params": [
+          "sep=None",
+          "maxsplit=-1"
+        ],
+        "doc": "Return a list of the substrings in the string, using sep as the separator string."
+      },
+      {
+        "name": "rstrip",
+        "params": [
+          "chars=None"
+        ],
+        "doc": "Return a copy of the string with trailing whitespace removed."
+      },
+      {
+        "name": "split",
+        "params": [
+          "sep=None",
+          "maxsplit=-1"
+        ],
+        "doc": "Return a list of the substrings in the string, using sep as the separator string."
+      },
+      {
+        "name": "splitlines",
+        "params": [
+          "keepends=False"
+        ],
+        "doc": "Return a list of the lines in the string, breaking at line boundaries."
+      },
+      {
+        "name": "startswith",
+        "params": [],
+        "doc": "Return True if the string starts with the specified prefix, False otherwise."
+      },
+      {
+        "name": "strip",
+        "params": [
+          "chars=None"
+        ],
+        "doc": "Return a copy of the string with leading and trailing whitespace removed."
+      },
+      {
+        "name": "swapcase",
+        "params": [],
+        "doc": "Convert uppercase characters to lowercase and lowercase characters to uppercase."
+      },
+      {
+        "name": "title",
+        "params": [],
+        "doc": "Return a version of the string where each word is titlecased."
+      },
+      {
+        "name": "translate",
+        "params": [
+          "table"
+        ],
+        "doc": "Replace each character in the string using the given translation table."
+      },
+      {
+        "name": "upper",
+        "params": [],
+        "doc": "Return a copy of the string converted to uppercase."
+      },
+      {
+        "name": "zfill",
+        "params": [
+          "width"
+        ],
+        "doc": "Pad a numeric string with zeros on the left, to fill a field of the given width."
+      }
+    ],
+    "list": [
+      {
+        "name": "append",
+        "params": [
+          "object"
+        ],
+        "doc": "Append object to the end of the list."
+      },
+      {
+        "name": "clear",
+        "params": [],
+        "doc": "Remove all items from list."
+      },
+      {
+        "name": "copy",
+        "params": [],
+        "doc": "Return a shallow copy of the list."
+      },
+      {
+        "name": "count",
+        "params": [
+          "value"
+        ],
+        "doc": "Return number of occurrences of value."
+      },
+      {
+        "name": "extend",
+        "params": [
+          "iterable"
+        ],
+        "doc": "Extend list by appending elements from the iterable."
+      },
+      {
+        "name": "index",
+        "params": [
+          "value",
+          "start=0",
+          "stop=9223372036854775807"
+        ],
+        "doc": "Return first index of value."
+      },
+      {
+        "name": "insert",
+        "params": [
+          "index",
+          "object"
+        ],
+        "doc": "Insert object before index."
+      },
+      {
+        "name": "pop",
+        "params": [
+          "index=-1"
+        ],
+        "doc": "Remove and return item at index (default last)."
+      },
+      {
+        "name": "remove",
+        "params": [
+          "value"
+        ],
+        "doc": "Remove first occurrence of value."
+      },
+      {
+        "name": "reverse",
+        "params": [],
+        "doc": "Reverse *IN PLACE*."
+      },
+      {
+        "name": "sort",
+        "params": [
+          "key=None",
+          "reverse=False"
+        ],
+        "doc": "Sort the list in ascending order and return None."
+      }
+    ],
+    "dict": [
+      {
+        "name": "clear",
+        "params": [],
+        "doc": "Remove all items from the dict."
+      },
+      {
+        "name": "copy",
+        "params": [],
+        "doc": "Return a shallow copy of the dict."
+      },
+      {
+        "name": "fromkeys",
+        "params": [
+          "iterable",
+          "value=None"
+        ],
+        "doc": "Create a new dictionary with keys from iterable and values set to value."
+      },
+      {
+        "name": "get",
+        "params": [
+          "key",
+          "default=None"
+        ],
+        "doc": "Return the value for key if key is in the dictionary, else default."
+      },
+      {
+        "name": "items",
+        "params": [],
+        "doc": "Return a set-like object providing a view on the dict's items."
+      },
+      {
+        "name": "keys",
+        "params": [],
+        "doc": "Return a set-like object providing a view on the dict's keys."
+      },
+      {
+        "name": "pop",
+        "params": [],
+        "doc": "D.pop(k[,d]) -> v, remove specified key and return the corresponding value."
+      },
+      {
+        "name": "popitem",
+        "params": [],
+        "doc": "Remove and return a (key, value) pair as a 2-tuple."
+      },
+      {
+        "name": "setdefault",
+        "params": [
+          "key",
+          "default=None"
+        ],
+        "doc": "Insert key with a value of default if key is not in the dictionary."
+      },
+      {
+        "name": "update",
+        "params": [],
+        "doc": "D.update([E, ]**F) -> None. Update D from mapping/iterable E and F. If E is present and has a .keys() method, then does: for k in E.keys(): D[k] = E[k] If E is present and lacks a .keys() method, then does: for k, v in E: D[k] = v In either case, this is followed by: for k in F: D[k] = F[k]"
+      },
+      {
+        "name": "values",
+        "params": [],
+        "doc": "Return an object providing a view on the dict's values."
+      }
+    ],
+    "set": [
+      {
+        "name": "add",
+        "params": [
+          "object"
+        ],
+        "doc": "Add an element to a set."
+      },
+      {
+        "name": "clear",
+        "params": [],
+        "doc": "Remove all elements from this set."
+      },
+      {
+        "name": "copy",
+        "params": [],
+        "doc": "Return a shallow copy of a set."
+      },
+      {
+        "name": "difference",
+        "params": [
+          "*others"
+        ],
+        "doc": "Return a new set with elements in the set that are not in the others."
+      },
+      {
+        "name": "difference_update",
+        "params": [
+          "*others"
+        ],
+        "doc": "Update the set, removing elements found in others."
+      },
+      {
+        "name": "discard",
+        "params": [
+          "object"
+        ],
+        "doc": "Remove an element from a set if it is a member."
+      },
+      {
+        "name": "intersection",
+        "params": [
+          "*others"
+        ],
+        "doc": "Return a new set with elements common to the set and all others."
+      },
+      {
+        "name": "intersection_update",
+        "params": [
+          "*others"
+        ],
+        "doc": "Update the set, keeping only elements found in it and all others."
+      },
+      {
+        "name": "isdisjoint",
+        "params": [
+          "other"
+        ],
+        "doc": "Return True if two sets have a null intersection."
+      },
+      {
+        "name": "issubset",
+        "params": [
+          "other"
+        ],
+        "doc": "Report whether another set contains this set."
+      },
+      {
+        "name": "issuperset",
+        "params": [
+          "other"
+        ],
+        "doc": "Report whether this set contains another set."
+      },
+      {
+        "name": "pop",
+        "params": [],
+        "doc": "Remove and return an arbitrary set element."
+      },
+      {
+        "name": "remove",
+        "params": [
+          "object"
+        ],
+        "doc": "Remove an element from a set; it must be a member."
+      },
+      {
+        "name": "symmetric_difference",
+        "params": [
+          "other"
+        ],
+        "doc": "Return a new set with elements in either the set or other but not both."
+      },
+      {
+        "name": "symmetric_difference_update",
+        "params": [
+          "other"
+        ],
+        "doc": "Update the set, keeping only elements found in either set, but not in both."
+      },
+      {
+        "name": "union",
+        "params": [
+          "*others"
+        ],
+        "doc": "Return a new set with elements from the set and all others."
+      },
+      {
+        "name": "update",
+        "params": [
+          "*others"
+        ],
+        "doc": "Update the set, adding elements from all others."
+      }
+    ],
+    "frozenset": [
+      {
+        "name": "copy",
+        "params": [],
+        "doc": "Return a shallow copy of a set."
+      },
+      {
+        "name": "difference",
+        "params": [
+          "*others"
+        ],
+        "doc": "Return a new set with elements in the set that are not in the others."
+      },
+      {
+        "name": "intersection",
+        "params": [
+          "*others"
+        ],
+        "doc": "Return a new set with elements common to the set and all others."
+      },
+      {
+        "name": "isdisjoint",
+        "params": [
+          "other"
+        ],
+        "doc": "Return True if two sets have a null intersection."
+      },
+      {
+        "name": "issubset",
+        "params": [
+          "other"
+        ],
+        "doc": "Report whether another set contains this set."
+      },
+      {
+        "name": "issuperset",
+        "params": [
+          "other"
+        ],
+        "doc": "Report whether this set contains another set."
+      },
+      {
+        "name": "symmetric_difference",
+        "params": [
+          "other"
+        ],
+        "doc": "Return a new set with elements in either the set or other but not both."
+      },
+      {
+        "name": "union",
+        "params": [
+          "*others"
+        ],
+        "doc": "Return a new set with elements from the set and all others."
+      }
+    ],
+    "bytes": [
+      {
+        "name": "capitalize",
+        "params": [],
+        "doc": "B.capitalize() -> copy of B"
+      },
+      {
+        "name": "center",
+        "params": [
+          "width",
+          "fillchar=b' '"
+        ],
+        "doc": "Return a centered string of length width."
+      },
+      {
+        "name": "count",
+        "params": [],
+        "doc": "Return the number of non-overlapping occurrences of subsection 'sub' in bytes B[start:end]."
+      },
+      {
+        "name": "decode",
+        "params": [
+          "encoding='utf-8'",
+          "errors='strict'"
+        ],
+        "doc": "Decode the bytes using the codec registered for encoding."
+      },
+      {
+        "name": "endswith",
+        "params": [],
+        "doc": "Return True if the bytes ends with the specified suffix, False otherwise."
+      },
+      {
+        "name": "expandtabs",
+        "params": [
+          "tabsize=8"
+        ],
+        "doc": "Return a copy where all tab characters are expanded using spaces."
+      },
+      {
+        "name": "find",
+        "params": [],
+        "doc": "Return the lowest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start,end]."
+      },
+      {
+        "name": "fromhex",
+        "params": [
+          "string"
+        ],
+        "doc": "Create a bytes object from a string of hexadecimal numbers."
+      },
+      {
+        "name": "hex",
+        "params": [],
+        "doc": "Create a string of hexadecimal numbers from a bytes object."
+      },
+      {
+        "name": "index",
+        "params": [],
+        "doc": "Return the lowest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start,end]."
+      },
+      {
+        "name": "isalnum",
+        "params": [],
+        "doc": "B.isalnum() -> bool"
+      },
+      {
+        "name": "isalpha",
+        "params": [],
+        "doc": "B.isalpha() -> bool"
+      },
+      {
+        "name": "isascii",
+        "params": [],
+        "doc": "B.isascii() -> bool"
+      },
+      {
+        "name": "isdigit",
+        "params": [],
+        "doc": "B.isdigit() -> bool"
+      },
+      {
+        "name": "islower",
+        "params": [],
+        "doc": "B.islower() -> bool"
+      },
+      {
+        "name": "isspace",
+        "params": [],
+        "doc": "B.isspace() -> bool"
+      },
+      {
+        "name": "istitle",
+        "params": [],
+        "doc": "B.istitle() -> bool"
+      },
+      {
+        "name": "isupper",
+        "params": [],
+        "doc": "B.isupper() -> bool"
+      },
+      {
+        "name": "join",
+        "params": [
+          "iterable_of_bytes"
+        ],
+        "doc": "Concatenate any number of bytes objects."
+      },
+      {
+        "name": "ljust",
+        "params": [
+          "width",
+          "fillchar=b' '"
+        ],
+        "doc": "Return a left-justified string of length width."
+      },
+      {
+        "name": "lower",
+        "params": [],
+        "doc": "B.lower() -> copy of B"
+      },
+      {
+        "name": "lstrip",
+        "params": [
+          "bytes=None"
+        ],
+        "doc": "Strip leading bytes contained in the argument."
+      },
+      {
+        "name": "maketrans",
+        "params": [
+          "frm",
+          "to"
+        ],
+        "doc": "Return a translation table usable for the bytes or bytearray translate method."
+      },
+      {
+        "name": "partition",
+        "params": [
+          "sep"
+        ],
+        "doc": "Partition the bytes into three parts using the given separator."
+      },
+      {
+        "name": "removeprefix",
+        "params": [
+          "prefix"
+        ],
+        "doc": "Return a bytes object with the given prefix string removed if present."
+      },
+      {
+        "name": "removesuffix",
+        "params": [
+          "suffix"
+        ],
+        "doc": "Return a bytes object with the given suffix string removed if present."
+      },
+      {
+        "name": "replace",
+        "params": [
+          "old",
+          "new",
+          "count=-1"
+        ],
+        "doc": "Return a copy with all occurrences of substring old replaced by new."
+      },
+      {
+        "name": "rfind",
+        "params": [],
+        "doc": "Return the highest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start,end]."
+      },
+      {
+        "name": "rindex",
+        "params": [],
+        "doc": "Return the highest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start,end]."
+      },
+      {
+        "name": "rjust",
+        "params": [
+          "width",
+          "fillchar=b' '"
+        ],
+        "doc": "Return a right-justified string of length width."
+      },
+      {
+        "name": "rpartition",
+        "params": [
+          "sep"
+        ],
+        "doc": "Partition the bytes into three parts using the given separator."
+      },
+      {
+        "name": "rsplit",
+        "params": [
+          "sep=None",
+          "maxsplit=-1"
+        ],
+        "doc": "Return a list of the sections in the bytes, using sep as the delimiter."
+      },
+      {
+        "name": "rstrip",
+        "params": [
+          "bytes=None"
+        ],
+        "doc": "Strip trailing bytes contained in the argument."
+      },
+      {
+        "name": "split",
+        "params": [
+          "sep=None",
+          "maxsplit=-1"
+        ],
+        "doc": "Return a list of the sections in the bytes, using sep as the delimiter."
+      },
+      {
+        "name": "splitlines",
+        "params": [
+          "keepends=False"
+        ],
+        "doc": "Return a list of the lines in the bytes, breaking at line boundaries."
+      },
+      {
+        "name": "startswith",
+        "params": [],
+        "doc": "Return True if the bytes starts with the specified prefix, False otherwise."
+      },
+      {
+        "name": "strip",
+        "params": [
+          "bytes=None"
+        ],
+        "doc": "Strip leading and trailing bytes contained in the argument."
+      },
+      {
+        "name": "swapcase",
+        "params": [],
+        "doc": "B.swapcase() -> copy of B"
+      },
+      {
+        "name": "title",
+        "params": [],
+        "doc": "B.title() -> copy of B"
+      },
+      {
+        "name": "translate",
+        "params": [
+          "table",
+          "delete=b''"
+        ],
+        "doc": "Return a copy with each character mapped by the given translation table."
+      },
+      {
+        "name": "upper",
+        "params": [],
+        "doc": "B.upper() -> copy of B"
+      },
+      {
+        "name": "zfill",
+        "params": [
+          "width"
+        ],
+        "doc": "Pad a numeric string with zeros on the left, to fill a field of the given width."
+      }
+    ],
+    "bytearray": [
+      {
+        "name": "append",
+        "params": [
+          "item"
+        ],
+        "doc": "Append a single item to the end of the bytearray."
+      },
+      {
+        "name": "capitalize",
+        "params": [],
+        "doc": "B.capitalize() -> copy of B"
+      },
+      {
+        "name": "center",
+        "params": [
+          "width",
+          "fillchar=b' '"
+        ],
+        "doc": "Return a centered string of length width."
+      },
+      {
+        "name": "clear",
+        "params": [],
+        "doc": "Remove all items from the bytearray."
+      },
+      {
+        "name": "copy",
+        "params": [],
+        "doc": "Return a copy of B."
+      },
+      {
+        "name": "count",
+        "params": [],
+        "doc": "Return the number of non-overlapping occurrences of subsection 'sub' in bytes B[start:end]."
+      },
+      {
+        "name": "decode",
+        "params": [
+          "encoding='utf-8'",
+          "errors='strict'"
+        ],
+        "doc": "Decode the bytearray using the codec registered for encoding."
+      },
+      {
+        "name": "endswith",
+        "params": [],
+        "doc": "Return True if the bytearray ends with the specified suffix, False otherwise."
+      },
+      {
+        "name": "expandtabs",
+        "params": [
+          "tabsize=8"
+        ],
+        "doc": "Return a copy where all tab characters are expanded using spaces."
+      },
+      {
+        "name": "extend",
+        "params": [
+          "iterable_of_ints"
+        ],
+        "doc": "Append all the items from the iterator or sequence to the end of the bytearray."
+      },
+      {
+        "name": "find",
+        "params": [],
+        "doc": "Return the lowest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start:end]."
+      },
+      {
+        "name": "fromhex",
+        "params": [
+          "string"
+        ],
+        "doc": "Create a bytearray object from a string of hexadecimal numbers."
+      },
+      {
+        "name": "hex",
+        "params": [],
+        "doc": "Create a string of hexadecimal numbers from a bytearray object."
+      },
+      {
+        "name": "index",
+        "params": [],
+        "doc": "Return the lowest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start:end]."
+      },
+      {
+        "name": "insert",
+        "params": [
+          "index",
+          "item"
+        ],
+        "doc": "Insert a single item into the bytearray before the given index."
+      },
+      {
+        "name": "isalnum",
+        "params": [],
+        "doc": "B.isalnum() -> bool"
+      },
+      {
+        "name": "isalpha",
+        "params": [],
+        "doc": "B.isalpha() -> bool"
+      },
+      {
+        "name": "isascii",
+        "params": [],
+        "doc": "B.isascii() -> bool"
+      },
+      {
+        "name": "isdigit",
+        "params": [],
+        "doc": "B.isdigit() -> bool"
+      },
+      {
+        "name": "islower",
+        "params": [],
+        "doc": "B.islower() -> bool"
+      },
+      {
+        "name": "isspace",
+        "params": [],
+        "doc": "B.isspace() -> bool"
+      },
+      {
+        "name": "istitle",
+        "params": [],
+        "doc": "B.istitle() -> bool"
+      },
+      {
+        "name": "isupper",
+        "params": [],
+        "doc": "B.isupper() -> bool"
+      },
+      {
+        "name": "join",
+        "params": [
+          "iterable_of_bytes"
+        ],
+        "doc": "Concatenate any number of bytes/bytearray objects."
+      },
+      {
+        "name": "ljust",
+        "params": [
+          "width",
+          "fillchar=b' '"
+        ],
+        "doc": "Return a left-justified string of length width."
+      },
+      {
+        "name": "lower",
+        "params": [],
+        "doc": "B.lower() -> copy of B"
+      },
+      {
+        "name": "lstrip",
+        "params": [
+          "bytes=None"
+        ],
+        "doc": "Strip leading bytes contained in the argument."
+      },
+      {
+        "name": "maketrans",
+        "params": [
+          "frm",
+          "to"
+        ],
+        "doc": "Return a translation table usable for the bytes or bytearray translate method."
+      },
+      {
+        "name": "partition",
+        "params": [
+          "sep"
+        ],
+        "doc": "Partition the bytearray into three parts using the given separator."
+      },
+      {
+        "name": "pop",
+        "params": [
+          "index=-1"
+        ],
+        "doc": "Remove and return a single item from B."
+      },
+      {
+        "name": "remove",
+        "params": [
+          "value"
+        ],
+        "doc": "Remove the first occurrence of a value in the bytearray."
+      },
+      {
+        "name": "removeprefix",
+        "params": [
+          "prefix"
+        ],
+        "doc": "Return a bytearray with the given prefix string removed if present."
+      },
+      {
+        "name": "removesuffix",
+        "params": [
+          "suffix"
+        ],
+        "doc": "Return a bytearray with the given suffix string removed if present."
+      },
+      {
+        "name": "replace",
+        "params": [
+          "old",
+          "new",
+          "count=-1"
+        ],
+        "doc": "Return a copy with all occurrences of substring old replaced by new."
+      },
+      {
+        "name": "reverse",
+        "params": [],
+        "doc": "Reverse the order of the values in B in place."
+      },
+      {
+        "name": "rfind",
+        "params": [],
+        "doc": "Return the highest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start:end]."
+      },
+      {
+        "name": "rindex",
+        "params": [],
+        "doc": "Return the highest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start:end]."
+      },
+      {
+        "name": "rjust",
+        "params": [
+          "width",
+          "fillchar=b' '"
+        ],
+        "doc": "Return a right-justified string of length width."
+      },
+      {
+        "name": "rpartition",
+        "params": [
+          "sep"
+        ],
+        "doc": "Partition the bytearray into three parts using the given separator."
+      },
+      {
+        "name": "rsplit",
+        "params": [
+          "sep=None",
+          "maxsplit=-1"
+        ],
+        "doc": "Return a list of the sections in the bytearray, using sep as the delimiter."
+      },
+      {
+        "name": "rstrip",
+        "params": [
+          "bytes=None"
+        ],
+        "doc": "Strip trailing bytes contained in the argument."
+      },
+      {
+        "name": "split",
+        "params": [
+          "sep=None",
+          "maxsplit=-1"
+        ],
+        "doc": "Return a list of the sections in the bytearray, using sep as the delimiter."
+      },
+      {
+        "name": "splitlines",
+        "params": [
+          "keepends=False"
+        ],
+        "doc": "Return a list of the lines in the bytearray, breaking at line boundaries."
+      },
+      {
+        "name": "startswith",
+        "params": [],
+        "doc": "Return True if the bytearray starts with the specified prefix, False otherwise."
+      },
+      {
+        "name": "strip",
+        "params": [
+          "bytes=None"
+        ],
+        "doc": "Strip leading and trailing bytes contained in the argument."
+      },
+      {
+        "name": "swapcase",
+        "params": [],
+        "doc": "B.swapcase() -> copy of B"
+      },
+      {
+        "name": "title",
+        "params": [],
+        "doc": "B.title() -> copy of B"
+      },
+      {
+        "name": "translate",
+        "params": [
+          "table",
+          "delete=b''"
+        ],
+        "doc": "Return a copy with each character mapped by the given translation table."
+      },
+      {
+        "name": "upper",
+        "params": [],
+        "doc": "B.upper() -> copy of B"
+      },
+      {
+        "name": "zfill",
+        "params": [
+          "width"
+        ],
+        "doc": "Pad a numeric string with zeros on the left, to fill a field of the given width."
+      }
+    ],
+    "tuple": [
+      {
+        "name": "count",
+        "params": [
+          "value"
+        ],
+        "doc": "Return number of occurrences of value."
+      },
+      {
+        "name": "index",
+        "params": [
+          "value",
+          "start=0",
+          "stop=9223372036854775807"
+        ],
+        "doc": "Return first index of value."
+      }
+    ]
+  },
+  "math_module": [
+    {
+      "type": "function",
+      "name": "math.acos",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the arc cosine (measured in radians) of x."
+    },
+    {
+      "type": "function",
+      "name": "math.acosh",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the inverse hyperbolic cosine of x."
+    },
+    {
+      "type": "function",
+      "name": "math.asin",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the arc sine (measured in radians) of x."
+    },
+    {
+      "type": "function",
+      "name": "math.asinh",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the inverse hyperbolic sine of x."
+    },
+    {
+      "type": "function",
+      "name": "math.atan",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the arc tangent (measured in radians) of x."
+    },
+    {
+      "type": "function",
+      "name": "math.atan2",
+      "params": [
+        "y",
+        "x"
+      ],
+      "doc": "Return the arc tangent (measured in radians) of y/x."
+    },
+    {
+      "type": "function",
+      "name": "math.atanh",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the inverse hyperbolic tangent of x."
+    },
+    {
+      "type": "function",
+      "name": "math.cbrt",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the cube root of x."
+    },
+    {
+      "type": "function",
+      "name": "math.ceil",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the ceiling of x as an Integral."
+    },
+    {
+      "type": "function",
+      "name": "math.comb",
+      "params": [
+        "n",
+        "k"
+      ],
+      "doc": "Number of ways to choose k items from n items without repetition and without order."
+    },
+    {
+      "type": "function",
+      "name": "math.copysign",
+      "params": [
+        "x",
+        "y"
+      ],
+      "doc": "Return a float with the magnitude (absolute value) of x but the sign of y."
+    },
+    {
+      "type": "function",
+      "name": "math.cos",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the cosine of x (measured in radians)."
+    },
+    {
+      "type": "function",
+      "name": "math.cosh",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the hyperbolic cosine of x."
+    },
+    {
+      "type": "function",
+      "name": "math.degrees",
+      "params": [
+        "x"
+      ],
+      "doc": "Convert angle x from radians to degrees."
+    },
+    {
+      "type": "function",
+      "name": "math.dist",
+      "params": [
+        "p",
+        "q"
+      ],
+      "doc": "Return the Euclidean distance between two points p and q."
+    },
+    {
+      "type": "constant",
+      "name": "math.e",
+      "value": "2.718281828459045",
+      "doc": "Convert a string or number to a floating-point number, if possible."
+    },
+    {
+      "type": "function",
+      "name": "math.erf",
+      "params": [
+        "x"
+      ],
+      "doc": "Error function at x."
+    },
+    {
+      "type": "function",
+      "name": "math.erfc",
+      "params": [
+        "x"
+      ],
+      "doc": "Complementary error function at x."
+    },
+    {
+      "type": "function",
+      "name": "math.exp",
+      "params": [
+        "x"
+      ],
+      "doc": "Return e raised to the power of x."
+    },
+    {
+      "type": "function",
+      "name": "math.exp2",
+      "params": [
+        "x"
+      ],
+      "doc": "Return 2 raised to the power of x."
+    },
+    {
+      "type": "function",
+      "name": "math.expm1",
+      "params": [
+        "x"
+      ],
+      "doc": "Return exp(x)-1."
+    },
+    {
+      "type": "function",
+      "name": "math.fabs",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the absolute value of the float x."
+    },
+    {
+      "type": "function",
+      "name": "math.factorial",
+      "params": [
+        "n"
+      ],
+      "doc": "Find n!."
+    },
+    {
+      "type": "function",
+      "name": "math.floor",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the floor of x as an Integral."
+    },
+    {
+      "type": "function",
+      "name": "math.fma",
+      "params": [
+        "x",
+        "y",
+        "z"
+      ],
+      "doc": "Fused multiply-add operation."
+    },
+    {
+      "type": "function",
+      "name": "math.fmod",
+      "params": [
+        "x",
+        "y"
+      ],
+      "doc": "Return fmod(x, y), according to platform C."
+    },
+    {
+      "type": "function",
+      "name": "math.frexp",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the mantissa and exponent of x, as pair (m, e)."
+    },
+    {
+      "type": "function",
+      "name": "math.fsum",
+      "params": [
+        "seq"
+      ],
+      "doc": "Return an accurate floating-point sum of values in the iterable seq."
+    },
+    {
+      "type": "function",
+      "name": "math.gamma",
+      "params": [
+        "x"
+      ],
+      "doc": "Gamma function at x."
+    },
+    {
+      "type": "function",
+      "name": "math.gcd",
+      "params": [
+        "*integers"
+      ],
+      "doc": "Greatest Common Divisor."
+    },
+    {
+      "type": "function",
+      "name": "math.hypot",
+      "params": [],
+      "doc": "hypot(*coordinates) -> value"
+    },
+    {
+      "type": "constant",
+      "name": "math.inf",
+      "value": "inf",
+      "doc": "Convert a string or number to a floating-point number, if possible."
+    },
+    {
+      "type": "function",
+      "name": "math.isclose",
+      "params": [
+        "a",
+        "b",
+        "rel_tol=1e-09",
+        "abs_tol=0.0"
+      ],
+      "doc": "Determine whether two floating-point numbers are close in value."
+    },
+    {
+      "type": "function",
+      "name": "math.isfinite",
+      "params": [
+        "x"
+      ],
+      "doc": "Return True if x is neither an infinity nor a NaN, and False otherwise."
+    },
+    {
+      "type": "function",
+      "name": "math.isinf",
+      "params": [
+        "x"
+      ],
+      "doc": "Return True if x is a positive or negative infinity, and False otherwise."
+    },
+    {
+      "type": "function",
+      "name": "math.isnan",
+      "params": [
+        "x"
+      ],
+      "doc": "Return True if x is a NaN (not a number), and False otherwise."
+    },
+    {
+      "type": "function",
+      "name": "math.isqrt",
+      "params": [
+        "n"
+      ],
+      "doc": "Return the integer part of the square root of the input."
+    },
+    {
+      "type": "function",
+      "name": "math.lcm",
+      "params": [
+        "*integers"
+      ],
+      "doc": "Least Common Multiple."
+    },
+    {
+      "type": "function",
+      "name": "math.ldexp",
+      "params": [
+        "x",
+        "i"
+      ],
+      "doc": "Return x * (2**i)."
+    },
+    {
+      "type": "function",
+      "name": "math.lgamma",
+      "params": [
+        "x"
+      ],
+      "doc": "Natural logarithm of absolute value of Gamma function at x."
+    },
+    {
+      "type": "function",
+      "name": "math.log",
+      "params": [],
+      "doc": "log(x, [base=math.e]) Return the logarithm of x to the given base."
+    },
+    {
+      "type": "function",
+      "name": "math.log10",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the base 10 logarithm of x."
+    },
+    {
+      "type": "function",
+      "name": "math.log1p",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the natural logarithm of 1+x (base e)."
+    },
+    {
+      "type": "function",
+      "name": "math.log2",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the base 2 logarithm of x."
+    },
+    {
+      "type": "function",
+      "name": "math.modf",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the fractional and integer parts of x."
+    },
+    {
+      "type": "constant",
+      "name": "math.nan",
+      "value": "nan",
+      "doc": "Convert a string or number to a floating-point number, if possible."
+    },
+    {
+      "type": "function",
+      "name": "math.nextafter",
+      "params": [
+        "x",
+        "y",
+        "steps=None"
+      ],
+      "doc": "Return the floating-point value the given number of steps after x towards y."
+    },
+    {
+      "type": "function",
+      "name": "math.perm",
+      "params": [
+        "n",
+        "k=None"
+      ],
+      "doc": "Number of ways to choose k items from n items without repetition and with order."
+    },
+    {
+      "type": "constant",
+      "name": "math.pi",
+      "value": "3.141592653589793",
+      "doc": "Convert a string or number to a floating-point number, if possible."
+    },
+    {
+      "type": "function",
+      "name": "math.pow",
+      "params": [
+        "x",
+        "y"
+      ],
+      "doc": "Return x**y (x to the power of y)."
+    },
+    {
+      "type": "function",
+      "name": "math.prod",
+      "params": [
+        "iterable",
+        "start=1"
+      ],
+      "doc": "Calculate the product of all the elements in the input iterable."
+    },
+    {
+      "type": "function",
+      "name": "math.radians",
+      "params": [
+        "x"
+      ],
+      "doc": "Convert angle x from degrees to radians."
+    },
+    {
+      "type": "function",
+      "name": "math.remainder",
+      "params": [
+        "x",
+        "y"
+      ],
+      "doc": "Difference between x and the closest integer multiple of y."
+    },
+    {
+      "type": "function",
+      "name": "math.sin",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the sine of x (measured in radians)."
+    },
+    {
+      "type": "function",
+      "name": "math.sinh",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the hyperbolic sine of x."
+    },
+    {
+      "type": "function",
+      "name": "math.sqrt",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the square root of x."
+    },
+    {
+      "type": "function",
+      "name": "math.sumprod",
+      "params": [
+        "p",
+        "q"
+      ],
+      "doc": "Return the sum of products of values from two iterables p and q."
+    },
+    {
+      "type": "function",
+      "name": "math.tan",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the tangent of x (measured in radians)."
+    },
+    {
+      "type": "function",
+      "name": "math.tanh",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the hyperbolic tangent of x."
+    },
+    {
+      "type": "constant",
+      "name": "math.tau",
+      "value": "6.283185307179586",
+      "doc": "Convert a string or number to a floating-point number, if possible."
+    },
+    {
+      "type": "function",
+      "name": "math.trunc",
+      "params": [
+        "x"
+      ],
+      "doc": "Truncates the Real x to the nearest Integral toward 0."
+    },
+    {
+      "type": "function",
+      "name": "math.ulp",
+      "params": [
+        "x"
+      ],
+      "doc": "Return the value of the least significant bit of the float x."
+    }
+  ]
+}
