@@ -58,6 +58,9 @@ extension Statement: PyCodeProtocol {
             return context.indent + "break"
         case .continueStmt:
             return context.indent + "continue"
+        case .blank(let blank):
+            // Generate the specified number of blank lines
+            return String(repeating: "\n", count: blank.count)
         case .typeAlias(let typeAlias):
             return typeAlias.toPythonCode(context: context)
         }

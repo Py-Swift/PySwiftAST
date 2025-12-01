@@ -27,6 +27,7 @@ public indirect enum Statement: ASTNode, Sendable {
     case pass(Pass)
     case breakStmt(Break)
     case continueStmt(Continue)
+    case blank(Blank) // Formatting control - generates blank lines
     case typeAlias(TypeAlias) // Python 3.12+
     
     public var lineno: Int {
@@ -58,6 +59,7 @@ public indirect enum Statement: ASTNode, Sendable {
         case .pass(let node): return node.lineno
         case .breakStmt(let node): return node.lineno
         case .continueStmt(let node): return node.lineno
+        case .blank(let node): return node.lineno
         case .typeAlias(let node): return node.lineno
         }
     }
@@ -263,6 +265,9 @@ extension Statement: TreeDisplayable {
             
         case .continueStmt:
             lines.append(indent + connector + "Continue")
+            
+        case .blank(let blank):
+            lines.append(indent + connector + "Blank(\(blank.count))")
             
         case .typeAlias(let typeAlias):
             lines.append(indent + connector + "TypeAlias: \(typeAlias.name)")
