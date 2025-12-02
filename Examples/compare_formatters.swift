@@ -32,8 +32,13 @@ if let module = try? parser.parse() {
     let googleFormatted = googleFormatter.formatDeep(module)
     print(googleFormatted.toPythonCode())
     
+    print("\n=== YAPF Formatter (PEP 8) ===")
+    let yapfFormatter = YAPFFormatter()
+    let yapfFormatted = yapfFormatter.formatDeep(module)
+    print(yapfFormatted.toPythonCode())
+    
     print("\n=== Using Protocol ===")
-    let formatters: [PyFormatter] = [BlackFormatter(), GoogleFormatter()]
+    let formatters: [PyFormatter] = [BlackFormatter(), GoogleFormatter(), YAPFFormatter()]
     for (index, formatter) in formatters.enumerated() {
         print("\nFormatter \(index + 1):")
         let formatted = formatter.formatDeep(module)

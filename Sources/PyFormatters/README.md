@@ -10,6 +10,7 @@ Currently includes:
 
 - **BlackFormatter**: Enforces [Black](https://black.readthedocs.io/) code style rules
 - **GoogleFormatter**: Enforces [Google Python Style Guide](https://github.com/google/styleguide/blob/gh-pages/pyguide.md) rules
+- **YAPFFormatter**: Enforces [YAPF](https://github.com/google/yapf) PEP 8 default style
 
 ## PyFormatter Protocol
 
@@ -50,6 +51,17 @@ Implements Google Python Style Guide blank line rules (Section 3.5):
 - **Function level**:
   - No blank line following a `def` line
   - Single blank lines within functions as judged appropriate
+
+### YAPFFormatter
+
+Implements YAPF's default PEP 8 style:
+
+- **Module level**: 2 blank lines around top-level definitions
+- **Import/Variable spacing**: 1 blank line between imports and variables
+- **Class level**:
+  - 1 blank line between method definitions
+  - 1 blank line after class docstring
+- **Nested definitions**: 1 blank line before nested class/function
 
 ## Usage
 
@@ -144,11 +156,13 @@ All future formatters will conform to `PyFormatter` for consistent API.
 
 ## Comparison
 
-| Feature | BlackFormatter | GoogleFormatter |
-|---------|---------------|-----------------|
-| Top-level spacing | 2 blank lines before AND after | 2 blank lines between |
-| Class methods | 1 blank line between | 1 blank line between |
-| After docstring | No blank line (functions) | No blank line (def) |
-| Inner functions | 1 blank line before/after | Judged appropriate |
+| Feature | BlackFormatter | GoogleFormatter | YAPFFormatter |
+|---------|---------------|-----------------|---------------|
+| Top-level spacing | 2 blanks before & after | 2 blanks between | 2 blanks before & after |
+| Class methods | 1 blank between | 1 blank between | 1 blank between |
+| After class docstring | 1 blank line | 1 blank line | 1 blank line |
+| Nested definitions | 1 blank before/after | No automatic | 1 blank before |
+| Imports → Variables | No special rule | No special rule | 1 blank line |
+| Philosophy | Aggressive | Conservative | Balanced (PEP 8) |
 
 Choose the formatter that matches your project's style guide.
