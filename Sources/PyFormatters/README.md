@@ -9,6 +9,7 @@ PyFormatters provides formatters that transform Python AST trees to enforce spec
 Currently includes:
 
 - **BlackFormatter**: Enforces [Black](https://black.readthedocs.io/) code style rules
+- **GoogleFormatter**: Enforces [Google Python Style Guide](https://github.com/google/styleguide/blob/gh-pages/pyguide.md) rules
 
 ## PyFormatter Protocol
 
@@ -37,6 +38,18 @@ Implements Black's blank line rules:
 - **Function level**: 
   - 1 blank line before/after inner function definitions
   - No blank line after function docstrings (unless inner function follows)
+
+### GoogleFormatter
+
+Implements Google Python Style Guide blank line rules (Section 3.5):
+
+- **Module level**: 2 blank lines between top-level definitions (functions or classes)
+- **Class level**:
+  - 1 blank line between method definitions
+  - 1 blank line between class docstring and first method
+- **Function level**:
+  - No blank line following a `def` line
+  - Single blank lines within functions as judged appropriate
 
 ## Usage
 
@@ -128,3 +141,14 @@ Planned additions:
 - Line length enforcement
 
 All future formatters will conform to `PyFormatter` for consistent API.
+
+## Comparison
+
+| Feature | BlackFormatter | GoogleFormatter |
+|---------|---------------|-----------------|
+| Top-level spacing | 2 blank lines before AND after | 2 blank lines between |
+| Class methods | 1 blank line between | 1 blank line between |
+| After docstring | No blank line (functions) | No blank line (def) |
+| Inner functions | 1 blank line before/after | Judged appropriate |
+
+Choose the formatter that matches your project's style guide.
