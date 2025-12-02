@@ -13,6 +13,9 @@ let package = Package(
         .library(
             name: "PySwiftCodeGen",
             targets: ["PySwiftCodeGen"]),
+        .library(
+            name: "PyFormatters",
+            targets: ["PyFormatters"]),
         .executable(
             name: "pyswift-benchmark",
             targets: ["pyswift-benchmark"]),
@@ -37,6 +40,13 @@ let package = Package(
             dependencies: [
                 "PySwiftAST",
                 .product(name: "Algorithms", package: "swift-algorithms")
+            ]
+        ),
+        .target(
+            name: "PyFormatters",
+            dependencies: [
+                "PySwiftAST",
+                "PySwiftCodeGen"
             ]
         ),
         .executableTarget(
