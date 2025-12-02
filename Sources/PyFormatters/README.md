@@ -4,9 +4,25 @@ Code formatters for Python AST, providing automated code style enforcement.
 
 ## Overview
 
-PyFormatters provides formatters that transform Python AST trees to enforce specific code styles. Currently includes:
+PyFormatters provides formatters that transform Python AST trees to enforce specific code styles. All formatters conform to the `PyFormatter` protocol.
+
+Currently includes:
 
 - **BlackFormatter**: Enforces [Black](https://black.readthedocs.io/) code style rules
+
+## PyFormatter Protocol
+
+All formatters implement this protocol:
+
+```swift
+public protocol PyFormatter {
+    /// Format top-level statements only
+    func format(_ module: Module) -> Module
+    
+    /// Recursively format all nested structures
+    func formatDeep(_ module: Module) -> Module
+}
+```
 
 ## Features
 
@@ -33,8 +49,8 @@ import PyFormatters
 let parser = Parser(sourceCode)
 let module = try parser.parse()
 
-// Apply Black formatting
-let formatter = BlackFormatter()
+// Apply Black formatting (protocol conformance)
+let formatter: PyFormatter = BlackFormatter()
 let formatted = formatter.formatDeep(module)
 
 // Generate formatted Python code
@@ -110,3 +126,5 @@ Planned additions:
 - Custom formatters with user-defined rules
 - Import sorting/organization
 - Line length enforcement
+
+All future formatters will conform to `PyFormatter` for consistent API.

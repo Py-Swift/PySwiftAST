@@ -11,7 +11,7 @@ import PySwiftCodeGen
 /// - Single empty line between class docstring and first field/method
 /// - Preserves single empty lines inside functions
 /// - No empty lines after function docstrings (unless inner function follows)
-public struct BlackFormatter {
+public struct BlackFormatter: PyFormatter {
     
     public init() {}
     

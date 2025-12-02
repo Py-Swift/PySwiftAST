@@ -6,10 +6,13 @@
 /// - Line spacing in classes and functions
 /// - Import organization
 ///
+/// All formatters conform to the `PyFormatter` protocol, providing both
+/// `format(_:)` for top-level formatting and `formatDeep(_:)` for recursive formatting.
+///
 /// Example:
 /// ```swift
-/// let formatter = PEP8BlankLineFormatter()
-/// let formattedStatements = formatter.format(statements)
+/// let formatter: PyFormatter = BlackFormatter()
+/// let formatted = formatter.formatDeep(module)
 /// ```
 
 public struct PyFormatters {
