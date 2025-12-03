@@ -2353,10 +2353,8 @@ public class Parser {
         var keywords: [Keyword] = []
         
         while currentToken().type != .rightparen && !isAtEnd() {
-            // Skip newlines in multi-line function calls (implicit line joining)
-            while currentToken().type == .newline {
-                advance()
-            }
+            // Skip newlines and comments in multi-line function calls (implicit line joining)
+            skipNewlinesAndComments()
             
             // Check if we've reached the closing paren after skipping newlines
             if currentToken().type == .rightparen {
@@ -2370,17 +2368,13 @@ public class Parser {
                 // Use None as arg name to indicate **kwargs
                 keywords.append(Keyword(arg: nil, value: value))
                 
-                // Skip newlines after **kwargs (implicit line joining)
-                while currentToken().type == .newline {
-                    advance()
-                }
+                // Skip newlines and comments after **kwargs (implicit line joining)
+                skipNewlinesAndComments()
                 
                 if currentToken().type == .comma {
                     advance()
-                    // Skip newlines after comma
-                    while currentToken().type == .newline {
-                        advance()
-                    }
+                    // Skip newlines and comments after comma
+                    skipNewlinesAndComments()
                 }
                 continue
             }
@@ -2400,17 +2394,13 @@ public class Parser {
                 ))
                 args.append(starred)
                 
-                // Skip newlines after starred expression (implicit line joining)
-                while currentToken().type == .newline {
-                    advance()
-                }
+                // Skip newlines and comments after starred expression (implicit line joining)
+                skipNewlinesAndComments()
                 
                 if currentToken().type == .comma {
                     advance()
-                    // Skip newlines after comma
-                    while currentToken().type == .newline {
-                        advance()
-                    }
+                    // Skip newlines and comments after comma
+                    skipNewlinesAndComments()
                 }
                 continue
             }
@@ -2425,17 +2415,13 @@ public class Parser {
                     let value = try parseExpression()
                     keywords.append(Keyword(arg: name, value: value))
                     
-                    // Skip newlines after keyword argument (implicit line joining)
-                    while currentToken().type == .newline {
-                        advance()
-                    }
+                    // Skip newlines and comments after keyword argument (implicit line joining)
+                    skipNewlinesAndComments()
                     
                     if currentToken().type == .comma {
                         advance()
-                        // Skip newlines after comma
-                        while currentToken().type == .newline {
-                            advance()
-                        }
+                        // Skip newlines and comments after comma
+                        skipNewlinesAndComments()
                     }
                     continue
                 }
@@ -2458,32 +2444,24 @@ public class Parser {
                 ))
                 args.append(genexp)
                 
-                // Skip newlines after generator expression (implicit line joining)
-                while currentToken().type == .newline {
-                    advance()
-                }
+                // Skip newlines and comments after generator expression (implicit line joining)
+                skipNewlinesAndComments()
                 
                 if currentToken().type == .comma {
                     advance()
-                    // Skip newlines after comma
-                    while currentToken().type == .newline {
-                        advance()
-                    }
+                    // Skip newlines and comments after comma
+                    skipNewlinesAndComments()
                 }
             } else {
                 args.append(arg)
                 
-                // Skip newlines after positional argument (implicit line joining)
-                while currentToken().type == .newline {
-                    advance()
-                }
+                // Skip newlines and comments after positional argument (implicit line joining)
+                skipNewlinesAndComments()
                 
                 if currentToken().type == .comma {
                     advance()
-                    // Skip newlines after comma
-                    while currentToken().type == .newline {
-                        advance()
-                    }
+                    // Skip newlines and comments after comma
+                    skipNewlinesAndComments()
                 } else if currentToken().type != .rightparen {
                     throw ParseError.expected(message: "Expected ',' or ')' in function call", line: currentToken().line)
                 }
@@ -2958,6 +2936,7 @@ public class Parser {
         case .leftbrace:
             // Dict, Set, Dict comprehension, or Set comprehension
             advance()
+            skipComments()
             
             if currentToken().type == .rightbrace {
                 // Empty dict
@@ -2982,6 +2961,7 @@ public class Parser {
                 
                 while currentToken().type == .comma {
                     advance()
+                    skipComments()
                     if currentToken().type == .rightbrace {
                         break
                     }
@@ -3041,6 +3021,7 @@ public class Parser {
                 
                 while currentToken().type == .comma {
                     advance()
+                    skipComments()
                     if currentToken().type == .rightbrace {
                         break
                     }
@@ -3090,6 +3071,7 @@ public class Parser {
                 var elts = [first]
                 while currentToken().type == .comma {
                     advance()
+                    skipComments()
                     if currentToken().type == .rightbrace {
                         break
                     }
@@ -3137,6 +3119,19 @@ public class Parser {
     private func skipComments() {
         while case .comment = currentToken().type {
             advance()
+        }
+    }
+    
+    @inline(__always)
+    private func skipNewlinesAndComments() {
+        while true {
+            if currentToken().type == .newline {
+                advance()
+            } else if case .comment = currentToken().type {
+                advance()
+            } else {
+                break
+            }
         }
     }
     
