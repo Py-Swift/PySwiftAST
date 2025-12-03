@@ -1441,10 +1441,8 @@ public class Parser {
         let hasParens = currentToken().type == .leftparen
         if hasParens {
             advance() // consume '('
-            // Skip any newlines after opening paren
-            while currentToken().type == .newline {
-                advance()
-            }
+            // Skip any newlines and comments after opening paren
+            skipNewlinesAndComments()
         }
         
         // Check for 'import *'
@@ -1474,11 +1472,9 @@ public class Parser {
             while currentToken().type == .comma {
                 advance() // consume ','
                 
-                // Skip newlines in multi-line imports
+                // Skip newlines and comments in multi-line imports
                 if hasParens {
-                    while currentToken().type == .newline {
-                        advance()
-                    }
+                    skipNewlinesAndComments()
                 }
                 
                 // Check for trailing comma (especially in multi-line imports)
@@ -1507,10 +1503,8 @@ public class Parser {
         
         // Handle closing parenthesis for multi-line imports
         if hasParens {
-            // Skip any newlines before closing paren
-            while currentToken().type == .newline {
-                advance()
-            }
+            // Skip any newlines and comments before closing paren
+            skipNewlinesAndComments()
             try consume(.rightparen, "Expected ')' to close multi-line import")
         }
         
