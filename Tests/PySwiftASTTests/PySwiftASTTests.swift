@@ -1468,6 +1468,29 @@ func loadRealWorldResource(_ filename: String) throws -> String {
     #expect(Bool(true), "Multi-line string concatenation in function args works")
 }
 
+@Test func testCommentInCondition() async throws {
+    let source = try loadTestFileResource("test_comment_in_condition")
+    
+    print("\nTesting: comments inside parenthesized conditions")
+    
+    let tokens = try tokenizePython(source)
+    print("✅ Tokenization successful: \(tokens.count) tokens")
+    
+    let module = try parsePython(source)
+    print("✅ Parsing successful")
+    
+    // Verify code generation
+    let generatedCode = generatePythonCode(from: module)
+    print("Generated code:")
+    print(generatedCode)
+    
+    // Verify it parses again
+    let _ = try parsePython(generatedCode)
+    print("✅ Round-trip successful")
+    
+    #expect(Bool(true), "Comments in parenthesized conditions work")
+}
+
 @Test func testPandasDataFrame() async throws {
     let source = try loadTestFileResource("pandas_frame")
     

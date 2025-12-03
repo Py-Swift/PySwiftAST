@@ -2896,10 +2896,8 @@ public class Parser {
             // Tuple, parenthesized expression, or generator expression
             advance()
             
-            // Skip newlines after opening paren (implicit line joining)
-            while currentToken().type == .newline {
-                advance()
-            }
+            // Skip newlines and comments after opening paren (implicit line joining)
+            skipNewlinesAndComments()
             
             if currentToken().type == .rightparen {
                 // Empty tuple
@@ -2927,10 +2925,8 @@ public class Parser {
                 first = try parseExpression()
             }
             
-            // Skip newlines after first element (implicit line joining)
-            while currentToken().type == .newline {
-                advance()
-            }
+            // Skip newlines and comments after first element (implicit line joining)
+            skipNewlinesAndComments()
             
             // Check for generator expression (including async)
             if currentToken().type == .for || currentToken().type == .async {
@@ -2952,12 +2948,7 @@ public class Parser {
                 while currentToken().type == .comma {
                     advance()
                     // Skip comments and newlines after comma (implicit line joining)
-                    while case .comment = currentToken().type {
-                        advance()
-                    }
-                    while currentToken().type == .newline {
-                        advance()
-                    }
+                    skipNewlinesAndComments()
                     if currentToken().type == .rightparen {
                         break
                     }
@@ -2972,12 +2963,7 @@ public class Parser {
                     }
                     elts.append(element)
                     // Skip comments and newlines after element (implicit line joining)
-                    while case .comment = currentToken().type {
-                        advance()
-                    }
-                    while currentToken().type == .newline {
-                        advance()
-                    }
+                    skipNewlinesAndComments()
                 }
                 try consume(.rightparen, "Expected ')' after tuple")
                 return .tuple(Tuple(
