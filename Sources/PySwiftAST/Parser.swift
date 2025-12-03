@@ -2622,6 +2622,29 @@ public class Parser {
                         } else {
                             break
                         }
+                    } else if case .string(let nextStr) = currentToken().type {
+                        // Handle mixed concatenation: f"..." "regular"
+                        advance()
+                        let regularStr = stripQuotes(from: nextStr)
+                        
+                        if case .joinedStr(let joined) = fstring {
+                            // Append regular string as a Constant to the JoinedStr
+                            let constantExpr = Expression.constant(Constant(
+                                value: .string(regularStr),
+                                kind: nil,
+                                lineno: joined.lineno,
+                                colOffset: joined.colOffset,
+                                endLineno: nil,
+                                endColOffset: nil
+                            ))
+                            fstring = .joinedStr(JoinedStr(
+                                values: joined.values + [constantExpr],
+                                lineno: joined.lineno,
+                                colOffset: joined.colOffset,
+                                endLineno: nil,
+                                endColOffset: nil
+                            ))
+                        }
                     } else {
                         break
                     }

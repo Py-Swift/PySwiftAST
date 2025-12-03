@@ -1335,6 +1335,35 @@ func loadRealWorldResource(_ filename: String) throws -> String {
     #expect(Bool(true), "F-string with method calls and attributes works")
 }
 
+@Test func testMixedStringConcatenation() async throws {
+    let source = """
+    # Test mixed f-string and regular string concatenation
+    x = f"Value: {value} " "is the result"
+    y = (f"Passing a {type(data).__name__} to {type(self).__name__} "
+         "is deprecated and will raise in a future version. "
+         "Use public APIs instead.")
+    """
+    
+    print("\nTesting: Mixed f-string and regular string concatenation")
+    
+    let tokens = try tokenizePython(source)
+    print("✅ Tokenization successful: \(tokens.count) tokens")
+    
+    let module = try parsePython(source)
+    print("✅ Parsing successful")
+    
+    // Verify code generation
+    let generatedCode = generatePythonCode(from: module)
+    print("Generated code:")
+    print(generatedCode)
+    
+    // Verify it parses again
+    let _ = try parsePython(generatedCode)
+    print("✅ Round-trip successful")
+    
+    #expect(Bool(true), "Mixed f-string and regular string concatenation works")
+}
+
 @Test func testPandasDataFrame() async throws {
     let source = try loadTestFileResource("pandas_frame")
     
