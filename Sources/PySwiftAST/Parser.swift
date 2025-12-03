@@ -2567,20 +2567,22 @@ public class Parser {
         
         switch token.type {
         case .name(let name):
-            // Check for f-string: f"..." or f'...'
+            // Check for string prefixes: f"...", r"...", b"...", u"...", rb"...", etc.
             let nextPos = position + 1
-            if name == "f", nextPos < tokens.count, case .string = tokens[nextPos].type {
-                // Parse first f-string
-                var fstring = try parseFString(startToken: token)
-                
-                // Handle implicit f-string concatenation: f"str1" f"str2"
-                while true {
-                    // Check if next token is another f-string
-                    if case .name(let nextName) = currentToken().type, nextName == "f" {
-                        let peekPos = position + 1
-                        if peekPos < tokens.count, case .string = tokens[peekPos].type {
-                            // Parse and concatenate next f-string
-                            let nextFString = try parseFString(startToken: currentToken())
+            if nextPos < tokens.count, case .string(let str) = tokens[nextPos].type {
+                // Handle f-strings
+                if name == "f" || name == "F" {
+                    // Parse first f-string
+                    var fstring = try parseFString(startToken: token)
+                    
+                    // Handle implicit f-string concatenation: f"str1" f"str2"
+                    while true {
+                        // Check if next token is another f-string
+                        if case .name(let nextName) = currentToken().type, nextName == "f" {
+                            let peekPos = position + 1
+                            if peekPos < tokens.count, case .string = tokens[peekPos].type {
+                                // Parse and concatenate next f-string
+                                let nextFString = try parseFString(startToken: currentToken())
                             
                             // Concatenate the f-strings by merging their values
                             if case .joinedStr(let joined1) = fstring,
@@ -2629,6 +2631,22 @@ public class Parser {
                 }
                 
                 return fstring
+                } else if name == "r" || name == "R" || name == "b" || name == "B" || 
+                          name == "u" || name == "U" || name == "rb" || name == "br" ||
+                          name == "RB" || name == "BR" {
+                    // Raw strings, byte strings, unicode strings - just consume the prefix and string
+                    advance() // consume prefix
+                    advance() // consume string
+                    
+                    return .constant(Constant(
+                        value: .string(stripQuotes(from: str)),
+                        kind: nil,
+                        lineno: token.line,
+                        colOffset: token.column,
+                        endLineno: nil,
+                        endColOffset: nil
+                    ))
+                }
             }
             
             advance()
