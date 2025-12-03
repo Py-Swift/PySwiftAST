@@ -1364,6 +1364,110 @@ func loadRealWorldResource(_ filename: String) throws -> String {
     #expect(Bool(true), "Mixed f-string and regular string concatenation works")
 }
 
+@Test func testNestedSubscripts() async throws {
+    let source = """
+    def f1() -> list[int]:
+        pass
+    
+    def f2() -> dict[str, int]:
+        pass
+    
+    def f3() -> Iterable[tuple[Hashable, Series]]:
+        pass
+    
+    x: dict[str, int]
+    y: tuple[int, str, float]
+    """
+    
+    print("\nTesting: Nested subscripts with multiple elements")
+    
+    let tokens = try tokenizePython(source)
+    print("✅ Tokenization successful: \(tokens.count) tokens")
+    
+    let module = try parsePython(source)
+    print("✅ Parsing successful")
+    
+    // Verify code generation
+    let generatedCode = generatePythonCode(from: module)
+    print("Generated code:")
+    print(generatedCode)
+    
+    // Verify it parses again
+    let _ = try parsePython(generatedCode)
+    print("✅ Round-trip successful")
+    
+    #expect(Bool(true), "Nested subscripts with multiple elements work")
+}
+
+@Test func testYieldTuple() async throws {
+    let source = try loadTestFileResource("test_yield_tuple")
+    
+    print("\nTesting: yield with tuple values")
+    
+    let tokens = try tokenizePython(source)
+    print("✅ Tokenization successful: \(tokens.count) tokens")
+    
+    let module = try parsePython(source)
+    print("✅ Parsing successful")
+    
+    // Verify code generation
+    let generatedCode = generatePythonCode(from: module)
+    print("Generated code:")
+    print(generatedCode)
+    
+    // Verify it parses again
+    let _ = try parsePython(generatedCode)
+    print("✅ Round-trip successful")
+    
+    #expect(Bool(true), "Yield with tuple values works")
+}
+
+@Test func testSliceTuple() async throws {
+    let source = try loadTestFileResource("test_slice_tuple")
+    
+    print("\nTesting: slice with comma (tuple of slices)")
+    
+    let tokens = try tokenizePython(source)
+    print("✅ Tokenization successful: \(tokens.count) tokens")
+    
+    let module = try parsePython(source)
+    print("✅ Parsing successful")
+    
+    // Verify code generation
+    let generatedCode = generatePythonCode(from: module)
+    print("Generated code:")
+    print(generatedCode)
+    
+    // Verify it parses again
+    let _ = try parsePython(generatedCode)
+    print("✅ Round-trip successful")
+    
+    #expect(Bool(true), "Slice with comma works")
+}
+
+@Test func testMultilineStringArg() async throws {
+    let source = try loadTestFileResource("test_multiline_str_arg")
+    
+    print("\nTesting: multi-line string concatenation as function argument")
+    
+    let tokens = try tokenizePython(source)
+    print("✅ Tokenization successful: \(tokens.count) tokens")
+    
+    let module = try parsePython(source)
+    print("✅ Parsing successful")
+    
+    // Verify code generation
+    let generatedCode = generatePythonCode(from: module)
+    print("Generated code:")
+    print(generatedCode)
+    
+    // Verify it parses again
+    let _ = try parsePython(generatedCode)
+    print("✅ Round-trip successful")
+    
+    #expect(Bool(true), "Multi-line string concatenation in function args works")
+}
+
 @Test func testPandasDataFrame() async throws {
     let source = try loadTestFileResource("pandas_frame")
     

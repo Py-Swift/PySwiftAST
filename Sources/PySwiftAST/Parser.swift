@@ -854,7 +854,31 @@ public class Parser {
         }
         
         if !isNewlineOrSemicolon() && !isAtEnd() {
+            // Parse first expression
             value = try parseExpression()
+            
+            // Check for comma - yield can have tuple values (e.g., yield 1, 2)
+            if currentToken().type == .comma {
+                var elements = [value!]
+                
+                while currentToken().type == .comma {
+                    advance() // consume ','
+                    // Check for trailing comma
+                    if isNewlineOrSemicolon() || isAtEnd() {
+                        break
+                    }
+                    elements.append(try parseExpression())
+                }
+                
+                value = .tuple(Tuple(
+                    elts: elements,
+                    ctx: .load,
+                    lineno: yieldToken.line,
+                    colOffset: yieldToken.column,
+                    endLineno: nil,
+                    endColOffset: nil
+                ))
+            }
         }
         
         consumeNewlineOrSemicolon()
@@ -2540,7 +2564,39 @@ public class Parser {
             ))
         }
         
-        // Parse first element (could be start of slice or single expression)
+        // Parse first slice element
+        let firstElement = try parseSliceElement()
+        
+        // Check for tuple subscript (e.g., arr[:, k] or dict[str, int])
+        if currentToken().type == .comma {
+            var elements = [firstElement]
+            
+            while currentToken().type == .comma {
+                advance()
+                if currentToken().type == .rightbracket {
+                    break
+                }
+                elements.append(try parseSliceElement())
+            }
+            
+            let token = currentToken()
+            return .tuple(Tuple(
+                elts: elements,
+                ctx: .load,
+                lineno: token.line,
+                colOffset: token.column,
+                endLineno: nil,
+                endColOffset: nil
+            ))
+        }
+        
+        // Simple subscript (single element)
+        return firstElement
+    }
+    
+    // Parse a single slice element (either a slice or an expression)
+    private func parseSliceElement() throws -> Expression {
+        // Parse first part (could be start of slice or single expression)
         let start = currentToken().type != .colon
             ? try parseBitwiseOrExpression()
             : nil
@@ -2548,14 +2604,14 @@ public class Parser {
         if currentToken().type == .colon {
             // Slice expression (e.g., [start:stop:step])
             advance()
-            let stop = currentToken().type != .colon && currentToken().type != .rightbracket
+            let stop = currentToken().type != .colon && currentToken().type != .rightbracket && currentToken().type != .comma
                 ? try parseBitwiseOrExpression()
                 : nil
             
             var step: Expression? = nil
             if currentToken().type == .colon {
                 advance()
-                if currentToken().type != .rightbracket {
+                if currentToken().type != .rightbracket && currentToken().type != .comma {
                     step = try parseBitwiseOrExpression()
                 }
             }
@@ -2571,30 +2627,7 @@ public class Parser {
             ))
         }
         
-        // Check for tuple subscript (e.g., dict[str, int])
-        if currentToken().type == .comma {
-            var elements = [start!]
-            
-            while currentToken().type == .comma {
-                advance()
-                if currentToken().type == .rightbracket {
-                    break
-                }
-                elements.append(try parseBitwiseOrExpression())
-            }
-            
-            let token = currentToken()
-            return .tuple(Tuple(
-                elts: elements,
-                ctx: .load,
-                lineno: token.line,
-                colOffset: token.column,
-                endLineno: nil,
-                endColOffset: nil
-            ))
-        }
-        
-        // Simple subscript
+        // Simple expression (not a slice)
         return start ?? .constant(Constant(
             value: .none,
             kind: nil,
@@ -2769,6 +2802,49 @@ public class Parser {
                 concatenated += stripQuotes(from: nextStr)
             }
             
+            // Check if there's an f-string after regular strings (mixed concatenation)
+            if case .name(let name) = currentToken().type, (name == "f" || name == "F") {
+                let peekPos = position + 1
+                if peekPos < tokens.count, case .string = tokens[peekPos].type {
+                    // We have regular strings followed by f-string(s)
+                    // Create a JoinedStr starting with the concatenated regular string
+                    var values: [Expression] = [
+                        .constant(Constant(
+                            value: .string(concatenated),
+                            kind: nil,
+                            lineno: token.line,
+                            colOffset: token.column,
+                            endLineno: nil,
+                            endColOffset: nil
+                        ))
+                    ]
+                    
+                    // Parse all following f-strings
+                    while case .name(let nextName) = currentToken().type, (nextName == "f" || nextName == "F") {
+                        let nextPeekPos = position + 1
+                        if nextPeekPos < tokens.count, case .string = tokens[nextPeekPos].type {
+                            let fstring = try parseFString(startToken: currentToken())
+                            
+                            // Extract values from the f-string
+                            if case .joinedStr(let joined) = fstring {
+                                values.append(contentsOf: joined.values)
+                            }
+                        } else {
+                            break
+                        }
+                    }
+                    
+                    return .joinedStr(JoinedStr(
+                        values: values,
+                        lineno: token.line,
+                        colOffset: token.column,
+                        endLineno: nil,
+                        endColOffset: nil
+                    ))
+                }
+            }
+            
+            // Just regular string concatenation
             return .constant(Constant(
                 value: .string(concatenated),
                 kind: nil,
