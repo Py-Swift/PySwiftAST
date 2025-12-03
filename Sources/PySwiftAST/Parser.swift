@@ -1516,10 +1516,8 @@ public class Parser {
         
         // Parse parameters
         while currentToken().type != .rightparen && !isAtEnd() {
-            // Skip newlines in multi-line parameter lists
-            while currentToken().type == .newline {
-                advance()
-            }
+            // Skip newlines and comments in multi-line parameter lists
+            skipNewlinesAndComments()
             
             // Check if we've reached the closing paren after newlines
             if currentToken().type == .rightparen {
@@ -1622,10 +1620,8 @@ public class Parser {
             
             if currentToken().type == .comma {
                 advance()
-                // Skip newlines after commas in multi-line parameter lists
-                while currentToken().type == .newline {
-                    advance()
-                }
+                // Skip newlines and comments after commas in multi-line parameter lists
+                skipNewlinesAndComments()
             } else {
                 break
             }
