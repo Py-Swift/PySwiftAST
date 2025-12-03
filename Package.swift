@@ -19,6 +19,9 @@ let package = Package(
         .library(
             name: "PyChecking",
             targets: ["PyChecking"]),
+        .library(
+            name: "PyAstVisitors",
+            targets: ["PyAstVisitors"]),
         .executable(
             name: "pyswift-benchmark",
             targets: ["pyswift-benchmark"]),
@@ -58,6 +61,12 @@ let package = Package(
                 "PySwiftAST"
             ]
         ),
+        .target(
+            name: "PyAstVisitors",
+            dependencies: [
+                "PySwiftAST"
+            ]
+        ),
         .executableTarget(
             name: "pyswift-benchmark",
             dependencies: ["PySwiftAST", "PySwiftCodeGen"]
@@ -72,6 +81,10 @@ let package = Package(
         .testTarget(
             name: "PySwiftCodeGenTests",
             dependencies: ["PySwiftCodeGen", "PySwiftAST"]
+        ),
+        .testTarget(
+            name: "PyAstVisitorsTests",
+            dependencies: ["PyAstVisitors", "PySwiftAST"]
         ),
     ]
 )
