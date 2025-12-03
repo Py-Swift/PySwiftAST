@@ -375,7 +375,19 @@ public class Parser {
         let iter = try parseExpression()
         try consume(.colon, "Expected ':' after for clause")
         
-        let body = try parseBlock()
+        // Skip inline comments before checking for single-line body
+        skipComments()
+        
+        // Check for single-line body (e.g., for i in range(10): print(i))
+        let body: [Statement]
+        if currentToken().type != .newline {
+            // Single-line body
+            let stmt = try parseStatement()
+            body = [stmt]
+        } else {
+            // Multi-line body with indentation
+            body = try parseBlock()
+        }
         
         var orElse: [Statement] = []
         if currentToken().type == .else {
@@ -404,7 +416,19 @@ public class Parser {
         let test = try parseExpression()
         try consume(.colon, "Expected ':' after while condition")
         
-        let body = try parseBlock()
+        // Skip inline comments before checking for single-line body
+        skipComments()
+        
+        // Check for single-line body (e.g., while True: break)
+        let body: [Statement]
+        if currentToken().type != .newline {
+            // Single-line body
+            let stmt = try parseStatement()
+            body = [stmt]
+        } else {
+            // Multi-line body with indentation
+            body = try parseBlock()
+        }
         
         var orElse: [Statement] = []
         if currentToken().type == .else {
@@ -891,7 +915,19 @@ public class Parser {
         let test = try parseExpression()
         try consume(.colon, "Expected ':' after if condition")
         
-        let body = try parseBlock()
+        // Skip inline comments before checking for single-line body
+        skipComments()
+        
+        // Check for single-line body (e.g., if x: return)
+        let body: [Statement]
+        if currentToken().type != .newline {
+            // Single-line body
+            let stmt = try parseStatement()
+            body = [stmt]
+        } else {
+            // Multi-line body with indentation
+            body = try parseBlock()
+        }
         
         var orElse: [Statement] = []
         
@@ -946,7 +982,19 @@ public class Parser {
         
         try consume(.colon, "Expected ':' after function signature")
         
-        let body = try parseBlock()
+        // Skip inline comments before checking for single-line body
+        skipComments()
+        
+        // Check for single-line body (e.g., def foo(): ... or def foo(): pass)
+        let body: [Statement]
+        if currentToken().type != .newline {
+            // Single-line body - parse the statement and consume the newline
+            let stmt = try parseStatement()
+            body = [stmt]
+        } else {
+            // Multi-line body with indentation
+            body = try parseBlock()
+        }
         
         return .functionDef(FunctionDef(
             name: name,
@@ -1031,7 +1079,19 @@ public class Parser {
         
         try consume(.colon, "Expected ':' after class name")
         
-        let body = try parseBlock()
+        // Skip inline comments before checking for single-line body
+        skipComments()
+        
+        // Check for single-line body (e.g., class Foo: pass)
+        let body: [Statement]
+        if currentToken().type != .newline {
+            // Single-line body
+            let stmt = try parseStatement()
+            body = [stmt]
+        } else {
+            // Multi-line body with indentation
+            body = try parseBlock()
+        }
         
         return .classDef(ClassDef(
             name: name,
