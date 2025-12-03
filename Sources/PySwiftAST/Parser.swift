@@ -2660,6 +2660,9 @@ public class Parser {
                     
                     // Handle implicit f-string concatenation: f"str1" f"str2"
                     while true {
+                        // Skip comments before checking for next string
+                        skipComments()
+                        
                         // Check if next token is another f-string
                         if case .name(let nextName) = currentToken().type, nextName == "f" {
                             let peekPos = position + 1
@@ -2791,10 +2794,18 @@ public class Parser {
             var concatenated = stripQuotes(from: str)
             
             // Keep concatenating adjacent string literals
-            while case .string(let nextStr) = currentToken().type {
-                advance()
-                concatenated += stripQuotes(from: nextStr)
+            while true {
+                skipComments() // Skip comments between strings
+                if case .string(let nextStr) = currentToken().type {
+                    advance()
+                    concatenated += stripQuotes(from: nextStr)
+                } else {
+                    break
+                }
             }
+            
+            // Skip comments before checking for f-string
+            skipComments()
             
             // Check if there's an f-string after regular strings (mixed concatenation)
             if case .name(let name) = currentToken().type, (name == "f" || name == "F") {
@@ -2814,14 +2825,19 @@ public class Parser {
                     ]
                     
                     // Parse all following f-strings
-                    while case .name(let nextName) = currentToken().type, (nextName == "f" || nextName == "F") {
-                        let nextPeekPos = position + 1
-                        if nextPeekPos < tokens.count, case .string = tokens[nextPeekPos].type {
-                            let fstring = try parseFString(startToken: currentToken())
-                            
-                            // Extract values from the f-string
-                            if case .joinedStr(let joined) = fstring {
-                                values.append(contentsOf: joined.values)
+                    while true {
+                        skipComments() // Skip comments between strings
+                        if case .name(let nextName) = currentToken().type, (nextName == "f" || nextName == "F") {
+                            let nextPeekPos = position + 1
+                            if nextPeekPos < tokens.count, case .string = tokens[nextPeekPos].type {
+                                let fstring = try parseFString(startToken: currentToken())
+                                
+                                // Extract values from the f-string
+                                if case .joinedStr(let joined) = fstring {
+                                    values.append(contentsOf: joined.values)
+                                }
+                            } else {
+                                break
                             }
                         } else {
                             break
