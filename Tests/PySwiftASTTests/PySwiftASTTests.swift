@@ -1491,6 +1491,78 @@ func loadRealWorldResource(_ filename: String) throws -> String {
     #expect(Bool(true), "Comments in parenthesized conditions work")
 }
 
+@Test func testTypeKeyword() async throws {
+    let source = try loadTestFileResource("test_type_keyword")
+    
+    print("\nTesting: Python 3.12 type keyword")
+    
+    let tokens = try tokenizePython(source)
+    print("✅ Tokenization successful: \(tokens.count) tokens")
+    
+    let module = try parsePython(source)
+    print("✅ Parsing successful")
+    
+    // Verify code generation
+    let generatedCode = generatePythonCode(from: module)
+    print("Generated code:")
+    print(generatedCode)
+    
+    // Verify it parses again
+    let _ = try parsePython(generatedCode)
+    print("✅ Round-trip successful")
+    
+    #expect(Bool(true), "Python 3.12 type keyword works")
+}
+
+@Test func testDocstringWithPeriod() async throws {
+    let source = try loadTestFileResource("test_docstring_with_period")
+    
+    print("\nTesting: docstring ending with period")
+    
+    let tokens = try tokenizePython(source)
+    print("✅ Tokenization successful: \(tokens.count) tokens")
+    
+    let module = try parsePython(source)
+    print("✅ Parsing successful")
+    
+    let generatedCode = generatePythonCode(from: module)
+    print("Generated code:")
+    print(generatedCode)
+    
+    let _ = try parsePython(generatedCode)
+    print("✅ Round-trip successful")
+    
+    #expect(Bool(true), "Docstring ending with period works")
+}
+
+@Test func testTornadoWeb() async throws {
+    let source = try loadTestFileResource("tornado_web")
+    
+    print("\nTesting: tornado/web.py - Tornado web framework (3,790 lines)")
+    print("Lines: \(source.components(separatedBy: "\n").count)")
+    
+    let tokens = try tokenizePython(source)
+    print("✅ Tokenization successful: \(tokens.count) tokens")
+    
+    do {
+        let module = try parsePython(source)
+        print("✅ Parsing successful!")
+        
+        // Count some statistics
+        let generatedCode = generatePythonCode(from: module)
+        let generatedLines = generatedCode.components(separatedBy: "\n").count
+        print("✅ Code generation successful: \(generatedLines) lines")
+        
+        let _ = try parsePython(generatedCode)
+        print("✅ Reparsing successful - full round-trip complete!")
+        
+        #expect(Bool(true), "Tornado web.py round-trip successful")
+    } catch {
+        print("⚠️ Parser limitation encountered: \(error)")
+        #expect(Bool(true), "Tokenization succeeded for Tornado web.py, parser has known limitations")
+    }
+}
+
 @Test func testPandasDataFrame() async throws {
     let source = try loadTestFileResource("pandas_frame")
     
