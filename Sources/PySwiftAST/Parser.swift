@@ -135,7 +135,7 @@ public class Parser {
             return try parseDel()
             
         case .name(let name) where name == "type":
-            // "type" is a soft keyword in Python 3.12+
+            // "type" is a soft keyword in Python 3.12+ for type aliases
             return try parseTypeAlias()
             
         case .yield:

@@ -68,3 +68,26 @@ class VariableFinder: ASTVisitor {
     }
 }
 ```
+
+
+# The Statement type needs an accept(visitor:) method added in PySwiftAST
+
+Something like:
+
+```swift
+extension Statement {
+    func accept(visitor: ASTVisitor) {
+        switch self {
+        case .assign(let assign):
+            visitor.visit(assign: assign)
+        case .annAssign(let annAssign):
+            visitor.visit(annAssign: annAssign)
+        case .functionDef(let functionDef):
+            visitor.visit(functionDef: functionDef)
+        case .classDef(let classDef):
+            visitor.visit(classDef: classDef)
+        // ... etc for all statement types
+        }
+    }
+}
+```
