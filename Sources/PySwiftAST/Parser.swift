@@ -3330,23 +3330,80 @@ public class Parser {
                     currentText = ""
                 }
                 
-                // Find the closing }
+                // Find the closing }, handling conversion (!r, !s, !a) and format specs (:format)
                 i = content.index(after: i)
                 var exprStr = ""
                 var braceDepth = 1
+                var conversion = -1
+                var formatSpec: Expression? = nil
                 
+                // Extract the expression part (before ! or :)
                 while i < content.endIndex && braceDepth > 0 {
                     let c = content[i]
                     if c == "{" {
                         braceDepth += 1
+                        exprStr.append(c)
+                        i = content.index(after: i)
                     } else if c == "}" {
                         braceDepth -= 1
                         if braceDepth == 0 {
                             break
                         }
+                        exprStr.append(c)
+                        i = content.index(after: i)
+                    } else if (c == "!" || c == ":") && braceDepth == 1 {
+                        // Handle conversion or format spec
+                        if c == "!" {
+                            // Conversion specifier: !r, !s, or !a
+                            i = content.index(after: i)
+                            if i < content.endIndex {
+                                let convChar = content[i]
+                                switch convChar {
+                                case "r": conversion = 114 // 'r'
+                                case "s": conversion = 115 // 's'
+                                case "a": conversion = 97  // 'a'
+                                default: break
+                                }
+                                i = content.index(after: i)
+                            }
+                        } else if c == ":" {
+                            // Format specifier
+                            i = content.index(after: i)
+                            var formatStr = ""
+                            while i < content.endIndex {
+                                let fc = content[i]
+                                if fc == "}" {
+                                    break
+                                }
+                                formatStr.append(fc)
+                                i = content.index(after: i)
+                            }
+                            if !formatStr.isEmpty {
+                                formatSpec = .joinedStr(JoinedStr(
+                                    values: [.constant(Constant(
+                                        value: .string(formatStr),
+                                        kind: nil,
+                                        lineno: stringToken.line,
+                                        colOffset: stringToken.column,
+                                        endLineno: nil,
+                                        endColOffset: nil
+                                    ))],
+                                    lineno: stringToken.line,
+                                    colOffset: stringToken.column,
+                                    endLineno: nil,
+                                    endColOffset: nil
+                                ))
+                            }
+                        }
+                        // After handling ! or :, look for closing }
+                        while i < content.endIndex && content[i] != "}" {
+                            i = content.index(after: i)
+                        }
+                        break
+                    } else {
+                        exprStr.append(c)
+                        i = content.index(after: i)
                     }
-                    exprStr.append(c)
-                    i = content.index(after: i)
                 }
                 
                 // Parse the expression
@@ -3360,8 +3417,8 @@ public class Parser {
                     // Wrap in FormattedValue
                     values.append(.formattedValue(FormattedValue(
                         value: expr,
-                        conversion: -1,
-                        formatSpec: nil,
+                        conversion: conversion,
+                        formatSpec: formatSpec,
                         lineno: stringToken.line,
                         colOffset: stringToken.column,
                         endLineno: nil,

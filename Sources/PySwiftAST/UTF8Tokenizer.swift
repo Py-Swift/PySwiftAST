@@ -619,7 +619,12 @@ public class Tokenizer {
                     advance()
                     return Token(type: .ellipsis, value: "...", line: startLine, column: startColumn, endLine: line, endColumn: column)
                 }
-                throw ParseError.syntaxError(message: "Unexpected '..'", line: line)
+                // Two dots - backtrack one position and return single dot
+                // This handles cases like `..` in relative imports (from ..parent)
+                position -= 1
+                if column > 1 {
+                    column -= 1
+                }
             }
             return Token(type: .dot, value: ".", line: startLine, column: startColumn, endLine: line, endColumn: column)
             

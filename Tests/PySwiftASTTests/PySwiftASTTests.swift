@@ -1308,6 +1308,33 @@ func loadRealWorldResource(_ filename: String) throws -> String {
     #expect(Bool(true), "Django query.py round-trip successful")
 }
 
+@Test func testFStringWithMethodAndAttribute() async throws {
+    let source = """
+    # Test f-string with method call and attribute access
+    x = f"{type(data).__name__}"
+    y = f"Value: {obj.method().__str__()}"
+    """
+    
+    print("\nTesting: F-string with method calls and attribute access")
+    
+    let tokens = try tokenizePython(source)
+    print("✅ Tokenization successful: \(tokens.count) tokens")
+    
+    let module = try parsePython(source)
+    print("✅ Parsing successful")
+    
+    // Verify code generation
+    let generatedCode = generatePythonCode(from: module)
+    print("Generated code:")
+    print(generatedCode)
+    
+    // Verify it parses again
+    let _ = try parsePython(generatedCode)
+    print("✅ Round-trip successful")
+    
+    #expect(Bool(true), "F-string with method calls and attributes works")
+}
+
 @Test func testPandasDataFrame() async throws {
     let source = try loadTestFileResource("pandas_frame")
     
