@@ -69,8 +69,73 @@ public indirect enum Statement: ASTNode, Sendable {
         return 0 // Simplified for brevity
     }
     
-    public var endLineno: Int? { nil }
-    public var endColOffset: Int? { nil }
+    public var endLineno: Int? {
+        switch self {
+        case .functionDef(let node): return node.endLineno
+        case .asyncFunctionDef(let node): return node.endLineno
+        case .classDef(let node): return node.endLineno
+        case .returnStmt(let node): return node.endLineno
+        case .delete(let node): return node.endLineno
+        case .assign(let node): return node.endLineno
+        case .augAssign(let node): return node.endLineno
+        case .annAssign(let node): return node.endLineno
+        case .forStmt(let node): return node.endLineno
+        case .asyncFor(let node): return node.endLineno
+        case .whileStmt(let node): return node.endLineno
+        case .ifStmt(let node): return node.endLineno
+        case .withStmt(let node): return node.endLineno
+        case .asyncWith(let node): return node.endLineno
+        case .match(let node): return node.endLineno
+        case .raise(let node): return node.endLineno
+        case .tryStmt(let node): return node.endLineno
+        case .tryStar(let node): return node.endLineno
+        case .assertStmt(let node): return node.endLineno
+        case .importStmt(let node): return node.endLineno
+        case .importFrom(let node): return node.endLineno
+        case .global(let node): return node.endLineno
+        case .nonlocal(let node): return node.endLineno
+        case .expr(let node): return node.endLineno
+        case .pass(let node): return node.endLineno
+        case .breakStmt(let node): return node.endLineno
+        case .continueStmt(let node): return node.endLineno
+        case .blank(let node): return node.endLineno
+        case .typeAlias(let node): return node.endLineno
+        }
+    }
+    
+    public var endColOffset: Int? {
+        switch self {
+        case .functionDef(let node): return node.endColOffset
+        case .asyncFunctionDef(let node): return node.endColOffset
+        case .classDef(let node): return node.endColOffset
+        case .returnStmt(let node): return node.endColOffset
+        case .delete(let node): return node.endColOffset
+        case .assign(let node): return node.endColOffset
+        case .augAssign(let node): return node.endColOffset
+        case .annAssign(let node): return node.endColOffset
+        case .forStmt(let node): return node.endColOffset
+        case .asyncFor(let node): return node.endColOffset
+        case .whileStmt(let node): return node.endColOffset
+        case .ifStmt(let node): return node.endColOffset
+        case .withStmt(let node): return node.endColOffset
+        case .asyncWith(let node): return node.endColOffset
+        case .match(let node): return node.endColOffset
+        case .raise(let node): return node.endColOffset
+        case .tryStmt(let node): return node.endColOffset
+        case .tryStar(let node): return node.endColOffset
+        case .assertStmt(let node): return node.endColOffset
+        case .importStmt(let node): return node.endColOffset
+        case .importFrom(let node): return node.endColOffset
+        case .global(let node): return node.endColOffset
+        case .nonlocal(let node): return node.endColOffset
+        case .expr(let node): return node.endColOffset
+        case .pass(let node): return node.endColOffset
+        case .breakStmt(let node): return node.endColOffset
+        case .continueStmt(let node): return node.endColOffset
+        case .blank(let node): return node.endColOffset
+        case .typeAlias(let node): return node.endColOffset
+        }
+    }
 }
 
 // MARK: - TreeDisplayable Conformance

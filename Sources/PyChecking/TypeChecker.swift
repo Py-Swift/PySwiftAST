@@ -1,4 +1,5 @@
 import PySwiftAST
+import PySwiftCodeGen
 
 /// Static type checker for Python code with queryable type analysis
 ///
@@ -137,6 +138,137 @@ public final class TypeChecker: PyChecker {
         return properties
     }
     
+    /// Get the type of a specific property in a class
+    /// - Parameters:
+    ///   - className: Name of the class
+    ///   - propertyName: Name of the property
+    /// - Returns: Type as a display string, or nil if not found
+    public func getPropertyType(className: String, propertyName: String) -> String? {
+        let members = visitor.classRegistry.getMembers(className)
+        if let member = members.first(where: { $0.name == propertyName && $0.kind == .property }) {
+            return member.type.toDisplayString()
+        }
+        return nil
+    }
+    
+    /// Get the class definition at a specific line number
+    /// - Parameter lineNumber: Line number (1-indexed)
+    /// - Returns: Tuple of (class name, generated code) if found, nil otherwise
+    public func getClassDefinition(at lineNumber: Int) -> (name: String, code: String)? {
+        guard case .module(let statements) = currentModule else { return nil }
+        
+        // Find the class definition that contains this line
+        func findClassInStatements(_ statements: [Statement]) -> (ClassDef, String)? {
+            for statement in statements {
+                if case .classDef(let classDef) = statement {
+                    let endLine = classDef.endLineno ?? classDef.body.last?.lineno ?? classDef.lineno
+                    if classDef.lineno <= lineNumber && lineNumber <= endLine {
+                        // Generate code for this class
+                        let code = statement.toPythonCode(context: CodeGenContext())
+                        return (classDef, code)
+                    }
+                }
+                
+                // Search nested statements (e.g., classes inside functions)
+                switch statement {
+                case .functionDef(let funcDef):
+                    if let found = findClassInStatements(funcDef.body) {
+                        return found
+                    }
+                case .asyncFunctionDef(let funcDef):
+                    if let found = findClassInStatements(funcDef.body) {
+                        return found
+                    }
+                case .classDef(let classDef):
+                    if let found = findClassInStatements(classDef.body) {
+                        return found
+                    }
+                case .forStmt(let forStmt):
+                    if let found = findClassInStatements(forStmt.body) {
+                        return found
+                    }
+                    if let found = findClassInStatements(forStmt.orElse) {
+                        return found
+                    }
+                case .asyncFor(let forStmt):
+                    if let found = findClassInStatements(forStmt.body) {
+                        return found
+                    }
+                    if let found = findClassInStatements(forStmt.orElse) {
+                        return found
+                    }
+                case .whileStmt(let whileStmt):
+                    if let found = findClassInStatements(whileStmt.body) {
+                        return found
+                    }
+                    if let found = findClassInStatements(whileStmt.orElse) {
+                        return found
+                    }
+                case .ifStmt(let ifStmt):
+                    if let found = findClassInStatements(ifStmt.body) {
+                        return found
+                    }
+                    if let found = findClassInStatements(ifStmt.orElse) {
+                        return found
+                    }
+                case .withStmt(let withStmt):
+                    if let found = findClassInStatements(withStmt.body) {
+                        return found
+                    }
+                case .asyncWith(let withStmt):
+                    if let found = findClassInStatements(withStmt.body) {
+                        return found
+                    }
+                case .tryStmt(let tryStmt):
+                    if let found = findClassInStatements(tryStmt.body) {
+                        return found
+                    }
+                    for handler in tryStmt.handlers {
+                        if let found = findClassInStatements(handler.body) {
+                            return found
+                        }
+                    }
+                    if let found = findClassInStatements(tryStmt.orElse) {
+                        return found
+                    }
+                    if let found = findClassInStatements(tryStmt.finalBody) {
+                        return found
+                    }
+                case .tryStar(let tryStmt):
+                    if let found = findClassInStatements(tryStmt.body) {
+                        return found
+                    }
+                    for handler in tryStmt.handlers {
+                        if let found = findClassInStatements(handler.body) {
+                            return found
+                        }
+                    }
+                    if let found = findClassInStatements(tryStmt.orElse) {
+                        return found
+                    }
+                    if let found = findClassInStatements(tryStmt.finalBody) {
+                        return found
+                    }
+                case .match(let matchStmt):
+                    for matchCase in matchStmt.cases {
+                        if let found = findClassInStatements(matchCase.body) {
+                            return found
+                        }
+                    }
+                default:
+                    break
+                }
+            }
+            return nil
+        }
+        
+        if let (classDef, code) = findClassInStatements(statements) {
+            return (name: classDef.name, code: code)
+        }
+        
+        return nil
+    }
+    
     /// Check if a variable exists in scope
     /// - Parameters:
     ///   - name: Variable name
@@ -248,8 +380,8 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     }
     
     func visitFunctionDef(_ node: FunctionDef) {
-        // Calculate function end line
-        let endLine = node.body.last?.lineno ?? node.lineno
+        // Use actual end line from AST node, or calculate from body
+        let endLine = node.endLineno ?? node.body.last?.lineno ?? node.lineno
         
         // Track function scope
         scopeTracker.enterScope(kind: .function, name: node.name, startLine: node.lineno, endLine: endLine)
@@ -279,7 +411,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     }
     
     func visitAsyncFunctionDef(_ node: AsyncFunctionDef) {
-        let endLine = node.body.last?.lineno ?? node.lineno
+        let endLine = node.endLineno ?? node.body.last?.lineno ?? node.lineno
         
         scopeTracker.enterScope(kind: .function, name: node.name, startLine: node.lineno, endLine: endLine)
         typeEnvironment.pushScope()
@@ -305,7 +437,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     }
     
     func visitClassDef(_ node: ClassDef) {
-        let endLine = node.body.last?.lineno ?? node.lineno
+        let endLine = node.endLineno ?? node.body.last?.lineno ?? node.lineno
         
         // Track class scope
         scopeTracker.enterScope(kind: .classScope, name: node.name, startLine: node.lineno, endLine: endLine)

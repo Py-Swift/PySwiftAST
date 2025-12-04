@@ -58,7 +58,8 @@ let package = Package(
         .target(
             name: "PyChecking",
             dependencies: [
-                "PySwiftAST"
+                "PySwiftAST",
+                "PySwiftCodeGen"
             ]
         ),
         .target(
@@ -73,7 +74,7 @@ let package = Package(
         ),
         .testTarget(
             name: "PySwiftASTTests",
-            dependencies: ["PySwiftAST"],
+            dependencies: ["PySwiftAST", "PyChecking"],
             resources: [
                 .copy("Resources")
             ]
