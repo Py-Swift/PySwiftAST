@@ -1216,6 +1216,84 @@ final class RealWorldTypeCheckingTests: XCTestCase {
             XCTFail("self.add_item type string not found")
         }
     }
+    
+    // MARK: - Method Return Type Inference Tests
+    
+    func testMethodWithoutReturnAnnotation_NoReturn() throws {
+        let checker = try analyze("""
+        class Calculator:
+            def add_item(self, x: int):
+                pass
+            
+            def process(self):
+                result = self.add_item(5)
+        """)
+        
+        // Method without return annotation and no return statement should infer None
+        if let attrType = checker.getAttributeType(object: "self", attribute: "add_item", line: 6) {
+            XCTAssertEqual(attrType.toDisplayString(), "None")
+        } else {
+            XCTFail("self.add_item attribute type not found")
+        }
+    }
+    
+    func testMethodWithoutReturnAnnotation_ExplicitReturn() throws {
+        let checker = try analyze("""
+        class Calculator:
+            def compute(self, x: int):
+                if x > 0:
+                    return x * 2
+                return 0
+            
+            def process(self):
+                result = self.compute(5)
+        """)
+        
+        // Method returns int values, should infer int
+        if let attrType = checker.getAttributeType(object: "self", attribute: "compute", line: 8) {
+            XCTAssertEqual(attrType.toDisplayString(), "int")
+        } else {
+            XCTFail("self.compute attribute type not found")
+        }
+    }
+    
+    func testMethodWithoutReturnAnnotation_BareReturn() throws {
+        let checker = try analyze("""
+        class Validator:
+            def validate(self, data):
+                if not data:
+                    return
+                print(data)
+            
+            def check(self):
+                self.validate([])
+        """)
+        
+        // Method with bare return should infer None
+        if let attrType = checker.getAttributeType(object: "self", attribute: "validate", line: 8) {
+            XCTAssertEqual(attrType.toDisplayString(), "None")
+        } else {
+            XCTFail("self.validate attribute type not found")
+        }
+    }
+    
+    func testAsyncMethodWithoutReturnAnnotation() throws {
+        let checker = try analyze("""
+        class AsyncWorker:
+            async def fetch_data(self, url: str):
+                return "data"
+            
+            async def process(self):
+                result = await self.fetch_data("url")
+        """)
+        
+        // Async method returns string, should infer str
+        if let attrType = checker.getAttributeType(object: "self", attribute: "fetch_data", line: 6) {
+            XCTAssertEqual(attrType.toDisplayString(), "str")
+        } else {
+            XCTFail("self.fetch_data attribute type not found")
+        }
+    }
 }
 
 

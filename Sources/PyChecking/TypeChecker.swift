@@ -1043,7 +1043,26 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     
     func visitAsyncFunctionDef(_ node: AsyncFunctionDef) {
         // Register async function with its return type in outer scope
-        let returnType = node.returns.map { PythonType.fromExpression($0) } ?? .any
+        let returnType: PythonType
+        if let returns = node.returns {
+            returnType = PythonType.fromExpression(returns)
+        } else {
+            // No annotation - infer from function body
+            // Need to set up temporary scope with parameters for accurate inference
+            let funcEndLine = node.endLineno ?? node.body.last?.lineno ?? node.lineno
+            typeEnvironment.pushScope(startLine: node.lineno, endLine: funcEndLine)
+            
+            // Register parameters
+            for arg in node.args.args {
+                if let annotation = arg.annotation {
+                    let paramType = PythonType.fromExpression(annotation)
+                    typeEnvironment.setType(arg.arg, type: paramType, at: node.lineno)
+                }
+            }
+            
+            returnType = inferFunctionReturnType(node.body)
+            typeEnvironment.popScope()
+        }
         typeEnvironment.setType(node.name, type: returnType, at: node.lineno)
         
         let endLine = node.endLineno ?? calculateEndLine(node.body) ?? node.lineno
@@ -1158,7 +1177,29 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
                 }
                 
                 // Register method
-                let returnType = funcDef.returns.map { PythonType.fromExpression($0) } ?? .any
+                let returnType: PythonType
+                if let returns = funcDef.returns {
+                    returnType = PythonType.fromExpression(returns)
+                } else {
+                    // No annotation - infer from function body
+                    // Need to set up temporary scope with parameters for accurate inference
+                    let funcEndLine = funcDef.endLineno ?? funcDef.body.last?.lineno ?? funcDef.lineno
+                    typeEnvironment.pushScope(startLine: funcDef.lineno, endLine: funcEndLine)
+                    
+                    // Register parameters (including self for methods)
+                    for (index, arg) in funcDef.args.args.enumerated() {
+                        if index == 0 && methodKind == .method {
+                            // First param in method is 'self'
+                            typeEnvironment.setType(arg.arg, type: .instance(node.name), at: funcDef.lineno)
+                        } else if let annotation = arg.annotation {
+                            let paramType = PythonType.fromExpression(annotation)
+                            typeEnvironment.setType(arg.arg, type: paramType, at: funcDef.lineno)
+                        }
+                    }
+                    
+                    returnType = inferFunctionReturnType(funcDef.body)
+                    typeEnvironment.popScope()
+                }
                 classRegistry.addMember(
                     toClass: node.name,
                     name: funcDef.name,
@@ -1222,7 +1263,29 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
             
             // Track async methods
             if case .asyncFunctionDef(let funcDef) = statement {
-                let returnType = funcDef.returns.map { PythonType.fromExpression($0) } ?? .any
+                let returnType: PythonType
+                if let returns = funcDef.returns {
+                    returnType = PythonType.fromExpression(returns)
+                } else {
+                    // No annotation - infer from function body
+                    // Need to set up temporary scope with parameters for accurate inference
+                    let funcEndLine = funcDef.endLineno ?? funcDef.body.last?.lineno ?? funcDef.lineno
+                    typeEnvironment.pushScope(startLine: funcDef.lineno, endLine: funcEndLine)
+                    
+                    // Register parameters (including self for methods)
+                    for (index, arg) in funcDef.args.args.enumerated() {
+                        if index == 0 {
+                            // First param in async method is 'self'
+                            typeEnvironment.setType(arg.arg, type: .instance(node.name), at: funcDef.lineno)
+                        } else if let annotation = arg.annotation {
+                            let paramType = PythonType.fromExpression(annotation)
+                            typeEnvironment.setType(arg.arg, type: paramType, at: funcDef.lineno)
+                        }
+                    }
+                    
+                    returnType = inferFunctionReturnType(funcDef.body)
+                    typeEnvironment.popScope()
+                }
                 classRegistry.addMember(
                     toClass: node.name,
                     name: funcDef.name,
@@ -2123,6 +2186,77 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     func visitFormattedValue(_ node: FormattedValue) -> PythonType { .str }
     func visitJoinedStr(_ node: JoinedStr) -> PythonType { .str }
     func visitSlice(_ node: Slice) -> PythonType { .any }
+    
+    /// Infer return type for a function without explicit return annotation
+    /// Returns .none if function has no return statements or only bare returns
+    /// Returns inferred type if all returns have consistent types
+    private func inferFunctionReturnType(_ body: [Statement]) -> PythonType {
+        var returnTypes: [PythonType] = []
+        
+        func collectReturns(_ statements: [Statement]) {
+            for stmt in statements {
+                switch stmt {
+                case .returnStmt(let ret):
+                    if let value = ret.value {
+                        returnTypes.append(visitExpression(value))
+                    } else {
+                        returnTypes.append(.none)
+                    }
+                case .ifStmt(let ifStmt):
+                    collectReturns(ifStmt.body)
+                    collectReturns(ifStmt.orElse)
+                case .whileStmt(let whileStmt):
+                    collectReturns(whileStmt.body)
+                    collectReturns(whileStmt.orElse)
+                case .forStmt(let forStmt):
+                    collectReturns(forStmt.body)
+                    collectReturns(forStmt.orElse)
+                case .withStmt(let withStmt):
+                    collectReturns(withStmt.body)
+                case .tryStmt(let tryStmt):
+                    collectReturns(tryStmt.body)
+                    for handler in tryStmt.handlers {
+                        collectReturns(handler.body)
+                    }
+                    collectReturns(tryStmt.orElse)
+                    collectReturns(tryStmt.finalBody)
+                case .functionDef, .asyncFunctionDef, .classDef:
+                    // Don't recurse into nested functions/classes
+                    break
+                default:
+                    break
+                }
+            }
+        }
+        
+        collectReturns(body)
+        
+        // If no return statements found, function implicitly returns None
+        if returnTypes.isEmpty {
+            return .none
+        }
+        
+        // If all returns are None (bare returns), the function returns None
+        if returnTypes.allSatisfy({ $0 == .none }) {
+            return .none
+        }
+        
+        // If there's a mix or only non-None returns, try to unify them
+        // For simplicity, if all non-None types are the same, use that
+        let nonNoneTypes = returnTypes.filter { $0 != .none }
+        if nonNoneTypes.isEmpty {
+            return .none
+        }
+        
+        // Check if all non-None types are the same
+        let firstNonNone = nonNoneTypes[0]
+        if nonNoneTypes.allSatisfy({ $0 == firstNonNone }) {
+            return firstNonNone
+        }
+        
+        // Mixed types - return union or any
+        return .union(nonNoneTypes)
+    }
 }
 
 // MARK: - Supporting Types
