@@ -241,26 +241,87 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
                 )
             }
             
-            // Track __init__ for instance properties
-            if case .functionDef(let funcDef) = statement, funcDef.name == "__init__" {
-                for funcStatement in funcDef.body {
-                    if case .assign(let assign) = funcStatement {
-                        for target in assign.targets {
-                            if case .attribute(let attr) = target,
-                               case .name(let value) = attr.value,
-                               value.id == "self" {
-                                let propType = visitExpression(assign.value)
-                                classRegistry.addMember(
-                                    toClass: node.name,
-                                    name: attr.attr,
-                                    type: propType,
-                                    kind: .property,
-                                    line: assign.lineno
-                                )
+            // Track methods (regular and async)
+            if case .functionDef(let funcDef) = statement {
+                // Determine method kind
+                let methodKind: MemberKind
+                if funcDef.decoratorList.contains(where: { decorator in
+                    if case .name(let name) = decorator, name.id == "classmethod" {
+                        return true
+                    }
+                    return false
+                }) {
+                    methodKind = .classMethod
+                } else if funcDef.decoratorList.contains(where: { decorator in
+                    if case .name(let name) = decorator, name.id == "staticmethod" {
+                        return true
+                    }
+                    return false
+                }) {
+                    methodKind = .staticMethod
+                } else {
+                    methodKind = .method
+                }
+                
+                // Register method
+                let returnType = funcDef.returns.map { PythonType.fromExpression($0) } ?? .any
+                classRegistry.addMember(
+                    toClass: node.name,
+                    name: funcDef.name,
+                    type: returnType,
+                    kind: methodKind,
+                    line: funcDef.lineno
+                )
+                
+                // Track __init__ for instance properties
+                if funcDef.name == "__init__" {
+                    for funcStatement in funcDef.body {
+                        // Handle regular assignments: self.x = value
+                        if case .assign(let assign) = funcStatement {
+                            for target in assign.targets {
+                                if case .attribute(let attr) = target,
+                                   case .name(let value) = attr.value,
+                                   value.id == "self" {
+                                    let propType = visitExpression(assign.value)
+                                    classRegistry.addMember(
+                                        toClass: node.name,
+                                        name: attr.attr,
+                                        type: propType,
+                                        kind: .property,
+                                        line: assign.lineno
+                                    )
+                                }
                             }
+                        }
+                        
+                        // Handle annotated assignments: self.x: int = value
+                        if case .annAssign(let annAssign) = funcStatement,
+                           case .attribute(let attr) = annAssign.target,
+                           case .name(let value) = attr.value,
+                           value.id == "self" {
+                            let propType = PythonType.fromExpression(annAssign.annotation)
+                            classRegistry.addMember(
+                                toClass: node.name,
+                                name: attr.attr,
+                                type: propType,
+                                kind: .property,
+                                line: annAssign.lineno
+                            )
                         }
                     }
                 }
+            }
+            
+            // Track async methods
+            if case .asyncFunctionDef(let funcDef) = statement {
+                let returnType = funcDef.returns.map { PythonType.fromExpression($0) } ?? .any
+                classRegistry.addMember(
+                    toClass: node.name,
+                    name: funcDef.name,
+                    type: returnType,
+                    kind: .method,
+                    line: funcDef.lineno
+                )
             }
             
             visitStatement(statement)
