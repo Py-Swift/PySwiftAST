@@ -74,18 +74,25 @@ public final class TypeChecker: PyChecker {
             if let scopeChain = findScopeChain(at: line, in: statements, globals: statements) {
                 return scopeChain.findVariable(name)?.toDisplayString()
             }
-            // Fallback to global scope search
-            if let type = searchVariableInStatements(statements, name: name, at: line) {
-                return type.toDisplayString()
-            }
+            // Fallback to global scope search with ScopeChain
+            let globalChain = ScopeChain(
+                localStatements: [],
+                classStatements: nil,
+                globalStatements: statements,
+                lineNumber: line
+            )
+            return globalChain.findVariable(name)?.toDisplayString()
         } else {
-            // No line number - search globally
-            if let type = searchVariableInStatements(statements, name: name, at: nil) {
-                return type.toDisplayString()
-            }
+            // No line number - use ScopeChain with global scope and a very high line number
+            // This ensures all assignments are considered
+            let globalChain = ScopeChain(
+                localStatements: [],
+                classStatements: nil,
+                globalStatements: statements,
+                lineNumber: 999999
+            )
+            return globalChain.findVariable(name)?.toDisplayString()
         }
-        
-        return nil
     }
     
     /// Get all symbols accessible at a specific location
@@ -1000,9 +1007,12 @@ public enum MemberKind: Sendable {
 /// Tracks scope boundaries during analysis
 final class ScopeTracker {
     private var scopes: [ScopeInfo] = []
+    private var allScopes: [ScopeInfo] = [] // Permanent record of all scopes
     
     func enterScope(kind: ScopeKind, name: String?, startLine: Int, endLine: Int) {
-        scopes.append(ScopeInfo(kind: kind, name: name, startLine: startLine, endLine: endLine))
+        let scopeInfo = ScopeInfo(kind: kind, name: name, startLine: startLine, endLine: endLine)
+        scopes.append(scopeInfo)
+        allScopes.append(scopeInfo)
     }
     
     func exitScope() {
@@ -1012,13 +1022,23 @@ final class ScopeTracker {
     }
     
     func getScopeAt(line: Int) -> ScopeInfo? {
-        // Return the innermost scope containing the line
-        for scope in scopes.reversed() {
+        // Search permanent record of all scopes, return innermost match
+        // Innermost = smallest range containing the line
+        var matchingScope: ScopeInfo? = nil
+        var smallestRange = Int.max
+        
+        for scope in allScopes {
             if scope.startLine <= line && line <= scope.endLine {
-                return scope
+                let range = scope.endLine - scope.startLine
+                // Prefer smaller ranges (more nested scopes)
+                if range < smallestRange {
+                    matchingScope = scope
+                    smallestRange = range
+                }
             }
         }
-        return nil
+        
+        return matchingScope
     }
 }
 
