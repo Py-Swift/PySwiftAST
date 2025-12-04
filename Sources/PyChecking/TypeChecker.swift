@@ -243,9 +243,12 @@ public final class TypeChecker: PyChecker {
     /// - Parameter lineNumber: Line number (1-indexed)
     /// - Returns: Class name if inside a class, nil otherwise
     public func getClassContext(lineNumber: Int) -> String? {
-        if let scope = visitor.scopeTracker.getScopeAt(line: lineNumber),
-           scope.kind == .classScope {
-            return scope.name
+        // Get scope chain and find the first class scope
+        let scopes = visitor.scopeTracker.getScopeChainAt(line: lineNumber)
+        for scope in scopes {
+            if scope.kind == .classScope {
+                return scope.name
+            }
         }
         return nil
     }
@@ -419,6 +422,112 @@ public final class TypeChecker: PyChecker {
         
         if let (classDef, code) = findClassInStatements(statements) {
             return (name: classDef.name, code: code)
+        }
+        
+        return nil
+    }
+    
+    /// Get a global constant's type and value
+    /// - Parameter name: The constant name
+    /// - Returns: Tuple of (type: String, value: String) if found, nil otherwise
+    public func getGlobalConstant(name: String) -> (type: String, value: String)? {
+        guard case .module(let statements) = currentModule else { return nil }
+        
+        // Search for module-level assignments to this name
+        for statement in statements {
+            if case .assign(let assign) = statement {
+                // Check if any target is this name
+                for target in assign.targets {
+                    if case .name(let nameExpr) = target, nameExpr.id == name {
+                        // Get the type from type environment
+                        let type = visitor.typeEnvironment.getType(name, at: assign.lineno)
+                        let typeString = type?.toDisplayString() ?? "Any"
+                        
+                        // Generate value string using PySwiftCodeGen
+                        let valueString = assign.value.toPythonCode(context: CodeGenContext())
+                        
+                        return (type: typeString, value: valueString)
+                    }
+                }
+            } else if case .annAssign(let annAssign) = statement {
+                // Annotated assignment: x: int = 5
+                if case .name(let target) = annAssign.target, target.id == name {
+                    // Use annotation for type
+                    let typeString = annAssign.annotation.toPythonCode(context: CodeGenContext())
+                    
+                    // Get value if present
+                    let valueString: String
+                    if let value = annAssign.value {
+                        valueString = value.toPythonCode(context: CodeGenContext())
+                    } else {
+                        valueString = "..."  // No value assigned yet
+                    }
+                    
+                    return (type: typeString, value: valueString)
+                }
+            }
+        }
+        
+        return nil
+    }
+    
+    /// Get a method definition including signature and full code
+    /// - Parameters:
+    ///   - className: The class name
+    ///   - methodName: The method name
+    /// - Returns: Tuple of (signature: String, code: String) if found, nil otherwise
+    public func getMethodDefinition(className: String, methodName: String) -> (signature: String, code: String)? {
+        guard case .module(let statements) = currentModule else { return nil }
+        
+        // Find the class definition
+        func findClass(_ name: String, in statements: [Statement]) -> ClassDef? {
+            for statement in statements {
+                if case .classDef(let classDef) = statement, classDef.name == name {
+                    return classDef
+                }
+                // Search nested structures
+                switch statement {
+                case .functionDef(let funcDef):
+                    if let found = findClass(name, in: funcDef.body) {
+                        return found
+                    }
+                case .asyncFunctionDef(let funcDef):
+                    if let found = findClass(name, in: funcDef.body) {
+                        return found
+                    }
+                case .classDef(let classDef):
+                    if let found = findClass(name, in: classDef.body) {
+                        return found
+                    }
+                default:
+                    break
+                }
+            }
+            return nil
+        }
+        
+        guard let classDef = findClass(className, in: statements) else { return nil }
+        
+        // Find the method in the class body
+        for statement in classDef.body {
+            switch statement {
+            case .functionDef(let funcDef) where funcDef.name == methodName:
+                let fullCode = statement.toPythonCode(context: CodeGenContext())
+                // Extract signature (first line)
+                let lines = fullCode.components(separatedBy: .newlines)
+                let signature = lines.first ?? ""
+                return (signature: signature, code: fullCode)
+                
+            case .asyncFunctionDef(let funcDef) where funcDef.name == methodName:
+                let fullCode = statement.toPythonCode(context: CodeGenContext())
+                // Extract signature (first line)
+                let lines = fullCode.components(separatedBy: .newlines)
+                let signature = lines.first ?? ""
+                return (signature: signature, code: fullCode)
+                
+            default:
+                continue
+            }
         }
         
         return nil

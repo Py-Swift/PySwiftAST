@@ -975,4 +975,127 @@ final class RealWorldTypeCheckingTests: XCTestCase {
         // Other parameters are not affected
         XCTAssertEqual(checker.getVariableType("x", at: 4), "int")
     }
+    
+    // MARK: - IDE Helper API Tests
+    
+    func testGetGlobalConstant() throws {
+        let checker = try analyze("""
+        # Simple assignment
+        DEFAULT_CURRENCY = "USD"
+        MAX_RETRIES = 3
+        TIMEOUT = 30.5
+        
+        # Annotated assignment
+        API_KEY: str = "secret"
+        PORT: int = 8080
+        
+        # No value yet
+        CONFIG: dict
+        """)
+        
+        // Test simple assignments
+        if let currency = checker.getGlobalConstant(name: "DEFAULT_CURRENCY") {
+            XCTAssertEqual(currency.type, "str")
+            XCTAssertEqual(currency.value, "\"USD\"")
+        } else {
+            XCTFail("DEFAULT_CURRENCY not found")
+        }
+        
+        if let retries = checker.getGlobalConstant(name: "MAX_RETRIES") {
+            XCTAssertEqual(retries.type, "int")
+            XCTAssertEqual(retries.value, "3")
+        } else {
+            XCTFail("MAX_RETRIES not found")
+        }
+        
+        // Test annotated assignments
+        if let apiKey = checker.getGlobalConstant(name: "API_KEY") {
+            XCTAssertEqual(apiKey.type, "str")
+            XCTAssertEqual(apiKey.value, "\"secret\"")
+        } else {
+            XCTFail("API_KEY not found")
+        }
+        
+        if let port = checker.getGlobalConstant(name: "PORT") {
+            XCTAssertEqual(port.type, "int")
+            XCTAssertEqual(port.value, "8080")
+        } else {
+            XCTFail("PORT not found")
+        }
+        
+        // Test annotated with no value
+        if let config = checker.getGlobalConstant(name: "CONFIG") {
+            XCTAssertEqual(config.type, "dict")
+            XCTAssertEqual(config.value, "...")
+        } else {
+            XCTFail("CONFIG not found")
+        }
+        
+        // Test non-existent constant
+        XCTAssertNil(checker.getGlobalConstant(name: "DOES_NOT_EXIST"))
+    }
+    
+    func testGetMethodDefinition() throws {
+        let checker = try analyze("""
+        class Calculator:
+            def add(self, x: int, y: int) -> int:
+                '''Add two numbers'''
+                return x + y
+            
+            async def fetch_data(self, url: str) -> dict:
+                '''Fetch data asynchronously'''
+                return {}
+        """)
+        
+        // Test regular method
+        if let addMethod = checker.getMethodDefinition(className: "Calculator", methodName: "add") {
+            XCTAssertTrue(addMethod.signature.contains("def add(self, x: int, y: int) -> int:"))
+            XCTAssertTrue(addMethod.code.contains("return"))
+            XCTAssertTrue(addMethod.code.contains("x + y") || addMethod.code.contains("(x + y)"))
+            XCTAssertTrue(addMethod.code.contains("Add two numbers"))
+        } else {
+            XCTFail("add method not found")
+        }
+        
+        // Test async method
+        if let fetchMethod = checker.getMethodDefinition(className: "Calculator", methodName: "fetch_data") {
+            XCTAssertTrue(fetchMethod.signature.contains("async def fetch_data(self, url: str) -> dict:"))
+            XCTAssertTrue(fetchMethod.code.contains("return {}"))
+        } else {
+            XCTFail("fetch_data method not found")
+        }
+        
+        // Test non-existent method
+        XCTAssertNil(checker.getMethodDefinition(className: "Calculator", methodName: "subtract"))
+        
+        // Test non-existent class
+        XCTAssertNil(checker.getMethodDefinition(className: "NonExistent", methodName: "add"))
+    }
+    
+    func testGetMethodDefinition_ComplexSignature() throws {
+        let checker = try analyze("""
+        class Manager:
+            def process(self, items: list[str], timeout: float = 30.0, *, retry: bool = True) -> dict[str, int]:
+                '''Process items with optional retry'''
+                result = {}
+                for item in items:
+                    result[item] = len(item)
+                return result
+        """)
+        
+        if let method = checker.getMethodDefinition(className: "Manager", methodName: "process") {
+            // Check signature includes all parameters
+            XCTAssertTrue(method.signature.contains("items: list[str]"))
+            XCTAssertTrue(method.signature.contains("timeout: float = 30.0"))
+            XCTAssertTrue(method.signature.contains("retry: bool = True"))
+            XCTAssertTrue(method.signature.contains("-> dict[str, int]"))
+            
+            // Check full code includes docstring and body
+            XCTAssertTrue(method.code.contains("Process items with optional retry"))
+            XCTAssertTrue(method.code.contains("for item in items:"))
+        } else {
+            XCTFail("process method not found")
+        }
+    }
 }
+
