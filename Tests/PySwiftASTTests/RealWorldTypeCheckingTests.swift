@@ -952,4 +952,27 @@ final class RealWorldTypeCheckingTests: XCTestCase {
         // First parameter in static method is not self, should be Any
         XCTAssertEqual(checker.getVariableType("value", at: 4), "Any")
     }
+    
+    func testCustomFirstParameterName() throws {
+        let checker = try analyze("""
+        class MyClass:
+            def method(this, x: int):
+                # 'this' is the instance, not 'self'
+                result = this
+                value = x
+        
+            def other(me):
+                # 'me' is the instance
+                y = me
+        """)
+        
+        // Any name for first parameter works, not just 'self'
+        XCTAssertEqual(checker.getVariableType("this", at: 3), "MyClass")
+        XCTAssertEqual(checker.getVariableType("result", at: 4), "MyClass")
+        XCTAssertEqual(checker.getVariableType("me", at: 8), "MyClass")
+        XCTAssertEqual(checker.getVariableType("y", at: 9), "MyClass")
+        
+        // Other parameters are not affected
+        XCTAssertEqual(checker.getVariableType("x", at: 4), "int")
+    }
 }
