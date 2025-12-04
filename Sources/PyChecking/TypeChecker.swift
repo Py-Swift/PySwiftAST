@@ -820,17 +820,56 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
         // Use actual end line from AST node, or calculate from body
         let endLine = node.endLineno ?? calculateEndLine(node.body) ?? node.lineno
         
+        // Check if we're inside a class
+        let containingClass = scopeTracker.getScopeAt(line: node.lineno)?.kind == .classScope 
+            ? scopeTracker.getScopeAt(line: node.lineno)?.name 
+            : nil
+        
+        // Check decorators for method type
+        let isStaticMethod = node.decoratorList.contains { decorator in
+            if case .name(let name) = decorator, name.id == "staticmethod" {
+                return true
+            }
+            return false
+        }
+        
+        let isClassMethod = node.decoratorList.contains { decorator in
+            if case .name(let name) = decorator, name.id == "classmethod" {
+                return true
+            }
+            return false
+        }
+        
         // Track function scope
         scopeTracker.enterScope(kind: .function, name: node.name, startLine: node.lineno, endLine: endLine)
         typeEnvironment.pushScope(startLine: node.lineno, endLine: endLine)
         
         // Register parameter types
-        for arg in node.args.args {
+        for (index, arg) in node.args.args.enumerated() {
             if let annotation = arg.annotation {
                 let paramType = PythonType.fromExpression(annotation)
                 typeEnvironment.setType(arg.arg, type: paramType, at: node.lineno)
             } else {
-                typeEnvironment.setType(arg.arg, type: .any, at: node.lineno)
+                // Special handling for first parameter in methods
+                if index == 0 && containingClass != nil && !isStaticMethod {
+                    if isClassMethod {
+                        // First param in @classmethod is 'cls' - reference to the class itself
+                        if let className = containingClass {
+                            typeEnvironment.setType(arg.arg, type: .classType(className), at: node.lineno)
+                        } else {
+                            typeEnvironment.setType(arg.arg, type: .any, at: node.lineno)
+                        }
+                    } else {
+                        // First param in regular method is 'self' - reference to class instance
+                        if let className = containingClass {
+                            typeEnvironment.setType(arg.arg, type: .instance(className), at: node.lineno)
+                        } else {
+                            typeEnvironment.setType(arg.arg, type: .any, at: node.lineno)
+                        }
+                    }
+                } else {
+                    typeEnvironment.setType(arg.arg, type: .any, at: node.lineno)
+                }
             }
         }
         
@@ -854,15 +893,54 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
         
         let endLine = node.endLineno ?? calculateEndLine(node.body) ?? node.lineno
         
+        // Check if we're inside a class
+        let containingClass = scopeTracker.getScopeAt(line: node.lineno)?.kind == .classScope 
+            ? scopeTracker.getScopeAt(line: node.lineno)?.name 
+            : nil
+        
+        // Check decorators for method type
+        let isStaticMethod = node.decoratorList.contains { decorator in
+            if case .name(let name) = decorator, name.id == "staticmethod" {
+                return true
+            }
+            return false
+        }
+        
+        let isClassMethod = node.decoratorList.contains { decorator in
+            if case .name(let name) = decorator, name.id == "classmethod" {
+                return true
+            }
+            return false
+        }
+        
         scopeTracker.enterScope(kind: .function, name: node.name, startLine: node.lineno, endLine: endLine)
         typeEnvironment.pushScope(startLine: node.lineno, endLine: endLine)
         
-        for arg in node.args.args {
+        for (index, arg) in node.args.args.enumerated() {
             if let annotation = arg.annotation {
                 let paramType = PythonType.fromExpression(annotation)
                 typeEnvironment.setType(arg.arg, type: paramType, at: node.lineno)
             } else {
-                typeEnvironment.setType(arg.arg, type: .any, at: node.lineno)
+                // Special handling for first parameter in methods
+                if index == 0 && containingClass != nil && !isStaticMethod {
+                    if isClassMethod {
+                        // First param in @classmethod is 'cls' - reference to the class itself
+                        if let className = containingClass {
+                            typeEnvironment.setType(arg.arg, type: .classType(className), at: node.lineno)
+                        } else {
+                            typeEnvironment.setType(arg.arg, type: .any, at: node.lineno)
+                        }
+                    } else {
+                        // First param in regular method is 'self' - reference to class instance
+                        if let className = containingClass {
+                            typeEnvironment.setType(arg.arg, type: .instance(className), at: node.lineno)
+                        } else {
+                            typeEnvironment.setType(arg.arg, type: .any, at: node.lineno)
+                        }
+                    }
+                } else {
+                    typeEnvironment.setType(arg.arg, type: .any, at: node.lineno)
+                }
             }
         }
         
@@ -2328,7 +2406,7 @@ extension PythonType {
         case .function:
             return "function"
         case .classType(let name):
-            return name
+            return "type[\(name)]"
         case .instance(let name):
             return name
         }

@@ -911,4 +911,45 @@ final class RealWorldTypeCheckingTests: XCTestCase {
         // Line 5 is not inside any class
         XCTAssertNil(checker.getClassContext(lineNumber: 5))
     }
+    
+    func testSelfParameterType() throws {
+        let checker = try analyze("""
+        class MyClass:
+            def method(self):
+                x = self
+        
+            def other(self, value: int):
+                y = self
+        """)
+        
+        // self should have the type of the containing class
+        XCTAssertEqual(checker.getVariableType("self", at: 3), "MyClass")
+        XCTAssertEqual(checker.getVariableType("x", at: 3), "MyClass")
+        XCTAssertEqual(checker.getVariableType("self", at: 6), "MyClass")
+        XCTAssertEqual(checker.getVariableType("y", at: 6), "MyClass")
+    }
+    
+    func testClsParameterType() throws {
+        let checker = try analyze("""
+        class MyClass:
+            @classmethod
+            def create(cls):
+                return cls()
+        """)
+        
+        // cls should have type "type[MyClass]"
+        XCTAssertEqual(checker.getVariableType("cls", at: 4), "type[MyClass]")
+    }
+    
+    func testStaticMethodNoSelf() throws {
+        let checker = try analyze("""
+        class MyClass:
+            @staticmethod
+            def utility(value):
+                return value * 2
+        """)
+        
+        // First parameter in static method is not self, should be Any
+        XCTAssertEqual(checker.getVariableType("value", at: 4), "Any")
+    }
 }
