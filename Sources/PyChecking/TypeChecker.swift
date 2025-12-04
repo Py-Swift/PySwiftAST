@@ -1417,12 +1417,13 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     
     func visitDict(_ node: Dict) -> PythonType {
         if node.keys.isEmpty {
-            return .dict(key: .any, value: .any)
+            // Empty dicts default to dict[str, Any] since string keys are most common
+            return .dict(key: .str, value: .any)
         }
         
         guard let firstKey = node.keys.compactMap({ $0 }).first,
               let firstValue = node.values.first else {
-            return .dict(key: .any, value: .any)
+            return .dict(key: .str, value: .any)
         }
         
         let keyType = visitExpression(firstKey)

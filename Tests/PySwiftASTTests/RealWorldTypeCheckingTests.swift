@@ -781,4 +781,22 @@ final class RealWorldTypeCheckingTests: XCTestCase {
         // Verify the isinstance pattern is handled (test passes if no crash)
         XCTAssertNotNil(checker.getVariableType("x", at: 2))
     }
+    
+    func testEmptyDictDefaultType() throws {
+        let checker = try analyze("""
+        # Global cache
+        price_cache = {}
+        customer_cache = {}
+        
+        # With values
+        config = {"debug": True}
+        """)
+        
+        // Empty dicts default to dict[str, Any]
+        XCTAssertEqual(checker.getVariableType("price_cache", at: 2), "dict[str, Any]")
+        XCTAssertEqual(checker.getVariableType("customer_cache", at: 3), "dict[str, Any]")
+        
+        // Dict with values infers from first entry
+        XCTAssertEqual(checker.getVariableType("config", at: 6), "dict[str, bool]")
+    }
 }
