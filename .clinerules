@@ -505,6 +505,109 @@ public func provideHover(at position: IDERange) -> Hover? {
 }
 ```
 
+## TODO Management (Package Coordination)
+
+### SwiftyMonacoIDE/TODO Directory
+
+The `SwiftyMonacoIDE/TODO/` folder contains coordination documents for package development:
+
+#### 1. PySwiftAST-TODO.md
+**Purpose**: Tasks that SwiftyMonacoIDE needs from PySwiftAST
+
+**Rules for PySwiftAST**:
+- ✅ **READ this file** at the start of each session
+- ✅ **CHECK for pending tasks** that SwiftyMonacoIDE requires
+- ✅ **IMPLEMENT the tasks** to improve SwiftyMonacoIDE functionality
+- ✅ **REMOVE tasks** from the file when 100% completed
+- ✅ **UPDATE tasks** with progress notes if partially complete
+
+**SwiftyMonacoIDE Responsibilities**:
+- Adds tasks when it discovers PySwiftAST is missing features
+- Tasks describe what's needed and why (for IDE functionality)
+- Tasks include examples and expected behavior
+
+**Example Task Entry**:
+```markdown
+## Task: Add getVariableDefinitionLocation() API
+
+**Why**: SwiftyMonacoIDE needs "Go to Definition" for variables
+
+**What**: Add method to TypeChecker:
+```swift
+public func getVariableDefinitionLocation(_ name: String, at line: Int) -> (file: String, line: Int, column: Int)?
+```
+
+**Status**: Not started
+```
+
+#### 2. SwiftyMonacoIDE-TODO.md
+**Purpose**: Internal tasks for SwiftyMonacoIDE development
+
+**Rules for PySwiftAST**:
+- ❌ **DO NOT read or modify** this file
+- ❌ **DO NOT implement** tasks from this file
+- ❌ This file is for SwiftyMonacoIDE's internal coordination only
+
+**SwiftyMonacoIDE Responsibilities**:
+- Tracks its own features, bugs, and improvements
+- Not relevant to PySwiftAST development
+
+### Workflow: Ping-Pong Development
+
+The TODO system enables coordination between packages:
+
+```
+SwiftyMonacoIDE discovers issue
+    ↓
+Adds task to PySwiftAST-TODO.md
+    ↓
+PySwiftAST reads PySwiftAST-TODO.md
+    ↓
+PySwiftAST implements the feature
+    ↓
+PySwiftAST removes completed task
+    ↓
+SwiftyMonacoIDE uses new feature
+    ↓
+Cycle repeats as needed
+```
+
+### Best Practices
+
+**When Starting Work on PySwiftAST**:
+1. Check `/Volumes/CodeSSD/GitHub/PySwiftAST/SwiftyMonacoIDE/TODO/PySwiftAST-TODO.md`
+2. Prioritize tasks that unblock SwiftyMonacoIDE features
+3. Implement with tests and documentation
+4. Remove task from file when complete
+5. Commit with reference to completed task
+
+**Task Completion Checklist**:
+- [ ] Feature fully implemented with tests
+- [ ] Public API documented
+- [ ] All tests passing
+- [ ] Task removed from PySwiftAST-TODO.md
+- [ ] Commit message references the task
+
+**Task Update Format** (if partially complete):
+```markdown
+## Task: [Name]
+
+**Status**: In Progress (50% - API added, tests pending)
+**Branch**: feature/task-name
+**Blocker**: Waiting on [dependency]
+```
+
+### Why This System Exists
+
+**Problem**: PySwiftAST is a pure parser with no IDE logic. SwiftyMonacoIDE needs specific features but can't implement them in the parser layer.
+
+**Solution**: SwiftyMonacoIDE documents what it needs via PySwiftAST-TODO.md. PySwiftAST implements these features to enable better IDE functionality.
+
+**Separation of Concerns**:
+- PySwiftAST = Pure parser + type checker + core APIs
+- SwiftyMonacoIDE = IDE features + Monaco integration + UI logic
+- TODO files = Communication bridge between packages
+
 ## File References
 - Grammar: `/Volumes/CodeSSD/GitHub/PySwiftAST/Grammar/python.gram`
 - Optimization Guidelines: `/Volumes/CodeSSD/GitHub/PySwiftAST/OPTIMIZATION_GUIDELINES.md`
@@ -516,6 +619,8 @@ public func provideHover(at position: IDERange) -> Hover? {
 - PySwiftIDE: `/Volumes/CodeSSD/GitHub/PySwiftAST/PySwiftIDE/`
 - PySwiftIDE Docs: `/Volumes/CodeSSD/GitHub/PySwiftAST/PySwiftIDE/USAGE.md`
 - Monaco Editor API: https://microsoft.github.io/monaco-editor/
+- **PySwiftAST TODO**: `/Volumes/CodeSSD/GitHub/PySwiftAST/SwiftyMonacoIDE/TODO/PySwiftAST-TODO.md` ⚠️ **CHECK FIRST**
+- SwiftyMonacoIDE TODO: `/Volumes/CodeSSD/GitHub/PySwiftAST/SwiftyMonacoIDE/TODO/SwiftyMonacoIDE-TODO.md` (DO NOT MODIFY)
 
 ## Workflow Summary
 
