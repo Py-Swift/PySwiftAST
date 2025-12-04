@@ -250,6 +250,26 @@ public final class TypeChecker: PyChecker {
         return nil
     }
     
+    /// Get all scopes at a position (returns chain from outermost to innermost)
+    /// - Parameters:
+    ///   - line: Line number (1-indexed)
+    ///   - column: Column number (0-indexed)
+    /// - Returns: Array of scopes from module to innermost containing scope
+    public func getScopeChainAt(line: Int, column: Int) -> [ScopeInfo] {
+        return visitor.scopeTracker.getScopeChainAt(line: line)
+    }
+    
+    /// Check if a line is inside a specific scope type
+    /// - Parameters:
+    ///   - line: Line number (1-indexed)
+    ///   - column: Column number (0-indexed)
+    ///   - kind: The scope kind to check for
+    /// - Returns: True if the line is inside a scope of the specified kind
+    public func isInScope(line: Int, column: Int, kind: ScopeKind) -> Bool {
+        let chain = visitor.scopeTracker.getScopeChainAt(line: line)
+        return chain.contains { $0.kind == kind }
+    }
+    
     /// Get all members of a class
     /// - Parameter className: Name of the class
     /// - Returns: Array of class members (properties and methods)
@@ -580,6 +600,57 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     
     init() {}
     
+    // MARK: - Helper Methods
+    
+    /// Calculate the actual end line of a list of statements by recursively finding the last line
+    private func calculateEndLine(_ statements: [Statement]) -> Int? {
+        guard let lastStmt = statements.last else { return nil }
+        
+        switch lastStmt {
+        case .functionDef(let funcDef):
+            return funcDef.endLineno ?? calculateEndLine(funcDef.body) ?? funcDef.lineno
+        case .asyncFunctionDef(let funcDef):
+            return funcDef.endLineno ?? calculateEndLine(funcDef.body) ?? funcDef.lineno
+        case .classDef(let classDef):
+            return classDef.endLineno ?? calculateEndLine(classDef.body) ?? classDef.lineno
+        case .ifStmt(let ifStmt):
+            // Check orElse first as it comes last, then body
+            if let elseEnd = calculateEndLine(ifStmt.orElse) {
+                return elseEnd
+            }
+            return calculateEndLine(ifStmt.body) ?? ifStmt.lineno
+        case .whileStmt(let whileStmt):
+            if let elseEnd = calculateEndLine(whileStmt.orElse) {
+                return elseEnd
+            }
+            return calculateEndLine(whileStmt.body) ?? whileStmt.lineno
+        case .forStmt(let forStmt):
+            if let elseEnd = calculateEndLine(forStmt.orElse) {
+                return elseEnd
+            }
+            return calculateEndLine(forStmt.body) ?? forStmt.lineno
+        case .withStmt(let withStmt):
+            return calculateEndLine(withStmt.body) ?? withStmt.lineno
+        case .tryStmt(let tryStmt):
+            // Check orElse, finalBody, then handlers, then body
+            if let finalEnd = calculateEndLine(tryStmt.finalBody) {
+                return finalEnd
+            }
+            if let elseEnd = calculateEndLine(tryStmt.orElse) {
+                return elseEnd
+            }
+            if let lastHandler = tryStmt.handlers.last {
+                if let handlerEnd = calculateEndLine(lastHandler.body) {
+                    return handlerEnd
+                }
+            }
+            return calculateEndLine(tryStmt.body) ?? tryStmt.lineno
+        default:
+            // For simple statements, return their line number
+            return lastStmt.lineno
+        }
+    }
+    
     // MARK: - Module Visitation
     
     func visitModule(_ module: Module) {
@@ -747,7 +818,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
         typeEnvironment.setType(node.name, type: returnType, at: node.lineno)
         
         // Use actual end line from AST node, or calculate from body
-        let endLine = node.endLineno ?? node.body.last?.lineno ?? node.lineno
+        let endLine = node.endLineno ?? calculateEndLine(node.body) ?? node.lineno
         
         // Track function scope
         scopeTracker.enterScope(kind: .function, name: node.name, startLine: node.lineno, endLine: endLine)
@@ -781,7 +852,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
         let returnType = node.returns.map { PythonType.fromExpression($0) } ?? .any
         typeEnvironment.setType(node.name, type: returnType, at: node.lineno)
         
-        let endLine = node.endLineno ?? node.body.last?.lineno ?? node.lineno
+        let endLine = node.endLineno ?? calculateEndLine(node.body) ?? node.lineno
         
         scopeTracker.enterScope(kind: .function, name: node.name, startLine: node.lineno, endLine: endLine)
         typeEnvironment.pushScope(startLine: node.lineno, endLine: endLine)
@@ -807,7 +878,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     }
     
     func visitClassDef(_ node: ClassDef) {
-        let endLine = node.endLineno ?? node.body.last?.lineno ?? node.lineno
+        let endLine = node.endLineno ?? calculateEndLine(node.body) ?? node.lineno
         
         // Track class scope
         scopeTracker.enterScope(kind: .classScope, name: node.name, startLine: node.lineno, endLine: endLine)
@@ -1832,7 +1903,7 @@ public struct ScopeInfo: Sendable {
 }
 
 /// Kind of scope
-public enum ScopeKind: Sendable {
+public enum ScopeKind: Sendable, Equatable {
     case module
     case function
     case classScope
@@ -1891,6 +1962,23 @@ final class ScopeTracker {
         }
         
         return matchingScope
+    }
+    
+    func getScopeChainAt(line: Int) -> [ScopeInfo] {
+        // Return all scopes containing the line, sorted from outermost to innermost
+        var matchingScopes: [(scope: ScopeInfo, range: Int)] = []
+        
+        for scope in allScopes {
+            if scope.startLine <= line && line <= scope.endLine {
+                let range = scope.endLine - scope.startLine
+                matchingScopes.append((scope, range))
+            }
+        }
+        
+        // Sort by range size (largest first = outermost)
+        matchingScopes.sort { $0.range > $1.range }
+        
+        return matchingScopes.map { $0.scope }
     }
 }
 

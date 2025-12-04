@@ -799,4 +799,116 @@ final class RealWorldTypeCheckingTests: XCTestCase {
         // Dict with values infers from first entry
         XCTAssertEqual(checker.getVariableType("config", at: 6), "dict[str, bool]")
     }
+    
+    // MARK: - Scope API Tests
+    
+    func testGetScopeAt_ClassDefinition() throws {
+        let checker = try analyze("""
+        class MyClass:
+            pass
+        """)
+        
+        let scope = checker.getScopeAt(line: 1, column: 0)
+        XCTAssertNotNil(scope)
+        XCTAssertEqual(scope?.kind, .classScope)
+        XCTAssertEqual(scope?.name, "MyClass")
+        XCTAssertEqual(scope?.startLine, 1)
+    }
+    
+    func testGetScopeAt_InsideMethod() throws {
+        let checker = try analyze("""
+        class MyClass:
+            def method(self):
+                x = 1
+        """)
+        
+        // Line 3 is inside the method, which is inside the class
+        let scope = checker.getScopeAt(line: 3, column: 8)
+        XCTAssertNotNil(scope)
+        // Should return function scope (innermost)
+        XCTAssertEqual(scope?.kind, .function)
+        XCTAssertEqual(scope?.name, "method")
+    }
+    
+    func testGetScopeAt_NestedClasses() throws {
+        let checker = try analyze("""
+        class Outer:
+            class Inner:
+                def method(self):
+                    pass
+        """)
+        
+        // Line 4 should be in the Inner class's method
+        let scope = checker.getScopeAt(line: 4, column: 12)
+        XCTAssertNotNil(scope)
+        // Should return the function scope (innermost)
+        XCTAssertEqual(scope?.kind, .function)
+        XCTAssertEqual(scope?.name, "method")
+    }
+    
+    func testGetScopeAt_ModuleLevel() throws {
+        let checker = try analyze("""
+        x = 1
+        y = 2
+        """)
+        
+        let scope = checker.getScopeAt(line: 1, column: 0)
+        XCTAssertNotNil(scope)
+        XCTAssertEqual(scope?.kind, .module)
+    }
+    
+    func testGetScopeChainAt() throws {
+        let checker = try analyze("""
+        class MyClass:
+            def method(self):
+                x = 1
+        """)
+        
+        // Line 3 is inside method inside class inside module
+        let chain = checker.getScopeChainAt(line: 3, column: 8)
+        
+        // Should have 3 scopes: module, class, function
+        XCTAssertEqual(chain.count, 3)
+        
+        // Outermost to innermost
+        XCTAssertEqual(chain[0].kind, .module)
+        XCTAssertEqual(chain[1].kind, .classScope)
+        XCTAssertEqual(chain[1].name, "MyClass")
+        XCTAssertEqual(chain[2].kind, .function)
+        XCTAssertEqual(chain[2].name, "method")
+    }
+    
+    func testIsInScope() throws {
+        let checker = try analyze("""
+        class MyClass:
+            def method(self):
+                x = 1
+        
+        y = 2
+        """)
+        
+        // Line 3 is inside a class
+        XCTAssertTrue(checker.isInScope(line: 3, column: 8, kind: .classScope))
+        XCTAssertTrue(checker.isInScope(line: 3, column: 8, kind: .function))
+        
+        // Line 5 is not inside a class or function
+        XCTAssertFalse(checker.isInScope(line: 5, column: 0, kind: .classScope))
+        XCTAssertFalse(checker.isInScope(line: 5, column: 0, kind: .function))
+    }
+    
+    func testGetClassContext() throws {
+        let checker = try analyze("""
+        class MyClass:
+            def method(self):
+                x = 1
+        
+        y = 2
+        """)
+        
+        // Line 3 is inside MyClass
+        XCTAssertEqual(checker.getClassContext(lineNumber: 3), "MyClass")
+        
+        // Line 5 is not inside any class
+        XCTAssertNil(checker.getClassContext(lineNumber: 5))
+    }
 }
