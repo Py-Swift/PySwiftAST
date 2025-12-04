@@ -701,7 +701,44 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     
     func visitAugAssign(_ node: AugAssign) {
         // Handle augmented assignments like +=, -=, etc.
-        _ = visitExpression(node.value)
+        let valueType = visitExpression(node.value)
+        
+        if case .name(let name) = node.target {
+            if let existingType = typeEnvironment.getType(name.id, at: node.lineno) {
+                // Check type compatibility for augmented assignment
+                // For numeric types, result should be compatible
+                var resultType = existingType
+                
+                switch node.op {
+                case .add:
+                    // str += str, int += int, list += list
+                    if existingType == .str && valueType == .str {
+                        resultType = .str
+                    } else if existingType == .int && valueType == .int {
+                        resultType = .int
+                    } else if (existingType == .int || existingType == .float) && (valueType == .int || valueType == .float) {
+                        resultType = .float
+                    } else if case .list(let elemType) = existingType, case .list = valueType {
+                        resultType = .list(elemType)
+                    }
+                case .sub, .mult, .div, .floorDiv, .mod, .pow:
+                    // Numeric operations
+                    if existingType == .int && valueType == .int {
+                        resultType = node.op == .div ? .float : .int
+                    } else if (existingType == .int || existingType == .float) && (valueType == .int || valueType == .float) {
+                        resultType = .float
+                    }
+                case .matMult, .bitOr, .bitXor, .bitAnd, .lShift, .rShift:
+                    // Preserve type for these operations
+                    break
+                }
+                
+                typeEnvironment.setType(name.id, type: resultType, at: node.lineno)
+            } else {
+                // Variable not yet defined, infer from value
+                typeEnvironment.setType(name.id, type: valueType, at: node.lineno)
+            }
+        }
     }
     
     func visitFunctionDef(_ node: FunctionDef) {
@@ -927,6 +964,62 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     }
     
     func visitIf(_ node: If) {
+        // Check for type narrowing patterns like isinstance(x, int)
+        let testExpr = node.test
+        
+        // Look for isinstance(variable, type) pattern
+        if case .call(let call) = testExpr,
+           case .name(let funcName) = call.fun,
+           funcName.id == "isinstance",
+           call.args.count >= 2,
+           case .name(let varName) = call.args[0] {
+            
+            // Try to extract the type from second argument
+            if case .name(let typeName) = call.args[1] {
+                var narrowedType: PythonType? = nil
+                
+                switch typeName.id {
+                case "int": narrowedType = .int
+                case "float": narrowedType = .float
+                case "str": narrowedType = .str
+                case "bool": narrowedType = .bool
+                case "list": narrowedType = .list(.any)
+                case "dict": narrowedType = .dict(key: .any, value: .any)
+                case "set": narrowedType = .set(.any)
+                case "tuple": narrowedType = .tuple([.any])
+                default:
+                    // Check if it's a class name
+                    if classRegistry.classExists(typeName.id) {
+                        narrowedType = .instance(typeName.id)
+                    }
+                }
+                
+                // Apply type narrowing in the if body
+                if let narrowedType = narrowedType {
+                    let currentType = typeEnvironment.getType(varName.id, at: node.lineno)
+                    // Temporarily narrow the type in the if block
+                    // Note: This is simplified - a full implementation would create a new scope
+                    typeEnvironment.setType(varName.id, type: narrowedType, at: node.lineno)
+                    
+                    for statement in node.body {
+                        visitStatement(statement)
+                    }
+                    
+                    // Restore original type for else block
+                    if let currentType = currentType {
+                        typeEnvironment.setType(varName.id, type: currentType, at: node.lineno)
+                    }
+                    
+                    for statement in node.orElse {
+                        visitStatement(statement)
+                    }
+                    
+                    return
+                }
+            }
+        }
+        
+        // Default behavior - no type narrowing
         for statement in node.body {
             visitStatement(statement)
         }
@@ -948,11 +1041,35 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     
     func visitFor(_ node: For) {
         let iterType = visitExpression(node.iter)
+        let elementType = extractElementType(from: iterType)
         
-        // Try to infer element type from iterator
-        if case .list(let elemType) = iterType,
-           case .name(let targetName) = node.target {
-            typeEnvironment.setType(targetName.id, type: elemType, at: node.lineno)
+        // Handle different target patterns
+        switch node.target {
+        case .name(let targetName):
+            // Simple loop variable: for x in iterable:
+            typeEnvironment.setType(targetName.id, type: elementType, at: node.lineno)
+            
+        case .tuple(let tupleNode):
+            // Tuple unpacking: for key, value in dict.items():
+            if case .tuple(let elementTypes) = elementType {
+                // Element is a tuple, unpack it
+                for (index, element) in tupleNode.elts.enumerated() {
+                    if case .name(let name) = element, index < elementTypes.count {
+                        typeEnvironment.setType(name.id, type: elementTypes[index], at: node.lineno)
+                    }
+                }
+            } else {
+                // Element is not a tuple, assign same type to all variables
+                for element in tupleNode.elts {
+                    if case .name(let name) = element {
+                        typeEnvironment.setType(name.id, type: elementType, at: node.lineno)
+                    }
+                }
+            }
+            
+        default:
+            // Other target patterns (subscript, attribute, etc.)
+            break
         }
         
         for statement in node.body {
@@ -1066,7 +1183,6 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
         case .lShift, .rShift, .bitOr, .bitXor, .bitAnd:
             // Bitwise operations return int
             return .int
-        default: return .any
         }
     }
     
@@ -1347,8 +1463,23 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     func visitRaise(_ node: Raise) {}
     func visitBreakStmt(_ node: Break) {}
     func visitContinueStmt(_ node: Continue) {}
-    func visitImportStmt(_ node: Import) {}
-    func visitImportFrom(_ node: ImportFrom) {}
+    func visitImportStmt(_ node: Import) {
+        // Track imported modules
+        for alias in node.names {
+            let moduleName = alias.asName ?? alias.name
+            // Register module as Any type (we don't have type stubs)
+            typeEnvironment.setType(moduleName, type: .any, at: node.lineno)
+        }
+    }
+    
+    func visitImportFrom(_ node: ImportFrom) {
+        // Track from X import Y statements
+        for alias in node.names {
+            let name = alias.asName ?? alias.name
+            // Register imported name as Any type (we don't have type stubs)
+            typeEnvironment.setType(name, type: .any, at: node.lineno)
+        }
+    }
     func visitGlobal(_ node: Global) {}
     func visitNonlocal(_ node: Nonlocal) {}
     func visitExpr(_ node: Expr) { _ = visitExpression(node.value) }
