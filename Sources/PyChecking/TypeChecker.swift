@@ -65,13 +65,27 @@ public final class TypeChecker: PyChecker {
     ///   - lineNumber: Optional line number for scope-aware lookup
     /// - Returns: Type as a display string, or nil if not found
     public func getVariableType(_ name: String, at lineNumber: Int? = nil) -> String? {
-        if let line = lineNumber {
-            return visitor.typeEnvironment.getType(name, at: line)?.toDisplayString()
-        } else {
-            // Search all scopes if no line specified
-            let allSymbols = visitor.typeEnvironment.getAllSymbols()
-            return allSymbols.first(where: { $0.name == name })?.type.toDisplayString()
+        guard case .module(let statements) = currentModule else {
+            return nil
         }
+        
+        if let line = lineNumber {
+            // Scope-aware lookup - find which function/class contains this line
+            if let scopeChain = findScopeChain(at: line, in: statements, globals: statements) {
+                return scopeChain.findVariable(name)?.toDisplayString()
+            }
+            // Fallback to global scope search
+            if let type = searchVariableInStatements(statements, name: name, at: line) {
+                return type.toDisplayString()
+            }
+        } else {
+            // No line number - search globally
+            if let type = searchVariableInStatements(statements, name: name, at: nil) {
+                return type.toDisplayString()
+            }
+        }
+        
+        return nil
     }
     
     /// Get all symbols accessible at a specific location
@@ -275,11 +289,142 @@ public final class TypeChecker: PyChecker {
     ///   - anywhere: If true, searches all scopes; if false, only current scope
     /// - Returns: True if variable exists
     public func variableExists(_ name: String, anywhere: Bool = false) -> Bool {
+        guard case .module(let statements) = currentModule else {
+            return false
+        }
+        
         if anywhere {
-            return visitor.typeEnvironment.variableExistsAnywhere(name)
+            return searchVariableAnywhereInStatements(statements, name: name)
         } else {
             return visitor.typeEnvironment.variableExists(name)
         }
+    }
+    
+    // MARK: - Private Scope-Aware Search Methods
+    
+    /// Find the scope chain (local + global statements) for a given line number
+    private func findScopeChain(at lineNumber: Int, in statements: [Statement], globals: [Statement], inClass: ClassDef? = nil) -> ScopeChain? {
+        for statement in statements {
+            switch statement {
+            case .functionDef(let funcDef):
+                let funcEndLine = statement.endLineno ?? funcDef.body.last?.lineno ?? funcDef.lineno
+                if funcDef.lineno <= lineNumber && lineNumber <= funcEndLine {
+                    return ScopeChain(
+                        localStatements: funcDef.body,
+                        classStatements: inClass.map { [$0].map { Statement.classDef($0) } },
+                        globalStatements: globals,
+                        lineNumber: lineNumber
+                    )
+                }
+                
+            case .asyncFunctionDef(let funcDef):
+                let funcEndLine = statement.endLineno ?? funcDef.body.last?.lineno ?? funcDef.lineno
+                if funcDef.lineno <= lineNumber && lineNumber <= funcEndLine {
+                    return ScopeChain(
+                        localStatements: funcDef.body,
+                        classStatements: inClass.map { [$0].map { Statement.classDef($0) } },
+                        globalStatements: globals,
+                        lineNumber: lineNumber
+                    )
+                }
+                
+            case .classDef(let classDef):
+                let classEndLine = statement.endLineno ?? classDef.body.last?.lineno ?? classDef.lineno
+                if classDef.lineno <= lineNumber && lineNumber <= classEndLine {
+                    // Recursively search within the class for nested functions
+                    if let nestedScope = findScopeChain(at: lineNumber, in: classDef.body, globals: globals, inClass: classDef) {
+                        return nestedScope
+                    }
+                    // If not in a nested function, it's in class scope (but class vars aren't accessible without self.)
+                    return ScopeChain(
+                        localStatements: [],
+                        classStatements: classDef.body,
+                        globalStatements: globals,
+                        lineNumber: lineNumber
+                    )
+                }
+                
+            default:
+                break
+            }
+        }
+        
+        return nil
+    }
+    
+    /// Search for a variable anywhere in statements (recursive)
+    private func searchVariableAnywhereInStatements(_ statements: [Statement], name: String) -> Bool {
+        for stmt in statements {
+            switch stmt {
+            case .assign(let assign):
+                for target in assign.targets {
+                    if case let .name(nameExpr) = target, nameExpr.id == name {
+                        return true
+                    }
+                }
+            case .annAssign(let annAssign):
+                if case let .name(target) = annAssign.target, target.id == name {
+                    return true
+                }
+            case .functionDef(let funcDef):
+                if searchVariableAnywhereInStatements(funcDef.body, name: name) {
+                    return true
+                }
+            case .asyncFunctionDef(let funcDef):
+                if searchVariableAnywhereInStatements(funcDef.body, name: name) {
+                    return true
+                }
+            case .classDef(let classDef):
+                if searchVariableAnywhereInStatements(classDef.body, name: name) {
+                    return true
+                }
+            default:
+                break
+            }
+        }
+        return false
+    }
+    
+    /// Search for a variable in statements
+    private func searchVariableInStatements(_ statements: [Statement], name: String, at lineNumber: Int?) -> PythonType? {
+        var mostRecentAssignment: (line: Int, type: PythonType)? = nil
+        
+        for stmt in statements {
+            switch stmt {
+            case .assign(let assign):
+                for target in assign.targets {
+                    if case let .name(nameExpr) = target, nameExpr.id == name {
+                        if let queryLine = lineNumber {
+                            if assign.lineno <= queryLine {
+                                let type = PythonType.fromExpression(assign.value)
+                                if mostRecentAssignment == nil || assign.lineno > mostRecentAssignment!.line {
+                                    mostRecentAssignment = (line: assign.lineno, type: type)
+                                }
+                            }
+                        } else {
+                            return PythonType.fromExpression(assign.value)
+                        }
+                    }
+                }
+            case .annAssign(let annAssign):
+                if case let .name(target) = annAssign.target, target.id == name {
+                    if let queryLine = lineNumber {
+                        if annAssign.lineno <= queryLine {
+                            let type = PythonType.fromExpression(annAssign.annotation)
+                            if mostRecentAssignment == nil || annAssign.lineno > mostRecentAssignment!.line {
+                                mostRecentAssignment = (line: annAssign.lineno, type: type)
+                            }
+                        }
+                    } else {
+                        return PythonType.fromExpression(annAssign.annotation)
+                    }
+                }
+            default:
+                break
+            }
+        }
+        
+        return mostRecentAssignment?.type
     }
     
     /// Get the diagnostics from the last check
@@ -1182,6 +1327,91 @@ extension PythonType {
             return name
         case .instance(let name):
             return name
+        }
+    }
+}
+
+// MARK: - Scope Chain for Query-Time Variable Resolution
+
+/// Represents a scope chain for variable lookup at a specific line
+struct ScopeChain {
+    let localStatements: [Statement]  // Current function/method scope
+    let classStatements: [Statement]? // Enclosing class scope (if any)
+    let globalStatements: [Statement] // Module-level scope
+    let lineNumber: Int // Line number for finding most recent assignment
+    
+    /// Search for a variable in the proper scope order: local -> global
+    func findVariable(_ name: String) -> PythonType? {
+        return findVariableWithVisited(name, visited: Swift.Set<String>())
+    }
+    
+    /// Internal search with cycle detection
+    private func findVariableWithVisited(_ name: String, visited: Swift.Set<String>) -> PythonType? {
+        if visited.contains(name) {
+            return nil
+        }
+        
+        var newVisited = visited
+        newVisited.insert(name)
+        
+        // 1. Search local scope first
+        if let type = searchStatements(localStatements, for: name, visited: newVisited) {
+            return type
+        }
+        
+        // 2. Search global scope
+        if let type = searchStatements(globalStatements, for: name, visited: newVisited) {
+            return type
+        }
+        
+        return nil
+    }
+    
+    /// Search statements for a variable assignment
+    private func searchStatements(_ statements: [Statement], for name: String, visited: Swift.Set<String>) -> PythonType? {
+        var mostRecentAssignment: (line: Int, type: PythonType)? = nil
+        
+        for stmt in statements {
+            switch stmt {
+            case .assign(let assign):
+                for target in assign.targets {
+                    if case let .name(nameExpr) = target, nameExpr.id == name {
+                        if assign.lineno <= lineNumber {
+                            let type = inferTypeFromExpression(assign.value, visited: visited)
+                            if mostRecentAssignment == nil || assign.lineno > mostRecentAssignment!.line {
+                                mostRecentAssignment = (line: assign.lineno, type: type)
+                            }
+                        }
+                    }
+                }
+            case .annAssign(let annAssign):
+                if case let .name(target) = annAssign.target, target.id == name {
+                    if annAssign.lineno <= lineNumber {
+                        let type = PythonType.fromExpression(annAssign.annotation)
+                        if mostRecentAssignment == nil || annAssign.lineno > mostRecentAssignment!.line {
+                            mostRecentAssignment = (line: annAssign.lineno, type: type)
+                        }
+                    }
+                }
+            default:
+                break
+            }
+        }
+        
+        return mostRecentAssignment?.type
+    }
+    
+    /// Infer type from an expression with variable resolution
+    private func inferTypeFromExpression(_ expr: Expression, visited: Swift.Set<String>) -> PythonType {
+        switch expr {
+        case .name(let nameExpr):
+            // Resolve variable reference
+            if let type = findVariableWithVisited(nameExpr.id, visited: visited) {
+                return type
+            }
+            return .any
+        default:
+            return PythonType.fromExpression(expr)
         }
     }
 }
