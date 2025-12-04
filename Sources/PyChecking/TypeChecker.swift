@@ -9,25 +9,41 @@ import PySwiftAST
 /// - Type compatibility rules
 ///
 /// Provides query APIs for IDE features:
+/// - analyze(module:) - Analyze a module and cache results for queries
 /// - getTypeAt(name:line:column:) - Get type of symbol at position
+/// - getVariableType(name:at:) - Get type of variable (simpler API)
 /// - getScopeAt(line:column:) - Get containing scope
 /// - getSymbolsAt(line:column:) - Get all accessible symbols
 /// - getClassMembers(className:) - Get class properties and methods
-public struct TypeChecker: PyChecker {
+/// - getClassContext(lineNumber:) - Get name of containing class
+/// - getClassProperties(at:) - Get properties of class at line
+/// - getAllVariablesInScope(at:) - Get all variables as [String: String]
+/// - variableExists(name:anywhere:) - Check if variable exists
+public final class TypeChecker: PyChecker {
     public let id = "type-checker"
     public let name = "Type Checker"
     public let description = "Static type checking with type inference and IDE queries"
     
     private var visitor: TypeCheckingVisitor
+    private var currentModule: Module?
     
     public init() {
         self.visitor = TypeCheckingVisitor()
     }
     
+    /// Analyze a module and cache the results for querying
+    /// - Parameter module: The module to analyze
+    /// - Returns: Diagnostics found during analysis
+    public func analyze(_ module: Module) -> [Diagnostic] {
+        self.currentModule = module
+        visitor = TypeCheckingVisitor() // Fresh visitor for new analysis
+        visitor.visitModule(module)
+        return visitor.diagnostics
+    }
+    
+    /// Legacy method for PyChecker protocol - delegates to analyze()
     public func check(_ module: Module) -> [Diagnostic] {
-        let checker = TypeChecker()
-        checker.visitor.visitModule(module)
-        return checker.visitor.diagnostics
+        return analyze(module)
     }
     
     // MARK: - Query APIs for IDE Features
@@ -42,6 +58,21 @@ public struct TypeChecker: PyChecker {
         return visitor.typeEnvironment.getType(name, at: line)
     }
     
+    /// Get the type of a variable as a string (simplified API matching ASTCore)
+    /// - Parameters:
+    ///   - name: Variable name
+    ///   - lineNumber: Optional line number for scope-aware lookup
+    /// - Returns: Type as a display string, or nil if not found
+    public func getVariableType(_ name: String, at lineNumber: Int? = nil) -> String? {
+        if let line = lineNumber {
+            return visitor.typeEnvironment.getType(name, at: line)?.toDisplayString()
+        } else {
+            // Search all scopes if no line specified
+            let allSymbols = visitor.typeEnvironment.getAllSymbols()
+            return allSymbols.first(where: { $0.name == name })?.type.toDisplayString()
+        }
+    }
+    
     /// Get all symbols accessible at a specific location
     /// - Parameters:
     ///   - line: Line number (1-indexed)
@@ -49,6 +80,18 @@ public struct TypeChecker: PyChecker {
     /// - Returns: Array of (name, type) tuples for all accessible symbols
     public func getSymbolsAt(line: Int, column: Int) -> [(name: String, type: PythonType)] {
         return visitor.typeEnvironment.getAllSymbolsInScope(at: line)
+    }
+    
+    /// Get all variables in scope as a dictionary (matching ASTCore API)
+    /// - Parameter lineNumber: Line number (1-indexed)
+    /// - Returns: Dictionary mapping variable names to type strings
+    public func getAllVariablesInScope(at lineNumber: Int) -> [String: String] {
+        let symbols = visitor.typeEnvironment.getAllSymbolsInScope(at: lineNumber)
+        var result: [String: String] = [:]
+        for (name, type) in symbols {
+            result[name] = type.toDisplayString()
+        }
+        return result
     }
     
     /// Get the containing scope at a specific location
@@ -60,6 +103,17 @@ public struct TypeChecker: PyChecker {
         return visitor.scopeTracker.getScopeAt(line: line)
     }
     
+    /// Get the name of the containing class at a line number
+    /// - Parameter lineNumber: Line number (1-indexed)
+    /// - Returns: Class name if inside a class, nil otherwise
+    public func getClassContext(lineNumber: Int) -> String? {
+        if let scope = visitor.scopeTracker.getScopeAt(line: lineNumber),
+           scope.kind == .classScope {
+            return scope.name
+        }
+        return nil
+    }
+    
     /// Get all members of a class
     /// - Parameter className: Name of the class
     /// - Returns: Array of class members (properties and methods)
@@ -67,9 +121,43 @@ public struct TypeChecker: PyChecker {
         return visitor.classRegistry.getMembers(className)
     }
     
+    /// Get properties of the class at a specific line
+    /// - Parameter lineNumber: Line number (1-indexed)
+    /// - Returns: Dictionary mapping property names to type strings
+    public func getClassProperties(at lineNumber: Int) -> [String: String] {
+        guard let className = getClassContext(lineNumber: lineNumber) else {
+            return [:]
+        }
+        
+        let members = visitor.classRegistry.getMembers(className)
+        var properties: [String: String] = [:]
+        for member in members where member.kind == .property {
+            properties[member.name] = member.type.toDisplayString()
+        }
+        return properties
+    }
+    
+    /// Check if a variable exists in scope
+    /// - Parameters:
+    ///   - name: Variable name
+    ///   - anywhere: If true, searches all scopes; if false, only current scope
+    /// - Returns: True if variable exists
+    public func variableExists(_ name: String, anywhere: Bool = false) -> Bool {
+        if anywhere {
+            return visitor.typeEnvironment.variableExistsAnywhere(name)
+        } else {
+            return visitor.typeEnvironment.variableExists(name)
+        }
+    }
+    
     /// Get the diagnostics from the last check
     public func getDiagnostics() -> [Diagnostic] {
         return visitor.diagnostics
+    }
+    
+    /// Get the currently analyzed module
+    public func getCurrentModule() -> Module? {
+        return currentModule
     }
 }
 
@@ -633,14 +721,14 @@ public enum MemberKind: Sendable {
 // MARK: - Scope Tracker
 
 /// Tracks scope boundaries during analysis
-struct ScopeTracker {
+final class ScopeTracker {
     private var scopes: [ScopeInfo] = []
     
-    mutating func enterScope(kind: ScopeKind, name: String?, startLine: Int, endLine: Int) {
+    func enterScope(kind: ScopeKind, name: String?, startLine: Int, endLine: Int) {
         scopes.append(ScopeInfo(kind: kind, name: name, startLine: startLine, endLine: endLine))
     }
     
-    mutating func exitScope() {
+    func exitScope() {
         if !scopes.isEmpty {
             scopes.removeLast()
         }
@@ -660,21 +748,27 @@ struct ScopeTracker {
 // MARK: - Class Registry
 
 /// Tracks class definitions and their members
-struct ClassRegistry {
+final class ClassRegistry {
     private var classes: [String: ClassInfo] = [:]
     
-    struct ClassInfo {
+    class ClassInfo {
         let name: String
         let startLine: Int
         let endLine: Int
         var members: [MemberInfo] = []
+        
+        init(name: String, startLine: Int, endLine: Int) {
+            self.name = name
+            self.startLine = startLine
+            self.endLine = endLine
+        }
     }
     
-    mutating func registerClass(_ name: String, at startLine: Int, endLine: Int) {
+    func registerClass(_ name: String, at startLine: Int, endLine: Int) {
         classes[name] = ClassInfo(name: name, startLine: startLine, endLine: endLine)
     }
     
-    mutating func addMember(toClass className: String, name: String, type: PythonType, kind: MemberKind, line: Int) {
+    func addMember(toClass className: String, name: String, type: PythonType, kind: MemberKind, line: Int) {
         classes[className]?.members.append(MemberInfo(name: name, type: type, kind: kind, line: line))
     }
     
@@ -686,26 +780,32 @@ struct ClassRegistry {
 // MARK: - Enhanced Type Environment
 
 /// Manages variable types and scopes with line-aware lookups and variable chain tracking
-public struct TypeEnvironment {
-    private struct Scope {
+public final class TypeEnvironment {
+    private class Scope {
         var variables: [(name: String, type: PythonType, line: Int)] = []
         var returnType: PythonType?
     }
     
     private var scopes: [Scope] = [Scope()]
     
-    mutating func pushScope() {
+    init() {}
+    
+    func pushScope() {
         scopes.append(Scope())
     }
     
-    mutating func popScope() {
+    func popScope() {
         if scopes.count > 1 {
             scopes.removeLast()
         }
     }
     
-    mutating func setType(_ name: String, type: PythonType, at line: Int) {
+    func setType(_ name: String, type: PythonType, at line: Int) {
         scopes[scopes.count - 1].variables.append((name: name, type: type, line: line))
+    }
+    
+    func setReturnType(_ type: PythonType) {
+        scopes[scopes.count - 1].returnType = type
     }
     
     /// Get type with variable chain following and cycle detection
@@ -802,7 +902,7 @@ public struct TypeEnvironment {
         return mostRecent
     }
     
-    mutating func setReturnType(_ type: PythonType?) {
+    func setReturnType(_ type: PythonType?) {
         scopes[scopes.count - 1].returnType = type
     }
     
@@ -825,6 +925,29 @@ public struct TypeEnvironment {
             }
         }
         return false
+    }
+    
+    /// Check if a variable exists anywhere in any scope (global search)
+    func variableExistsAnywhere(_ name: String) -> Bool {
+        return variableExists(name)
+    }
+    
+    /// Get all symbols from all scopes (for global search)
+    func getAllSymbols() -> [(name: String, type: PythonType)] {
+        var result: [(name: String, type: PythonType)] = []
+        var seen: Swift.Set<String> = []
+        
+        // Collect from all scopes, avoiding duplicates
+        for scope in scopes.reversed() {
+            for (name, type, _) in scope.variables {
+                if !seen.contains(name) {
+                    result.append((name: name, type: type))
+                    seen.insert(name)
+                }
+            }
+        }
+        
+        return result
     }
 }
 
