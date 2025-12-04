@@ -1097,5 +1097,125 @@ final class RealWorldTypeCheckingTests: XCTestCase {
             XCTFail("process method not found")
         }
     }
+    
+    // MARK: - Attribute Type Inference Tests
+    
+    func testGetAttributeType_InstanceMethod() throws {
+        let checker = try analyze("""
+        class Calculator:
+            def add(self, x: int, y: int) -> int:
+                return x + y
+            
+            def process(self):
+                result = self.add(1, 2)
+        """)
+        
+        // Get type of self.add attribute (returns the method's return type)
+        if let attrType = checker.getAttributeType(object: "self", attribute: "add", line: 6) {
+            XCTAssertEqual(attrType.toDisplayString(), "int")
+        } else {
+            XCTFail("self.add attribute type not found")
+        }
+    }
+    
+    func testGetAttributeType_InstanceProperty() throws {
+        let checker = try analyze("""
+        class User:
+            def __init__(self, name: str):
+                self.name = name
+                self.age: int = 0
+            
+            def greet(self):
+                message = self.name
+                years = self.age
+        """)
+        
+        // Get type of self.name
+        if let nameType = checker.getAttributeType(object: "self", attribute: "name", line: 7) {
+            XCTAssertEqual(nameType.toDisplayString(), "str")
+        } else {
+            XCTFail("self.name attribute type not found")
+        }
+        
+        // Get type of self.age
+        if let ageType = checker.getAttributeType(object: "self", attribute: "age", line: 8) {
+            XCTAssertEqual(ageType.toDisplayString(), "int")
+        } else {
+            XCTFail("self.age attribute type not found")
+        }
+    }
+    
+    func testGetAttributeType_BuiltinMethods() throws {
+        let checker = try analyze("""
+        text = "hello"
+        result = text.upper()
+        """)
+        
+        // Get type of str.upper method
+        if let upperType = checker.getAttributeType(object: "text", attribute: "upper", line: 2) {
+            XCTAssertEqual(upperType.toDisplayString(), "str")
+        } else {
+            XCTFail("text.upper attribute type not found")
+        }
+    }
+    
+    func testGetAttributeType_ListMethods() throws {
+        let checker = try analyze("""
+        numbers = [1, 2, 3]
+        numbers.append(4)
+        """)
+        
+        // Get type of list.append method
+        if let appendType = checker.getAttributeType(object: "numbers", attribute: "append", line: 2) {
+            // append returns None
+            XCTAssertEqual(appendType.toDisplayString(), "None")
+        } else {
+            XCTFail("numbers.append attribute type not found")
+        }
+    }
+    
+    func testGetAttributeType_UnknownObject() throws {
+        let checker = try analyze("""
+        x = 1
+        """)
+        
+        // Query attribute on non-existent object
+        let attrType = checker.getAttributeType(object: "unknown", attribute: "method", line: 1)
+        XCTAssertNil(attrType)
+    }
+    
+    func testGetAttributeType_UnknownAttribute() throws {
+        let checker = try analyze("""
+        class MyClass:
+            def method(self):
+                pass
+        
+        obj = MyClass()
+        """)
+        
+        // Query non-existent attribute
+        let attrType = checker.getAttributeType(object: "obj", attribute: "nonexistent", line: 5)
+        XCTAssertNil(attrType)
+    }
+    
+    func testGetAttributeTypeString_Convenience() throws {
+        let checker = try analyze("""
+        class Order:
+            def add_item(self, product: str) -> None:
+                pass
+            
+            def process(self):
+                self.add_item("widget")
+        """)
+        
+        // Test convenience method that returns string directly
+        // Method's return type is None
+        if let typeString = checker.getAttributeTypeString(object: "self", attribute: "add_item", line: 6) {
+            XCTAssertEqual(typeString, "None")
+        } else {
+            XCTFail("self.add_item type string not found")
+        }
+    }
 }
+
 

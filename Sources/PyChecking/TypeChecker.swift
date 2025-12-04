@@ -533,6 +533,52 @@ public final class TypeChecker: PyChecker {
         return nil
     }
     
+    /// Get the type of an attribute access (e.g., self.method, instance.property)
+    /// - Parameters:
+    ///   - object: The object being accessed (e.g., "self", "instance")
+    ///   - attribute: The attribute name (e.g., "method", "property")
+    ///   - line: Line number where the access occurs
+    ///   - column: Column number (unused but kept for API consistency)
+    /// - Returns: The inferred type of the attribute, or nil if not found
+    public func getAttributeType(object: String, attribute: String, line: Int, column: Int = 0) -> PythonType? {
+        // First, get the type of the object
+        guard let objectType = visitor.typeEnvironment.getType(object, at: line) else {
+            return nil
+        }
+        
+        // Check built-in type methods
+        if let builtinMethod = BuiltinTypesRegistry.getMethodReturnType(
+            forType: objectType,
+            methodName: attribute
+        ) {
+            return builtinMethod
+        }
+        
+        // Check custom class members
+        switch objectType {
+        case .classType(let className), .instance(let className):
+            let members = visitor.classRegistry.getMembers(className)
+            if let member = members.first(where: { $0.name == attribute }) {
+                return member.type
+            }
+        default:
+            break
+        }
+        
+        return nil
+    }
+    
+    /// Get the type of an attribute access as a display string
+    /// - Parameters:
+    ///   - object: The object being accessed
+    ///   - attribute: The attribute name
+    ///   - line: Line number where the access occurs
+    ///   - column: Column number
+    /// - Returns: Type as a display string, or nil if not found
+    public func getAttributeTypeString(object: String, attribute: String, line: Int, column: Int = 0) -> String? {
+        return getAttributeType(object: object, attribute: attribute, line: line, column: column)?.toDisplayString()
+    }
+    
     /// Check if a variable exists in scope
     /// - Parameters:
     ///   - name: Variable name
