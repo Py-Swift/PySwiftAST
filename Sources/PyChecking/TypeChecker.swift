@@ -1,6 +1,142 @@
 import PySwiftAST
 import PySwiftCodeGen
 
+// MARK: - Built-in Types Registry
+
+/// Registry of built-in Python type methods and their return types
+struct BuiltinTypesRegistry {
+    /// Get the return type of a method for a given type
+    static func getMethodReturnType(forType type: PythonType, methodName: String) -> PythonType? {
+        switch type {
+        case .str:
+            return stringMethods[methodName]
+        case .list:
+            return listMethods[methodName]
+        case .dict:
+            return dictMethods[methodName]
+        case .set:
+            return setMethods[methodName]
+        case .tuple:
+            return tupleMethods[methodName]
+        case .int:
+            return intMethods[methodName]
+        case .float:
+            return floatMethods[methodName]
+        case .bool:
+            return boolMethods[methodName]
+        default:
+            return nil
+        }
+    }
+    
+    // String methods
+    private static let stringMethods: [String: PythonType] = [
+        "upper": .str,
+        "lower": .str,
+        "capitalize": .str,
+        "title": .str,
+        "strip": .str,
+        "lstrip": .str,
+        "rstrip": .str,
+        "replace": .str,
+        "split": .list(.str),
+        "join": .str,
+        "startswith": .bool,
+        "endswith": .bool,
+        "find": .int,
+        "rfind": .int,
+        "index": .int,
+        "rindex": .int,
+        "count": .int,
+        "isalpha": .bool,
+        "isdigit": .bool,
+        "isalnum": .bool,
+        "isspace": .bool,
+        "islower": .bool,
+        "isupper": .bool,
+        "format": .str,
+        "encode": .any, // bytes
+        "zfill": .str,
+        "center": .str,
+        "ljust": .str,
+        "rjust": .str,
+    ]
+    
+    // List methods
+    private static let listMethods: [String: PythonType] = [
+        "append": .none,
+        "extend": .none,
+        "insert": .none,
+        "remove": .none,
+        "pop": .any, // Returns element type
+        "clear": .none,
+        "index": .int,
+        "count": .int,
+        "sort": .none,
+        "reverse": .none,
+        "copy": .any, // Returns list copy
+    ]
+    
+    // Dict methods
+    private static let dictMethods: [String: PythonType] = [
+        "keys": .any, // dict_keys
+        "values": .any, // dict_values
+        "items": .any, // dict_items
+        "get": .any, // Returns value type or None
+        "pop": .any, // Returns value type
+        "popitem": .any, // tuple
+        "clear": .none,
+        "update": .none,
+        "setdefault": .any,
+        "copy": .any, // Returns dict copy
+    ]
+    
+    // Set methods
+    private static let setMethods: [String: PythonType] = [
+        "add": .none,
+        "remove": .none,
+        "discard": .none,
+        "pop": .any, // Returns element
+        "clear": .none,
+        "union": .any, // Returns set
+        "intersection": .any, // Returns set
+        "difference": .any, // Returns set
+        "symmetric_difference": .any, // Returns set
+        "update": .none,
+        "intersection_update": .none,
+        "difference_update": .none,
+        "symmetric_difference_update": .none,
+        "issubset": .bool,
+        "issuperset": .bool,
+        "isdisjoint": .bool,
+        "copy": .any, // Returns set copy
+    ]
+    
+    // Tuple methods (limited - tuples are immutable)
+    private static let tupleMethods: [String: PythonType] = [
+        "count": .int,
+        "index": .int,
+    ]
+    
+    // Int methods
+    private static let intMethods: [String: PythonType] = [
+        "bit_length": .int,
+        "to_bytes": .any, // bytes
+        "from_bytes": .int, // classmethod
+    ]
+    
+    // Float methods
+    private static let floatMethods: [String: PythonType] = [
+        "is_integer": .bool,
+        "as_integer_ratio": .tuple([.int, .int]),
+        "hex": .str,
+        "fromhex": .float, // classmethod
+    ]
+    
+    // Bool methods (inherits from int, but listed separately)
+    private static let boolMethods: [String: PythonType] = [:]
+}
+
 /// Static type checker for Python code with queryable type analysis
 ///
 /// Performs type inference and type checking based on:
@@ -65,33 +201,11 @@ public final class TypeChecker: PyChecker {
     ///   - lineNumber: Optional line number for scope-aware lookup
     /// - Returns: Type as a display string, or nil if not found
     public func getVariableType(_ name: String, at lineNumber: Int? = nil) -> String? {
-        guard case .module(let statements) = currentModule else {
-            return nil
-        }
-        
         if let line = lineNumber {
-            // Scope-aware lookup - find which function/class contains this line
-            if let scopeChain = findScopeChain(at: line, in: statements, globals: statements) {
-                return scopeChain.findVariable(name)?.toDisplayString()
-            }
-            // Fallback to global scope search with ScopeChain
-            let globalChain = ScopeChain(
-                localStatements: [],
-                classStatements: nil,
-                globalStatements: statements,
-                lineNumber: line
-            )
-            return globalChain.findVariable(name)?.toDisplayString()
+            return visitor.typeEnvironment.getType(name, at: line)?.toDisplayString()
         } else {
-            // No line number - use ScopeChain with global scope and a very high line number
-            // This ensures all assignments are considered
-            let globalChain = ScopeChain(
-                localStatements: [],
-                classStatements: nil,
-                globalStatements: statements,
-                lineNumber: 999999
-            )
-            return globalChain.findVariable(name)?.toDisplayString()
+            // No line number - find the most recent definition
+            return visitor.typeEnvironment.getType(name, at: 999999)?.toDisplayString()
         }
     }
     
@@ -307,6 +421,13 @@ public final class TypeChecker: PyChecker {
         }
     }
     
+    /// Check if a variable follows the constant naming convention (UPPERCASE)
+    /// - Parameter name: Variable name to check
+    /// - Returns: True if the variable is defined as a constant
+    public func isConstant(_ name: String) -> Bool {
+        return visitor.typeEnvironment.isConstant(name)
+    }
+    
     // MARK: - Private Scope-Aware Search Methods
     
     /// Find the scope chain (local + global statements) for a given line number
@@ -486,6 +607,16 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
         
         for target in node.targets {
             if case .name(let name) = target {
+                // Check if this is a constant reassignment
+                if typeEnvironment.isConstant(name.id) {
+                    diagnostics.append(.warning(
+                        checkerId: "type-checker",
+                        message: "Constant \(name.id) is being reassigned",
+                        line: node.lineno,
+                        column: node.colOffset
+                    ))
+                }
+                
                 // Check if variable already has a type
                 if let existingType = typeEnvironment.getType(name.id, at: node.lineno) {
                     // Check type compatibility
@@ -501,6 +632,48 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
                 
                 // Store type with line number for scope-aware lookup
                 typeEnvironment.setType(name.id, type: valueType, at: node.lineno)
+            } else if case .tuple(let tupleNode) = target {
+                // Handle tuple unpacking: a, b = (1, "hello") or first, *rest = [1, 2, 3]
+                if case .tuple(let types) = valueType {
+                    // Assign each element type to corresponding variable
+                    for (index, element) in tupleNode.elts.enumerated() {
+                        if case .name(let name) = element, index < types.count {
+                            typeEnvironment.setType(name.id, type: types[index], at: node.lineno)
+                        } else if case .starred(let starredNode) = element {
+                            // Handle *rest in unpacking
+                            if case .name(let name) = starredNode.value {
+                                // Remaining elements go into a list
+                                let remainingTypes = Array(types.dropFirst(index))
+                                let listType: PythonType = remainingTypes.isEmpty ? .list(.any) : .list(remainingTypes[0])
+                                typeEnvironment.setType(name.id, type: listType, at: node.lineno)
+                            }
+                        }
+                    }
+                } else if case .list(let elementType) = valueType {
+                    // Unpacking from list: first, *rest = [1, 2, 3]
+                    for element in tupleNode.elts {
+                        if case .name(let name) = element {
+                            typeEnvironment.setType(name.id, type: elementType, at: node.lineno)
+                        } else if case .starred(let starredNode) = element {
+                            // Handle *rest in unpacking from list
+                            if case .name(let name) = starredNode.value {
+                                typeEnvironment.setType(name.id, type: .list(elementType), at: node.lineno)
+                            }
+                        }
+                    }
+                } else {
+                    // Value is not a tuple or list - try to extract element type for iteration
+                    let elementType = extractElementType(from: valueType)
+                    for element in tupleNode.elts {
+                        if case .name(let name) = element {
+                            typeEnvironment.setType(name.id, type: elementType, at: node.lineno)
+                        } else if case .starred(let starredNode) = element {
+                            if case .name(let name) = starredNode.value {
+                                typeEnvironment.setType(name.id, type: .list(elementType), at: node.lineno)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -532,12 +705,16 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     }
     
     func visitFunctionDef(_ node: FunctionDef) {
+        // Register function with its return type in outer scope (before entering function scope)
+        let returnType = node.returns.map { PythonType.fromExpression($0) } ?? .any
+        typeEnvironment.setType(node.name, type: returnType, at: node.lineno)
+        
         // Use actual end line from AST node, or calculate from body
         let endLine = node.endLineno ?? node.body.last?.lineno ?? node.lineno
         
         // Track function scope
         scopeTracker.enterScope(kind: .function, name: node.name, startLine: node.lineno, endLine: endLine)
-        typeEnvironment.pushScope()
+        typeEnvironment.pushScope(startLine: node.lineno, endLine: endLine)
         
         // Register parameter types
         for arg in node.args.args {
@@ -563,10 +740,14 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     }
     
     func visitAsyncFunctionDef(_ node: AsyncFunctionDef) {
+        // Register async function with its return type in outer scope
+        let returnType = node.returns.map { PythonType.fromExpression($0) } ?? .any
+        typeEnvironment.setType(node.name, type: returnType, at: node.lineno)
+        
         let endLine = node.endLineno ?? node.body.last?.lineno ?? node.lineno
         
         scopeTracker.enterScope(kind: .function, name: node.name, startLine: node.lineno, endLine: endLine)
-        typeEnvironment.pushScope()
+        typeEnvironment.pushScope(startLine: node.lineno, endLine: endLine)
         
         for arg in node.args.args {
             if let annotation = arg.annotation {
@@ -593,7 +774,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
         
         // Track class scope
         scopeTracker.enterScope(kind: .classScope, name: node.name, startLine: node.lineno, endLine: endLine)
-        typeEnvironment.pushScope()
+        typeEnvironment.pushScope(startLine: node.lineno, endLine: endLine)
         
         // Register class in registry
         classRegistry.registerClass(node.name, at: node.lineno, endLine: endLine)
@@ -647,6 +828,18 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
                 
                 // Track __init__ for instance properties
                 if funcDef.name == "__init__" {
+                    // Create temporary scope and register parameters to properly infer property types
+                    let endLine = funcDef.endLineno ?? funcDef.body.last?.lineno ?? funcDef.lineno
+                    typeEnvironment.pushScope(startLine: funcDef.lineno, endLine: endLine)
+                    
+                    // Register parameter types in temporary scope
+                    for arg in funcDef.args.args {
+                        if let annotation = arg.annotation {
+                            let paramType = PythonType.fromExpression(annotation)
+                            typeEnvironment.setType(arg.arg, type: paramType, at: funcDef.lineno)
+                        }
+                    }
+                    
                     for funcStatement in funcDef.body {
                         // Handle regular assignments: self.x = value
                         if case .assign(let assign) = funcStatement {
@@ -681,6 +874,8 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
                             )
                         }
                     }
+                    
+                    typeEnvironment.popScope()
                 }
             }
             
@@ -793,27 +988,86 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
         let leftType = visitExpression(node.left)
         let rightType = visitExpression(node.right)
         
-        // Simple numeric operations
-        if leftType == .int && rightType == .int {
-            switch node.op {
-            case .div: return .float
-            default: return .int
+        switch node.op {
+        case .add:
+            // String concatenation
+            if leftType == .str && rightType == .str {
+                return .str
             }
-        }
-        
-        if (leftType == .float || rightType == .float) {
+            // Numeric addition
+            if leftType == .int && rightType == .int {
+                return .int
+            }
+            if (leftType == .int || leftType == .float) && (rightType == .int || rightType == .float) {
+                return .float
+            }
+            // List concatenation
+            if case .list(let elemType) = leftType, case .list = rightType {
+                return .list(elemType)
+            }
+            return .any
+        case .sub:
+            if leftType == .int && rightType == .int {
+                return .int
+            }
+            if (leftType == .int || leftType == .float) && (rightType == .int || rightType == .float) {
+                return .float
+            }
+            return .any
+        case .mult:
+            // String repetition: str * int or int * str
+            if (leftType == .str && rightType == .int) || (leftType == .int && rightType == .str) {
+                return .str
+            }
+            // List repetition: list * int or int * list
+            if case .list(let elemType) = leftType, rightType == .int {
+                return .list(elemType)
+            }
+            if leftType == .int, case .list(let elemType) = rightType {
+                return .list(elemType)
+            }
+            // Numeric multiplication
+            if leftType == .int && rightType == .int {
+                return .int
+            }
+            if (leftType == .int || leftType == .float) && (rightType == .int || rightType == .float) {
+                return .float
+            }
+            return .any
+        case .div:
+            // Division always returns float in Python 3
             return .float
-        }
-        
-        // String concatenation
-        if leftType == .str && rightType == .str {
-            switch node.op {
-            case .add: return .str
-            default: return .unknown
+        case .floorDiv:
+            // Floor division returns int if both operands are int
+            if leftType == .int && rightType == .int {
+                return .int
             }
+            // Otherwise returns float
+            return .float
+        case .mod:
+            // Modulo preserves int if both are int
+            if leftType == .int && rightType == .int {
+                return .int
+            }
+            // String formatting: str % tuple
+            if leftType == .str {
+                return .str
+            }
+            return .float
+        case .pow:
+            // Power operation
+            if leftType == .int && rightType == .int {
+                return .int
+            }
+            return .float
+        case .matMult:
+            // Matrix multiplication - return same type
+            return leftType
+        case .lShift, .rShift, .bitOr, .bitXor, .bitAnd:
+            // Bitwise operations return int
+            return .int
+        default: return .any
         }
-        
-        return .unknown
     }
     
     func visitUnaryOp(_ node: UnaryOp) -> PythonType {
@@ -835,7 +1089,55 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     }
     
     func visitCall(_ node: Call) -> PythonType {
-        // Try to infer from function name
+        // Handle method calls (obj.method())
+        if case .attribute(let attr) = node.fun {
+            let objectType = visitExpression(attr.value)
+            
+            // Check built-in type methods
+            if let returnType = BuiltinTypesRegistry.getMethodReturnType(
+                forType: objectType,
+                methodName: attr.attr
+            ) {
+                // Special handling for methods that return element/value types
+                switch (objectType, attr.attr) {
+                case (.list(let elementType), "pop"):
+                    return elementType
+                case (.set(let elementType), "pop"):
+                    return elementType
+                case (.dict(_, let valueType), "get"), (.dict(_, let valueType), "pop"):
+                    return valueType
+                case (.dict(let keyType, _), "keys"):
+                    // dict_keys is iterable of keys - represent as list[K] for simplicity
+                    return .list(keyType)
+                case (.dict(_, let valueType), "values"):
+                    // dict_values is iterable of values - represent as list[V] for simplicity
+                    return .list(valueType)
+                case (.dict(let keyType, let valueType), "items"):
+                    // dict_items is iterable of (key, value) tuples
+                    return .list(.tuple([keyType, valueType]))
+                case (.set(let elementType), "union"), (.set(let elementType), "intersection"),
+                     (.set(let elementType), "difference"), (.set(let elementType), "symmetric_difference"):
+                    return .set(elementType)
+                default:
+                    return returnType
+                }
+            }
+            
+            // Check custom class methods
+            switch objectType {
+            case .classType(let className), .instance(let className):
+                let members = classRegistry.getMembers(className)
+                if let member = members.first(where: { $0.name == attr.attr && $0.kind == .method }) {
+                    return member.type
+                }
+            default:
+                break
+            }
+            
+            return .unknown
+        }
+        
+        // Handle direct function calls
         if case .name(let name) = node.fun {
             switch name.id {
             case "int": return .int
@@ -846,7 +1148,142 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
             case "dict": return .dict(key: .any, value: .any)
             case "set": return .set(.any)
             case "tuple": return .tuple([.any])
-            default: return .unknown
+            // Built-in functions
+            case "len": return .int
+            case "max", "min":
+                // Return element type of the collection if we can infer it
+                if !node.args.isEmpty {
+                    let argType = visitExpression(node.args[0])
+                    return extractElementType(from: argType)
+                }
+                return .any
+            case "sum":
+                // Return int for sum of numeric collections
+                if !node.args.isEmpty {
+                    let argType = visitExpression(node.args[0])
+                    let elementType = extractElementType(from: argType)
+                    // sum of ints/floats returns the same type
+                    if elementType == .int || elementType == .float {
+                        return elementType
+                    }
+                }
+                return .int
+            case "abs":
+                // abs preserves numeric type
+                if !node.args.isEmpty {
+                    let argType = visitExpression(node.args[0])
+                    if argType == .int || argType == .float {
+                        return argType
+                    }
+                }
+                return .int
+            case "round":
+                // round returns int
+                return .int
+            case "sorted", "reversed":
+                // Return list of same element type
+                if !node.args.isEmpty {
+                    let argType = visitExpression(node.args[0])
+                    let elementType = extractElementType(from: argType)
+                    return .list(elementType)
+                }
+                return .list(.any)
+            case "enumerate":
+                // Returns iterator of tuples (int, element_type)
+                if !node.args.isEmpty {
+                    let argType = visitExpression(node.args[0])
+                    let elementType = extractElementType(from: argType)
+                    return .list(.tuple([.int, elementType]))
+                }
+                return .list(.tuple([.int, .any]))
+            case "zip":
+                // Returns iterator of tuples with types from each argument
+                if node.args.count >= 2 {
+                    let types = node.args.map { extractElementType(from: visitExpression($0)) }
+                    return .list(.tuple(types))
+                }
+                return .list(.tuple([.any]))
+            case "map", "filter":
+                // Returns iterator - simplified to list[Any]
+                return .list(.any)
+            case "range":
+                // range returns a range object, but we'll treat as iterable of ints
+                return .list(.int)
+            case "all", "any":
+                return .bool
+            case "isinstance", "issubclass", "callable", "hasattr":
+                return .bool
+            case "type":
+                // type() returns type object
+                return .any  // Could be .type(...) if we add that
+            case "print":
+                return .none
+            case "input":
+                return .str
+            case "open":
+                return .any  // file object
+            case "iter":
+                // Returns iterator of same element type
+                if !node.args.isEmpty {
+                    let argType = visitExpression(node.args[0])
+                    let elementType = extractElementType(from: argType)
+                    return .list(elementType)  // Simplified as list
+                }
+                return .any
+            case "next":
+                // Returns element type from iterator
+                if !node.args.isEmpty {
+                    let argType = visitExpression(node.args[0])
+                    return extractElementType(from: argType)
+                }
+                return .any
+            case "bytes", "bytearray":
+                return .any  // bytes type
+            case "ord":
+                return .int
+            case "chr":
+                return .str
+            case "pow":
+                // pow(x, y) returns numeric type
+                if !node.args.isEmpty {
+                    let baseType = visitExpression(node.args[0])
+                    if baseType == .float || (node.args.count > 1 && visitExpression(node.args[1]) == .float) {
+                        return .float
+                    }
+                    return .int
+                }
+                return .int
+            case "divmod":
+                // Returns tuple of (quotient, remainder)
+                return .tuple([.int, .int])
+            case "hash", "id":
+                return .int
+            case "getattr":
+                // Returns attribute value - unknown type
+                return .any
+            case "setattr", "delattr":
+                return .none
+            case "repr", "ascii":
+                return .str
+            case "bin", "hex", "oct":
+                return .str
+            case "format":
+                return .str
+            case "vars", "dir", "globals", "locals":
+                return .dict(key: .str, value: .any)
+            case "eval", "exec", "compile":
+                return .any
+            default:
+                // Check if it's a class instantiation
+                if classRegistry.classExists(name.id) {
+                    return .instance(name.id)
+                }
+                
+                // Check if it's a known function
+                if let funcType = typeEnvironment.getType(name.id, at: nil) {
+                    return funcType
+                }
+                return .unknown
             }
         }
         
@@ -916,29 +1353,153 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     func visitNonlocal(_ node: Nonlocal) {}
     func visitExpr(_ node: Expr) { _ = visitExpression(node.value) }
     func visitBlank(_ node: Blank) {}
-    func visitWith(_ node: With) { for stmt in node.body { visitStatement(stmt) } }
-    func visitTry(_ node: Try) { for stmt in node.body { visitStatement(stmt) } }
-    func visitTryStar(_ node: TryStar) { for stmt in node.body { visitStatement(stmt) } }
+    
+    func visitWith(_ node: With) {
+        // Track context manager variables
+        for item in node.items {
+            if let optionalVars = item.optionalVars {
+                // Get type from context manager expression
+                let contextType = visitExpression(item.contextExpr)
+                
+                // Assign the context expression type to the variable
+                if case .name(let name) = optionalVars {
+                    typeEnvironment.setType(name.id, type: contextType, at: node.lineno)
+                }
+            }
+        }
+        
+        for stmt in node.body {
+            visitStatement(stmt)
+        }
+    }
+    
+    func visitTry(_ node: Try) {
+        for stmt in node.body {
+            visitStatement(stmt)
+        }
+        
+        // Handle exception handlers
+        for handler in node.handlers {
+            // Track exception variable if specified
+            if let name = handler.name, let type = handler.type {
+                let exceptionType = visitExpression(type)
+                typeEnvironment.setType(name, type: exceptionType, at: node.lineno)
+            }
+            
+            for stmt in handler.body {
+                visitStatement(stmt)
+            }
+        }
+        
+        // Handle else and finally clauses
+        for stmt in node.orElse {
+            visitStatement(stmt)
+        }
+        for stmt in node.finalBody {
+            visitStatement(stmt)
+        }
+    }
+    
+    func visitTryStar(_ node: TryStar) {
+        for stmt in node.body {
+            visitStatement(stmt)
+        }
+        
+        for handler in node.handlers {
+            if let name = handler.name, let type = handler.type {
+                let exceptionType = visitExpression(type)
+                typeEnvironment.setType(name, type: exceptionType, at: node.lineno)
+            }
+            
+            for stmt in handler.body {
+                visitStatement(stmt)
+            }
+        }
+        
+        for stmt in node.orElse {
+            visitStatement(stmt)
+        }
+        for stmt in node.finalBody {
+            visitStatement(stmt)
+        }
+    }
+    
     func visitMatch(_ node: Match) {}
-    func visitAsyncFor(_ node: AsyncFor) { for stmt in node.body { visitStatement(stmt) } }
-    func visitAsyncWith(_ node: AsyncWith) { for stmt in node.body { visitStatement(stmt) } }
+    
+    func visitAsyncFor(_ node: AsyncFor) {
+        for stmt in node.body {
+            visitStatement(stmt)
+        }
+    }
+    
+    func visitAsyncWith(_ node: AsyncWith) {
+        // Similar to visitWith but for async context managers
+        for item in node.items {
+            if let optionalVars = item.optionalVars {
+                let contextType = visitExpression(item.contextExpr)
+                
+                if case .name(let name) = optionalVars {
+                    typeEnvironment.setType(name.id, type: contextType, at: node.lineno)
+                }
+            }
+        }
+        
+        for stmt in node.body {
+            visitStatement(stmt)
+        }
+    }
     func visitTypeAlias(_ node: TypeAlias) {}
     
-    func visitAttribute(_ node: Attribute) -> PythonType { 
-        // TODO: Implement class member resolution
-        .unknown 
+    func visitAttribute(_ node: Attribute) -> PythonType {
+        // Infer the type of the object being accessed
+        let objectType = visitExpression(node.value)
+        
+        // Check built-in type methods first
+        if let builtinMethod = BuiltinTypesRegistry.getMethodReturnType(
+            forType: objectType,
+            methodName: node.attr
+        ) {
+            return builtinMethod
+        }
+        
+        // Check custom class members
+        switch objectType {
+        case .classType(let className), .instance(let className):
+            let members = classRegistry.getMembers(className)
+            if let member = members.first(where: { $0.name == node.attr }) {
+                return member.type
+            }
+        default:
+            break
+        }
+        
+        // Unknown attribute
+        return .unknown
     }
     
     func visitSubscript(_ node: Subscript) -> PythonType { 
         // Infer type from subscript - extract element type from collection
         let collectionType = visitExpression(node.value)
         
+        // Check if this is a slice operation
+        let isSlice: Bool
+        if case .slice = node.slice {
+            isSlice = true
+        } else {
+            isSlice = false
+        }
+        
         switch collectionType {
         case .list(let elementType):
-            return elementType
+            // Slicing a list returns a list, indexing returns element
+            return isSlice ? .list(elementType) : elementType
         case .set(let elementType):
             return elementType
         case .tuple(let types):
+            // Tuple slicing returns tuple, indexing needs specific index
+            if isSlice {
+                return .tuple(types)  // Simplified - actual slice might have fewer elements
+            }
             // For tuple indexing, we'd need to know the specific index
             // For now, return union of all types or first type
             if types.count == 1 {
@@ -948,22 +1509,181 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
         case .dict(_, let valueType):
             return valueType
         case .str:
-            return .str // String indexing returns str
+            // String slicing returns str, indexing returns str (char)
+            return .str
         default:
             return .any
         }
     }
     
-    func visitStarred(_ node: Starred) -> PythonType { .unknown }
-    func visitLambda(_ node: Lambda) -> PythonType { .unknown }
-    func visitListComp(_ node: ListComp) -> PythonType { .list(.any) }
-    func visitSetComp(_ node: SetComp) -> PythonType { .set(.any) }
-    func visitDictComp(_ node: DictComp) -> PythonType { .dict(key: .any, value: .any) }
-    func visitGeneratorExp(_ node: GeneratorExp) -> PythonType { .any }
-    func visitNamedExpr(_ node: NamedExpr) -> PythonType { visitExpression(node.value) }
-    func visitYield(_ node: Yield) -> PythonType { .any }
-    func visitYieldFrom(_ node: YieldFrom) -> PythonType { .any }
-    func visitAwait(_ node: Await) -> PythonType { .any }
+    func visitStarred(_ node: Starred) -> PythonType {
+        // Starred expressions are used in unpacking
+        // The type depends on context - for now return list of element type
+        let valueType = visitExpression(node.value)
+        return valueType
+    }
+    
+    func visitLambda(_ node: Lambda) -> PythonType {
+        // Infer return type from lambda body
+        // Create temporary scope for lambda parameters
+        typeEnvironment.pushScope(startLine: node.lineno, endLine: node.endLineno ?? node.lineno)
+        
+        // Register parameter types if annotated
+        for arg in node.args.args {
+            if let annotation = arg.annotation {
+                let paramType = PythonType.fromExpression(annotation)
+                typeEnvironment.setType(arg.arg, type: paramType, at: node.lineno)
+            } else {
+                // Parameter type is unknown
+                typeEnvironment.setType(arg.arg, type: .any, at: node.lineno)
+            }
+        }
+        
+        // Infer return type from body expression
+        let returnType = visitExpression(node.body)
+        
+        typeEnvironment.popScope()
+        
+        // Return callable type (simplified - we don't have full function type support)
+        return returnType  // For now, just return the return type
+    }
+    
+    func visitListComp(_ node: ListComp) -> PythonType {
+        // Set up comprehension variables in a temporary scope
+        typeEnvironment.pushScope(startLine: node.lineno, endLine: node.endLineno ?? node.lineno)
+        
+        // Register loop variables with inferred types from iterables
+        for generator in node.generators {
+            let iterType = visitExpression(generator.iter)
+            let varType = extractElementType(from: iterType)
+            
+            // Register the loop variable
+            if case .name(let name) = generator.target {
+                typeEnvironment.setType(name.id, type: varType, at: node.lineno)
+            }
+        }
+        
+        // Infer element type from the element expression
+        let elementType = visitExpression(node.elt)
+        
+        typeEnvironment.popScope()
+        return .list(elementType)
+    }
+    
+    func visitSetComp(_ node: SetComp) -> PythonType {
+        // Set up comprehension variables in a temporary scope
+        typeEnvironment.pushScope(startLine: node.lineno, endLine: node.endLineno ?? node.lineno)
+        
+        // Register loop variables with inferred types from iterables
+        for generator in node.generators {
+            let iterType = visitExpression(generator.iter)
+            let varType = extractElementType(from: iterType)
+            
+            // Register the loop variable
+            if case .name(let name) = generator.target {
+                typeEnvironment.setType(name.id, type: varType, at: node.lineno)
+            }
+        }
+        
+        // Infer element type from the element expression
+        let elementType = visitExpression(node.elt)
+        
+        typeEnvironment.popScope()
+        return .set(elementType)
+    }
+    
+    func visitDictComp(_ node: DictComp) -> PythonType {
+        // Set up comprehension variables in a temporary scope
+        typeEnvironment.pushScope(startLine: node.lineno, endLine: node.endLineno ?? node.lineno)
+        
+        // Register loop variables with inferred types from iterables
+        for generator in node.generators {
+            let iterType = visitExpression(generator.iter)
+            let varType = extractElementType(from: iterType)
+            
+            // Register the loop variable
+            if case .name(let name) = generator.target {
+                typeEnvironment.setType(name.id, type: varType, at: node.lineno)
+            }
+        }
+        
+        // Infer key and value types from the expressions
+        let keyType = visitExpression(node.key)
+        let valueType = visitExpression(node.value)
+        
+        typeEnvironment.popScope()
+        return .dict(key: keyType, value: valueType)
+    }
+    
+    /// Extract element type from iterable types
+    private func extractElementType(from type: PythonType) -> PythonType {
+        switch type {
+        case .list(let elementType):
+            return elementType
+        case .set(let elementType):
+            return elementType
+        case .tuple(let types):
+            return types.first ?? .any
+        case .dict(let keyType, _):
+            return keyType  // Iterating over dict gives keys
+        case .str:
+            return .str  // Iterating over string gives strings
+        default:
+            return .int  // range() and most numeric iterables produce ints
+        }
+    }
+    
+    func visitGeneratorExp(_ node: GeneratorExp) -> PythonType {
+        // Generator expressions work like list comprehensions but return generators
+        // For simplicity, we'll treat them as iterables with inferred element type
+        typeEnvironment.pushScope(startLine: node.lineno, endLine: node.endLineno ?? node.lineno)
+        
+        // Register loop variables with inferred types from iterables
+        for generator in node.generators {
+            let iterType = visitExpression(generator.iter)
+            let varType = extractElementType(from: iterType)
+            
+            if case .name(let name) = generator.target {
+                typeEnvironment.setType(name.id, type: varType, at: node.lineno)
+            }
+        }
+        
+        // Infer element type from the element expression
+        let elementType = visitExpression(node.elt)
+        
+        typeEnvironment.popScope()
+        
+        // Return as list for IDE purposes (generators are iterable)
+        return .list(elementType)
+    }
+    func visitNamedExpr(_ node: NamedExpr) -> PythonType {
+        let valueType = visitExpression(node.value)
+        // Register the walrus operator variable
+        if case .name(let name) = node.target {
+            typeEnvironment.setType(name.id, type: valueType, at: node.lineno)
+        }
+        return valueType
+    }
+    
+    func visitYield(_ node: Yield) -> PythonType {
+        // Yield returns the yielded value type
+        if let value = node.value {
+            return visitExpression(value)
+        }
+        return .none
+    }
+    
+    func visitYieldFrom(_ node: YieldFrom) -> PythonType {
+        // Yield from returns the element type of the iterable
+        let iterType = visitExpression(node.value)
+        return extractElementType(from: iterType)
+    }
+    
+    func visitAwait(_ node: Await) -> PythonType {
+        // Await unwraps the awaitable/coroutine type
+        // For now, just return the type of the awaited expression
+        return visitExpression(node.value)
+    }
     func visitFormattedValue(_ node: FormattedValue) -> PythonType { .str }
     func visitJoinedStr(_ node: JoinedStr) -> PythonType { .str }
     func visitSlice(_ node: Slice) -> PythonType { .any }
@@ -1072,6 +1792,10 @@ final class ClassRegistry {
     func getMembers(_ className: String) -> [MemberInfo] {
         return classes[className]?.members ?? []
     }
+    
+    func classExists(_ name: String) -> Bool {
+        return classes[name] != nil
+    }
 }
 
 // MARK: - Enhanced Type Environment
@@ -1079,30 +1803,51 @@ final class ClassRegistry {
 /// Manages variable types and scopes with line-aware lookups and variable chain tracking
 public final class TypeEnvironment {
     private class Scope {
-        var variables: [(name: String, type: PythonType, line: Int)] = []
+        var variables: [(name: String, type: PythonType, line: Int, isConstant: Bool)] = []
         var returnType: PythonType?
-    }
-    
-    private var scopes: [Scope] = [Scope()]
-    
-    init() {}
-    
-    func pushScope() {
-        scopes.append(Scope())
-    }
-    
-    func popScope() {
-        if scopes.count > 1 {
-            scopes.removeLast()
+        var startLine: Int
+        var endLine: Int
+        
+        init(startLine: Int, endLine: Int) {
+            self.startLine = startLine
+            self.endLine = endLine
         }
     }
     
-    func setType(_ name: String, type: PythonType, at line: Int) {
-        scopes[scopes.count - 1].variables.append((name: name, type: type, line: line))
+    private var activeScopes: [Scope] = []  // Stack for current traversal
+    private var allScopes: [Scope] = []     // All scopes with line ranges (permanent)
+    
+    init() {
+        // Global scope covers all lines
+        let globalScope = Scope(startLine: 1, endLine: Int.max)
+        activeScopes.append(globalScope)
+        allScopes.append(globalScope)
     }
     
-    func setReturnType(_ type: PythonType) {
-        scopes[scopes.count - 1].returnType = type
+    func pushScope(startLine: Int = 1, endLine: Int = Int.max) {
+        let scope = Scope(startLine: startLine, endLine: endLine)
+        activeScopes.append(scope)
+        allScopes.append(scope)
+    }
+    
+    func popScope() {
+        if activeScopes.count > 1 {
+            activeScopes.removeLast()
+        }
+    }
+    
+    /// Check if a name follows the constant naming convention (all uppercase with underscores)
+    private func isConstantName(_ name: String) -> Bool {
+        return name.allSatisfy { $0.isUppercase || $0 == "_" || $0.isNumber } && !name.isEmpty
+    }
+    
+    func setType(_ name: String, type: PythonType, at line: Int) {
+        let isConstant = isConstantName(name)
+        activeScopes[activeScopes.count - 1].variables.append((name: name, type: type, line: line, isConstant: isConstant))
+    }
+    
+    func setReturnType(_ type: PythonType?) {
+        activeScopes[activeScopes.count - 1].returnType = type
     }
     
     /// Get type with variable chain following and cycle detection
@@ -1120,12 +1865,22 @@ public final class TypeEnvironment {
         var newVisited = visited
         newVisited.insert(name)
         
+        // Find scopes that contain this line, ordered from innermost to outermost
+        let relevantScopes: [Scope]
+        if let queryLine = line {
+            relevantScopes = allScopes
+                .filter { $0.startLine <= queryLine && queryLine <= $0.endLine }
+                .sorted { ($0.endLine - $0.startLine) < ($1.endLine - $1.startLine) }
+        } else {
+            relevantScopes = allScopes
+        }
+        
         // Search from innermost to outermost scope
-        for scope in scopes.reversed() {
+        for scope in relevantScopes {
             // Find the most recent assignment at or before the line
             var mostRecent: (type: PythonType, line: Int)?
             
-            for (varName, varType, varLine) in scope.variables {
+            for (varName, varType, varLine, _) in scope.variables {
                 if varName == name {
                     if let queryLine = line {
                         if varLine <= queryLine {
@@ -1162,13 +1917,13 @@ public final class TypeEnvironment {
         var symbols: [String: PythonType] = [:]
         
         // Collect from all scopes (outer to inner)
-        for scope in scopes {
-            for (name, type, varLine) in scope.variables {
+        for scope in allScopes {
+            for (name, type, varLine, _) in scope.variables {
                 if varLine <= line {
                     // Use the most recent assignment for each variable
                     if symbols[name] != nil {
                         // Check if this assignment is more recent
-                        if let existingLine = findMostRecentLine(for: name, in: scopes, before: line),
+                        if let existingLine = findMostRecentLine(for: name, in: allScopes, before: line),
                            varLine > existingLine {
                             symbols[name] = type
                         }
@@ -1182,12 +1937,25 @@ public final class TypeEnvironment {
         return Array(symbols.map { ($0.key, $0.value) })
     }
     
+    /// Check if a variable is defined as a constant (uppercase naming)
+    func isConstant(_ name: String) -> Bool {
+        // Search all scopes for the first definition
+        for scope in allScopes {
+            for (varName, _, _, isConst) in scope.variables {
+                if varName == name {
+                    return isConst
+                }
+            }
+        }
+        return false
+    }
+    
     /// Find the most recent line where a variable was assigned
     private func findMostRecentLine(for name: String, in scopes: [Scope], before line: Int) -> Int? {
         var mostRecent: Int?
         
         for scope in scopes {
-            for (varName, _, varLine) in scope.variables {
+            for (varName, _, varLine, _) in scope.variables {
                 if varName == name && varLine <= line {
                     if mostRecent == nil || varLine > mostRecent! {
                         mostRecent = varLine
@@ -1199,23 +1967,19 @@ public final class TypeEnvironment {
         return mostRecent
     }
     
-    func setReturnType(_ type: PythonType?) {
-        scopes[scopes.count - 1].returnType = type
-    }
-    
     func getReturnType() -> PythonType? {
-        return scopes.last?.returnType
+        return activeScopes.last?.returnType
     }
     
     /// Get the current scope level (for debugging)
     func getCurrentScopeLevel() -> Int {
-        return scopes.count - 1
+        return activeScopes.count - 1
     }
     
     /// Check if a variable exists in any scope
     func variableExists(_ name: String) -> Bool {
-        for scope in scopes {
-            for (varName, _, _) in scope.variables {
+        for scope in allScopes {
+            for (varName, _, _, _) in scope.variables {
                 if varName == name {
                     return true
                 }
@@ -1235,8 +1999,8 @@ public final class TypeEnvironment {
         var seen: Swift.Set<String> = []
         
         // Collect from all scopes, avoiding duplicates
-        for scope in scopes.reversed() {
-            for (name, type, _) in scope.variables {
+        for scope in allScopes.reversed() {
+            for (name, type, _, _) in scope.variables {
                 if !seen.contains(name) {
                     result.append((name: name, type: type))
                     seen.insert(name)
