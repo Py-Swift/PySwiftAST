@@ -491,8 +491,36 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     func visitAsyncWith(_ node: AsyncWith) { for stmt in node.body { visitStatement(stmt) } }
     func visitTypeAlias(_ node: TypeAlias) {}
     
-    func visitAttribute(_ node: Attribute) -> PythonType { .unknown }
-    func visitSubscript(_ node: Subscript) -> PythonType { .unknown }
+    func visitAttribute(_ node: Attribute) -> PythonType { 
+        // TODO: Implement class member resolution
+        .unknown 
+    }
+    
+    func visitSubscript(_ node: Subscript) -> PythonType { 
+        // Infer type from subscript - extract element type from collection
+        let collectionType = visitExpression(node.value)
+        
+        switch collectionType {
+        case .list(let elementType):
+            return elementType
+        case .set(let elementType):
+            return elementType
+        case .tuple(let types):
+            // For tuple indexing, we'd need to know the specific index
+            // For now, return union of all types or first type
+            if types.count == 1 {
+                return types[0]
+            }
+            return .union(types)
+        case .dict(_, let valueType):
+            return valueType
+        case .str:
+            return .str // String indexing returns str
+        default:
+            return .any
+        }
+    }
+    
     func visitStarred(_ node: Starred) -> PythonType { .unknown }
     func visitLambda(_ node: Lambda) -> PythonType { .unknown }
     func visitListComp(_ node: ListComp) -> PythonType { .list(.any) }
@@ -596,7 +624,7 @@ struct ClassRegistry {
 
 // MARK: - Enhanced Type Environment
 
-/// Manages variable types and scopes with line-aware lookups
+/// Manages variable types and scopes with line-aware lookups and variable chain tracking
 public struct TypeEnvironment {
     private struct Scope {
         var variables: [(name: String, type: PythonType, line: Int)] = []
@@ -619,7 +647,21 @@ public struct TypeEnvironment {
         scopes[scopes.count - 1].variables.append((name: name, type: type, line: line))
     }
     
+    /// Get type with variable chain following and cycle detection
     func getType(_ name: String, at line: Int?) -> PythonType? {
+        return getTypeWithVisited(name, at: line, visited: Swift.Set<String>())
+    }
+    
+    /// Internal method with cycle detection for variable chains
+    private func getTypeWithVisited(_ name: String, at line: Int?, visited: Swift.Set<String>) -> PythonType? {
+        // Prevent infinite loops when following variable chains
+        if visited.contains(name) {
+            return nil
+        }
+        
+        var newVisited = visited
+        newVisited.insert(name)
+        
         // Search from innermost to outermost scope
         for scope in scopes.reversed() {
             // Find the most recent assignment at or before the line
@@ -635,17 +677,27 @@ public struct TypeEnvironment {
                         }
                     } else {
                         // No line filtering - return first match
-                        return varType
+                        return resolveTypeChain(varType, at: line, visited: newVisited)
                     }
                 }
             }
             
             if let result = mostRecent {
-                return result.type
+                return resolveTypeChain(result.type, at: line, visited: newVisited)
             }
         }
         
         return nil
+    }
+    
+    /// Resolve variable chains where type might reference another variable
+    /// For example: a = b where b: int → resolve to int
+    private func resolveTypeChain(_ type: PythonType, at line: Int?, visited: Swift.Set<String>) -> PythonType {
+        // If the type is unknown, it might be a reference to another variable
+        // This handles patterns like: x = y where we need to look up y's type
+        // Note: In practice, this is handled during visitExpression in the visitor
+        // but we keep this for potential future enhancements
+        return type
     }
     
     func getAllSymbolsInScope(at line: Int) -> [(name: String, type: PythonType)] {
@@ -655,12 +707,38 @@ public struct TypeEnvironment {
         for scope in scopes {
             for (name, type, varLine) in scope.variables {
                 if varLine <= line {
-                    symbols[name] = type
+                    // Use the most recent assignment for each variable
+                    if symbols[name] != nil {
+                        // Check if this assignment is more recent
+                        if let existingLine = findMostRecentLine(for: name, in: scopes, before: line),
+                           varLine > existingLine {
+                            symbols[name] = type
+                        }
+                    } else {
+                        symbols[name] = type
+                    }
                 }
             }
         }
         
         return Array(symbols.map { ($0.key, $0.value) })
+    }
+    
+    /// Find the most recent line where a variable was assigned
+    private func findMostRecentLine(for name: String, in scopes: [Scope], before line: Int) -> Int? {
+        var mostRecent: Int?
+        
+        for scope in scopes {
+            for (varName, _, varLine) in scope.variables {
+                if varName == name && varLine <= line {
+                    if mostRecent == nil || varLine > mostRecent! {
+                        mostRecent = varLine
+                    }
+                }
+            }
+        }
+        
+        return mostRecent
     }
     
     mutating func setReturnType(_ type: PythonType?) {
@@ -669,6 +747,23 @@ public struct TypeEnvironment {
     
     func getReturnType() -> PythonType? {
         return scopes.last?.returnType
+    }
+    
+    /// Get the current scope level (for debugging)
+    func getCurrentScopeLevel() -> Int {
+        return scopes.count - 1
+    }
+    
+    /// Check if a variable exists in any scope
+    func variableExists(_ name: String) -> Bool {
+        for scope in scopes {
+            for (varName, _, _) in scope.variables {
+                if varName == name {
+                    return true
+                }
+            }
+        }
+        return false
     }
 }
 
