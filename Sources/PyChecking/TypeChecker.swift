@@ -1,31 +1,95 @@
 import PySwiftAST
 
-/// Static type checker for Python code
+/// Static type checker for Python code with queryable type analysis
 ///
 /// Performs type inference and type checking based on:
 /// - Variable annotations (x: int = 5)
 /// - Function annotations (def f(x: int) -> str)
 /// - Inferred types from literals and operations
 /// - Type compatibility rules
+///
+/// Provides query APIs for IDE features:
+/// - getTypeAt(name:line:column:) - Get type of symbol at position
+/// - getScopeAt(line:column:) - Get containing scope
+/// - getSymbolsAt(line:column:) - Get all accessible symbols
+/// - getClassMembers(className:) - Get class properties and methods
 public struct TypeChecker: PyChecker {
     public let id = "type-checker"
     public let name = "Type Checker"
-    public let description = "Static type checking with type inference"
+    public let description = "Static type checking with type inference and IDE queries"
     
-    private var typeEnvironment: TypeEnvironment
+    private var visitor: TypeCheckingVisitor
     
     public init() {
-        self.typeEnvironment = TypeEnvironment()
+        self.visitor = TypeCheckingVisitor()
     }
     
     public func check(_ module: Module) -> [Diagnostic] {
-        var checker = TypeChecker()
-        return checker.checkModule(module)
+        let checker = TypeChecker()
+        checker.visitor.visitModule(module)
+        return checker.visitor.diagnostics
     }
     
-    private mutating func checkModule(_ module: Module) -> [Diagnostic] {
-        var diagnostics: [Diagnostic] = []
-        
+    // MARK: - Query APIs for IDE Features
+    
+    /// Get the type of a symbol at a specific location
+    /// - Parameters:
+    ///   - name: Symbol name to look up
+    ///   - line: Line number (1-indexed)
+    ///   - column: Column number (0-indexed)
+    /// - Returns: The inferred type, or nil if not found
+    public func getTypeAt(name: String, line: Int, column: Int) -> PythonType? {
+        return visitor.typeEnvironment.getType(name, at: line)
+    }
+    
+    /// Get all symbols accessible at a specific location
+    /// - Parameters:
+    ///   - line: Line number (1-indexed)
+    ///   - column: Column number (0-indexed)
+    /// - Returns: Array of (name, type) tuples for all accessible symbols
+    public func getSymbolsAt(line: Int, column: Int) -> [(name: String, type: PythonType)] {
+        return visitor.typeEnvironment.getAllSymbolsInScope(at: line)
+    }
+    
+    /// Get the containing scope at a specific location
+    /// - Parameters:
+    ///   - line: Line number (1-indexed)
+    ///   - column: Column number (0-indexed)
+    /// - Returns: The scope information, or nil if not in a specific scope
+    public func getScopeAt(line: Int, column: Int) -> ScopeInfo? {
+        return visitor.scopeTracker.getScopeAt(line: line)
+    }
+    
+    /// Get all members of a class
+    /// - Parameter className: Name of the class
+    /// - Returns: Array of class members (properties and methods)
+    public func getClassMembers(className: String) -> [MemberInfo] {
+        return visitor.classRegistry.getMembers(className)
+    }
+    
+    /// Get the diagnostics from the last check
+    public func getDiagnostics() -> [Diagnostic] {
+        return visitor.diagnostics
+    }
+}
+
+// MARK: - Type Checking Visitor
+
+/// Internal visitor that performs type checking and analysis
+private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
+    typealias StatementResult = Void
+    typealias ExpressionResult = PythonType
+    
+    var diagnostics: [Diagnostic] = []
+    var typeEnvironment = TypeEnvironment()
+    var classRegistry = ClassRegistry()
+    var scopeTracker = ScopeTracker()
+    
+    init() {}
+    
+    // MARK: - Module Visitation
+    
+    func visitModule(_ module: Module) {
         let statements: [Statement] = switch module {
         case .module(let stmts), .interactive(let stmts):
             stmts
@@ -33,300 +97,252 @@ public struct TypeChecker: PyChecker {
             []
         }
         
+        // Track module scope
+        scopeTracker.enterScope(kind: .module, name: nil, startLine: 1, endLine: Int.max)
+        
         for statement in statements {
-            diagnostics.append(contentsOf: checkStatement(statement))
+            visitStatement(statement)
         }
         
-        return diagnostics
+        scopeTracker.exitScope()
     }
     
-    // MARK: - Statement Checking
+    // MARK: - Statement Visitors
     
-    private mutating func checkStatement(_ stmt: Statement) -> [Diagnostic] {
-        var diagnostics: [Diagnostic] = []
+    func visitAssign(_ node: Assign) {
+        let valueType = visitExpression(node.value)
         
-        switch stmt {
-        case .assign(let assign):
-            diagnostics.append(contentsOf: checkAssign(assign))
-            
-        case .annAssign(let annAssign):
-            diagnostics.append(contentsOf: checkAnnAssign(annAssign))
-            
-        case .functionDef(let funcDef):
-            diagnostics.append(contentsOf: checkFunctionDef(funcDef))
-            
-        case .asyncFunctionDef(let funcDef):
-            diagnostics.append(contentsOf: checkAsyncFunctionDef(funcDef))
-            
-        case .returnStmt(let ret):
-            diagnostics.append(contentsOf: checkReturn(ret))
-            
-        case .ifStmt(let ifStmt):
-            diagnostics.append(contentsOf: checkIf(ifStmt))
-            
-        case .forStmt(let forStmt):
-            diagnostics.append(contentsOf: checkFor(forStmt))
-            
-        case .whileStmt(let whileStmt):
-            diagnostics.append(contentsOf: checkWhile(whileStmt))
-            
-        default:
-            break
-        }
-        
-        return diagnostics
-    }
-    
-    // MARK: - Assignment Checking
-    
-    private mutating func checkAssign(_ assign: Assign) -> [Diagnostic] {
-        var diagnostics: [Diagnostic] = []
-        
-        // Infer type from value
-        let valueType = inferType(assign.value)
-        
-        // Update type environment for each target
-        for target in assign.targets {
+        for target in node.targets {
             if case .name(let name) = target {
                 // Check if variable already has a type
-                if let existingType = typeEnvironment.getType(name.id) {
+                if let existingType = typeEnvironment.getType(name.id, at: node.lineno) {
                     // Check type compatibility
                     if !existingType.isCompatible(with: valueType) {
                         diagnostics.append(.error(
-                            checkerId: id,
+                            checkerId: "type-checker",
                             message: "Type mismatch: cannot assign \(valueType) to \(name.id) of type \(existingType)",
-                            line: assign.lineno,
-                            column: assign.colOffset
+                            line: node.lineno,
+                            column: node.colOffset
                         ))
                     }
-                } else {
-                    // Infer and store type
-                    typeEnvironment.setType(name.id, type: valueType)
                 }
+                
+                // Store type with line number for scope-aware lookup
+                typeEnvironment.setType(name.id, type: valueType, at: node.lineno)
             }
         }
-        
-        return diagnostics
     }
     
-    private mutating func checkAnnAssign(_ annAssign: AnnAssign) -> [Diagnostic] {
-        var diagnostics: [Diagnostic] = []
+    func visitAnnAssign(_ node: AnnAssign) {
+        let annotatedType = PythonType.fromExpression(node.annotation)
         
-        // Parse annotation
-        let annotatedType = TypeAnnotationParser.parse(annAssign.annotation)
-        
-        // Store annotated type
-        if case .name(let name) = annAssign.target {
-            typeEnvironment.setType(name.id, type: annotatedType)
+        if case .name(let name) = node.target {
+            typeEnvironment.setType(name.id, type: annotatedType, at: node.lineno)
             
             // If there's a value, check compatibility
-            if let value = annAssign.value {
-                let valueType = inferType(value)
+            if let value = node.value {
+                let valueType = visitExpression(value)
                 if !annotatedType.isCompatible(with: valueType) {
                     diagnostics.append(.error(
-                        checkerId: id,
+                        checkerId: "type-checker",
                         message: "Type mismatch: cannot assign \(valueType) to \(name.id): \(annotatedType)",
-                        line: annAssign.lineno,
-                        column: annAssign.colOffset,
-                        suggestion: "Ensure the assigned value matches the annotated type"
+                        line: node.lineno,
+                        column: node.colOffset
                     ))
                 }
             }
         }
-        
-        return diagnostics
     }
     
-    // MARK: - Function Checking
+    func visitAugAssign(_ node: AugAssign) {
+        // Handle augmented assignments like +=, -=, etc.
+        _ = visitExpression(node.value)
+    }
     
-    private mutating func checkFunctionDef(_ funcDef: FunctionDef) -> [Diagnostic] {
-        var diagnostics: [Diagnostic] = []
+    func visitFunctionDef(_ node: FunctionDef) {
+        // Calculate function end line
+        let endLine = node.body.last?.lineno ?? node.lineno
         
-        // Create new scope for function
+        // Track function scope
+        scopeTracker.enterScope(kind: .function, name: node.name, startLine: node.lineno, endLine: endLine)
         typeEnvironment.pushScope()
         
         // Register parameter types
-        for arg in funcDef.args.args {
+        for arg in node.args.args {
             if let annotation = arg.annotation {
-                let paramType = TypeAnnotationParser.parse(annotation)
-                typeEnvironment.setType(arg.arg, type: paramType)
+                let paramType = PythonType.fromExpression(annotation)
+                typeEnvironment.setType(arg.arg, type: paramType, at: node.lineno)
             } else {
-                typeEnvironment.setType(arg.arg, type: .any)
+                typeEnvironment.setType(arg.arg, type: .any, at: node.lineno)
             }
         }
         
         // Store expected return type
-        let expectedReturn = funcDef.returns.map { TypeAnnotationParser.parse($0) }
+        let expectedReturn = node.returns.map { PythonType.fromExpression($0) }
         typeEnvironment.setReturnType(expectedReturn)
         
         // Check function body
-        for statement in funcDef.body {
-            diagnostics.append(contentsOf: checkStatement(statement))
+        for statement in node.body {
+            visitStatement(statement)
         }
         
         typeEnvironment.popScope()
-        
-        return diagnostics
+        scopeTracker.exitScope()
     }
     
-    private mutating func checkAsyncFunctionDef(_ funcDef: AsyncFunctionDef) -> [Diagnostic] {
-        var diagnostics: [Diagnostic] = []
+    func visitAsyncFunctionDef(_ node: AsyncFunctionDef) {
+        let endLine = node.body.last?.lineno ?? node.lineno
         
+        scopeTracker.enterScope(kind: .function, name: node.name, startLine: node.lineno, endLine: endLine)
         typeEnvironment.pushScope()
         
-        for arg in funcDef.args.args {
+        for arg in node.args.args {
             if let annotation = arg.annotation {
-                let paramType = TypeAnnotationParser.parse(annotation)
-                typeEnvironment.setType(arg.arg, type: paramType)
+                let paramType = PythonType.fromExpression(annotation)
+                typeEnvironment.setType(arg.arg, type: paramType, at: node.lineno)
             } else {
-                typeEnvironment.setType(arg.arg, type: .any)
+                typeEnvironment.setType(arg.arg, type: .any, at: node.lineno)
             }
         }
         
-        let expectedReturn = funcDef.returns.map { TypeAnnotationParser.parse($0) }
+        let expectedReturn = node.returns.map { PythonType.fromExpression($0) }
         typeEnvironment.setReturnType(expectedReturn)
         
-        for statement in funcDef.body {
-            diagnostics.append(contentsOf: checkStatement(statement))
+        for statement in node.body {
+            visitStatement(statement)
         }
         
         typeEnvironment.popScope()
-        
-        return diagnostics
+        scopeTracker.exitScope()
     }
     
-    private mutating func checkReturn(_ ret: Return) -> [Diagnostic] {
-        var diagnostics: [Diagnostic] = []
+    func visitClassDef(_ node: ClassDef) {
+        let endLine = node.body.last?.lineno ?? node.lineno
         
-        guard let expectedType = typeEnvironment.getReturnType() else {
-            return diagnostics
+        // Track class scope
+        scopeTracker.enterScope(kind: .classScope, name: node.name, startLine: node.lineno, endLine: endLine)
+        typeEnvironment.pushScope()
+        
+        // Register class in registry
+        classRegistry.registerClass(node.name, at: node.lineno, endLine: endLine)
+        
+        // Process class body
+        for statement in node.body {
+            // Track class-level annotations
+            if case .annAssign(let annAssign) = statement,
+               case .name(let target) = annAssign.target {
+                let memberType = PythonType.fromExpression(annAssign.annotation)
+                classRegistry.addMember(
+                    toClass: node.name,
+                    name: target.id,
+                    type: memberType,
+                    kind: .property,
+                    line: annAssign.lineno
+                )
+            }
+            
+            // Track __init__ for instance properties
+            if case .functionDef(let funcDef) = statement, funcDef.name == "__init__" {
+                for funcStatement in funcDef.body {
+                    if case .assign(let assign) = funcStatement {
+                        for target in assign.targets {
+                            if case .attribute(let attr) = target,
+                               case .name(let value) = attr.value,
+                               value.id == "self" {
+                                let propType = visitExpression(assign.value)
+                                classRegistry.addMember(
+                                    toClass: node.name,
+                                    name: attr.attr,
+                                    type: propType,
+                                    kind: .property,
+                                    line: assign.lineno
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            
+            visitStatement(statement)
         }
         
-        if let value = ret.value {
-            let actualType = inferType(value)
+        typeEnvironment.popScope()
+        scopeTracker.exitScope()
+    }
+    
+    func visitReturn(_ node: Return) {
+        guard let expectedType = typeEnvironment.getReturnType() else {
+            return
+        }
+        
+        if let value = node.value {
+            let actualType = visitExpression(value)
             if !expectedType.isCompatible(with: actualType) {
                 diagnostics.append(.error(
-                    checkerId: id,
+                    checkerId: "type-checker",
                     message: "Return type mismatch: expected \(expectedType), got \(actualType)",
-                    line: ret.lineno,
-                    column: ret.colOffset
+                    line: node.lineno,
+                    column: node.colOffset
                 ))
             }
         } else {
             // Returning None
             if !expectedType.isCompatible(with: .none) {
                 diagnostics.append(.error(
-                    checkerId: id,
+                    checkerId: "type-checker",
                     message: "Return type mismatch: expected \(expectedType), got None",
-                    line: ret.lineno,
-                    column: ret.colOffset
+                    line: node.lineno,
+                    column: node.colOffset
                 ))
             }
         }
-        
-        return diagnostics
     }
     
-    // MARK: - Control Flow Checking
-    
-    private mutating func checkIf(_ ifStmt: If) -> [Diagnostic] {
-        var diagnostics: [Diagnostic] = []
-        
-        for statement in ifStmt.body {
-            diagnostics.append(contentsOf: checkStatement(statement))
+    func visitIf(_ node: If) {
+        for statement in node.body {
+            visitStatement(statement)
         }
         
-        for statement in ifStmt.orElse {
-            diagnostics.append(contentsOf: checkStatement(statement))
+        for statement in node.orElse {
+            visitStatement(statement)
         }
-        
-        return diagnostics
     }
     
-    private mutating func checkFor(_ forStmt: For) -> [Diagnostic] {
-        var diagnostics: [Diagnostic] = []
+    func visitWhile(_ node: While) {
+        for statement in node.body {
+            visitStatement(statement)
+        }
         
-        // Infer iterator type
-        let iterType = inferType(forStmt.iter)
+        for statement in node.orElse {
+            visitStatement(statement)
+        }
+    }
+    
+    func visitFor(_ node: For) {
+        let iterType = visitExpression(node.iter)
         
         // Try to infer element type from iterator
         if case .list(let elemType) = iterType,
-           case .name(let targetName) = forStmt.target {
-            typeEnvironment.setType(targetName.id, type: elemType)
+           case .name(let targetName) = node.target {
+            typeEnvironment.setType(targetName.id, type: elemType, at: node.lineno)
         }
         
-        for statement in forStmt.body {
-            diagnostics.append(contentsOf: checkStatement(statement))
+        for statement in node.body {
+            visitStatement(statement)
         }
         
-        for statement in forStmt.orElse {
-            diagnostics.append(contentsOf: checkStatement(statement))
-        }
-        
-        return diagnostics
-    }
-    
-    private mutating func checkWhile(_ whileStmt: While) -> [Diagnostic] {
-        var diagnostics: [Diagnostic] = []
-        
-        for statement in whileStmt.body {
-            diagnostics.append(contentsOf: checkStatement(statement))
-        }
-        
-        for statement in whileStmt.orElse {
-            diagnostics.append(contentsOf: checkStatement(statement))
-        }
-        
-        return diagnostics
-    }
-    
-    // MARK: - Type Inference
-    
-    private func inferType(_ expr: Expression) -> PythonType {
-        switch expr {
-        case .constant(let constant):
-            return inferConstantType(constant)
-            
-        case .name(let name):
-            return typeEnvironment.getType(name.id) ?? .unknown
-            
-        case .binOp(let binOp):
-            return inferBinOpType(binOp)
-            
-        case .unaryOp(let unaryOp):
-            return inferUnaryOpType(unaryOp)
-            
-        case .compare:
-            return .bool
-            
-        case .call(let call):
-            return inferCallType(call)
-            
-        case .list(let list):
-            return inferListType(list)
-            
-        case .dict(let dict):
-            return inferDictType(dict)
-            
-        case .set(let set):
-            return inferSetType(set)
-            
-        case .tuple(let tuple):
-            return inferTupleType(tuple)
-            
-        case .ifExp(let ifExp):
-            return inferIfExpType(ifExp)
-            
-        default:
-            return .unknown
+        for statement in node.orElse {
+            visitStatement(statement)
         }
     }
     
-    private func inferConstantType(_ constant: Constant) -> PythonType {
-        switch constant.value {
+    // MARK: - Expression Visitors
+    
+    func visitConstant(_ node: Constant) -> PythonType {
+        switch node.value {
         case .int: return .int
         case .float: return .float
-        case .complex: return .float // Treat complex as float for simplicity
+        case .complex: return .float
         case .string: return .str
         case .bytes: return .bytes
         case .bool: return .bool
@@ -335,14 +351,19 @@ public struct TypeChecker: PyChecker {
         }
     }
     
-    private func inferBinOpType(_ binOp: BinOp) -> PythonType {
-        let leftType = inferType(binOp.left)
-        let rightType = inferType(binOp.right)
+    func visitName(_ node: Name) -> PythonType {
+        // Look up type in environment (will search scopes properly)
+        return typeEnvironment.getType(node.id, at: nil) ?? .unknown
+    }
+    
+    func visitBinOp(_ node: BinOp) -> PythonType {
+        let leftType = visitExpression(node.left)
+        let rightType = visitExpression(node.right)
         
         // Simple numeric operations
         if leftType == .int && rightType == .int {
-            switch binOp.op {
-            case .div: return .float // Division always returns float
+            switch node.op {
+            case .div: return .float
             default: return .int
             }
         }
@@ -353,7 +374,7 @@ public struct TypeChecker: PyChecker {
         
         // String concatenation
         if leftType == .str && rightType == .str {
-            switch binOp.op {
+            switch node.op {
             case .add: return .str
             default: return .unknown
             }
@@ -362,22 +383,27 @@ public struct TypeChecker: PyChecker {
         return .unknown
     }
     
-    private func inferUnaryOpType(_ unaryOp: UnaryOp) -> PythonType {
-        let operandType = inferType(unaryOp.operand)
+    func visitUnaryOp(_ node: UnaryOp) -> PythonType {
+        let operandType = visitExpression(node.operand)
         
-        switch unaryOp.op {
-        case .not:
-            return .bool
-        case .uSub, .uAdd:
-            return operandType
-        case .invert:
-            return operandType
+        switch node.op {
+        case .not: return .bool
+        case .uSub, .uAdd: return operandType
+        case .invert: return operandType
         }
     }
     
-    private func inferCallType(_ call: Call) -> PythonType {
+    func visitBoolOp(_ node: BoolOp) -> PythonType {
+        return .bool
+    }
+    
+    func visitCompare(_ node: Compare) -> PythonType {
+        return .bool
+    }
+    
+    func visitCall(_ node: Call) -> PythonType {
         // Try to infer from function name
-        if case .name(let name) = call.fun {
+        if case .name(let name) = node.fun {
             switch name.id {
             case "int": return .int
             case "float": return .float
@@ -387,57 +413,54 @@ public struct TypeChecker: PyChecker {
             case "dict": return .dict(key: .any, value: .any)
             case "set": return .set(.any)
             case "tuple": return .tuple([.any])
-            default:
-                return .unknown
+            default: return .unknown
             }
         }
         
         return .unknown
     }
     
-    private func inferListType(_ list: List) -> PythonType {
-        if list.elts.isEmpty {
+    func visitList(_ node: List) -> PythonType {
+        if node.elts.isEmpty {
             return .list(.any)
         }
         
-        // Infer from first element
-        let firstType = inferType(list.elts[0])
+        let firstType = visitExpression(node.elts[0])
         return .list(firstType)
     }
     
-    private func inferDictType(_ dict: Dict) -> PythonType {
-        if dict.keys.isEmpty {
+    func visitDict(_ node: Dict) -> PythonType {
+        if node.keys.isEmpty {
             return .dict(key: .any, value: .any)
         }
         
-        // Find first non-nil key
-        guard let firstKey = dict.keys.compactMap({ $0 }).first,
-              let firstValue = dict.values.first else {
+        guard let firstKey = node.keys.compactMap({ $0 }).first,
+              let firstValue = node.values.first else {
             return .dict(key: .any, value: .any)
         }
         
-        let keyType = inferType(firstKey)
-        let valueType = inferType(firstValue)
+        let keyType = visitExpression(firstKey)
+        let valueType = visitExpression(firstValue)
         return .dict(key: keyType, value: valueType)
     }
     
-    private func inferSetType(_ set: Set) -> PythonType {
-        if set.elts.isEmpty {
+    func visitSet(_ node: Set) -> PythonType {
+        if node.elts.isEmpty {
             return .set(.any)
         }
         
-        let elemType = inferType(set.elts[0])
+        let elemType = visitExpression(node.elts[0])
         return .set(elemType)
     }
     
-    private func inferTupleType(_ tuple: Tuple) -> PythonType {
-        let types = tuple.elts.map { inferType($0) }
+    func visitTuple(_ node: Tuple) -> PythonType {
+        let types = node.elts.map { visitExpression($0) }
         return .tuple(types)
     }
     
-    private func inferIfExpType(_ ifExp: IfExp) -> PythonType {
-        let trueType = inferType(ifExp.body)
-        let falseType = inferType(ifExp.orElse)
+    func visitIfExp(_ node: IfExp) -> PythonType {
+        let trueType = visitExpression(node.body)
+        let falseType = visitExpression(node.orElse)
         
         if trueType == falseType {
             return trueType
@@ -445,46 +468,309 @@ public struct TypeChecker: PyChecker {
         
         return .union([trueType, falseType])
     }
+    
+    // MARK: - Stub implementations for other visitors
+    
+    func visitAssertStmt(_ node: Assert) {}
+    func visitPass(_ node: Pass) {}
+    func visitDelete(_ node: Delete) {}
+    func visitRaise(_ node: Raise) {}
+    func visitBreakStmt(_ node: Break) {}
+    func visitContinueStmt(_ node: Continue) {}
+    func visitImportStmt(_ node: Import) {}
+    func visitImportFrom(_ node: ImportFrom) {}
+    func visitGlobal(_ node: Global) {}
+    func visitNonlocal(_ node: Nonlocal) {}
+    func visitExpr(_ node: Expr) { _ = visitExpression(node.value) }
+    func visitBlank(_ node: Blank) {}
+    func visitWith(_ node: With) { for stmt in node.body { visitStatement(stmt) } }
+    func visitTry(_ node: Try) { for stmt in node.body { visitStatement(stmt) } }
+    func visitTryStar(_ node: TryStar) { for stmt in node.body { visitStatement(stmt) } }
+    func visitMatch(_ node: Match) {}
+    func visitAsyncFor(_ node: AsyncFor) { for stmt in node.body { visitStatement(stmt) } }
+    func visitAsyncWith(_ node: AsyncWith) { for stmt in node.body { visitStatement(stmt) } }
+    func visitTypeAlias(_ node: TypeAlias) {}
+    
+    func visitAttribute(_ node: Attribute) -> PythonType { .unknown }
+    func visitSubscript(_ node: Subscript) -> PythonType { .unknown }
+    func visitStarred(_ node: Starred) -> PythonType { .unknown }
+    func visitLambda(_ node: Lambda) -> PythonType { .unknown }
+    func visitListComp(_ node: ListComp) -> PythonType { .list(.any) }
+    func visitSetComp(_ node: SetComp) -> PythonType { .set(.any) }
+    func visitDictComp(_ node: DictComp) -> PythonType { .dict(key: .any, value: .any) }
+    func visitGeneratorExp(_ node: GeneratorExp) -> PythonType { .any }
+    func visitNamedExpr(_ node: NamedExpr) -> PythonType { visitExpression(node.value) }
+    func visitYield(_ node: Yield) -> PythonType { .any }
+    func visitYieldFrom(_ node: YieldFrom) -> PythonType { .any }
+    func visitAwait(_ node: Await) -> PythonType { .any }
+    func visitFormattedValue(_ node: FormattedValue) -> PythonType { .str }
+    func visitJoinedStr(_ node: JoinedStr) -> PythonType { .str }
+    func visitSlice(_ node: Slice) -> PythonType { .any }
 }
 
-// MARK: - Type Environment
+// MARK: - Supporting Types
 
-/// Manages variable types and scopes during type checking
-private struct TypeEnvironment {
-    private var scopes: [[String: PythonType]] = [[:]]
-    private var returnTypes: [PythonType?] = [nil]
+/// Information about a scope
+public struct ScopeInfo: Sendable {
+    public let kind: ScopeKind
+    public let name: String?
+    public let startLine: Int
+    public let endLine: Int
+}
+
+/// Kind of scope
+public enum ScopeKind: Sendable {
+    case module
+    case function
+    case classScope
+}
+
+/// Information about a class member
+public struct MemberInfo: Sendable {
+    public let name: String
+    public let type: PythonType
+    public let kind: MemberKind
+    public let line: Int
+}
+
+/// Kind of class member
+public enum MemberKind: Sendable {
+    case property
+    case method
+    case classMethod
+    case staticMethod
+}
+
+// MARK: - Scope Tracker
+
+/// Tracks scope boundaries during analysis
+struct ScopeTracker {
+    private var scopes: [ScopeInfo] = []
+    
+    mutating func enterScope(kind: ScopeKind, name: String?, startLine: Int, endLine: Int) {
+        scopes.append(ScopeInfo(kind: kind, name: name, startLine: startLine, endLine: endLine))
+    }
+    
+    mutating func exitScope() {
+        if !scopes.isEmpty {
+            scopes.removeLast()
+        }
+    }
+    
+    func getScopeAt(line: Int) -> ScopeInfo? {
+        // Return the innermost scope containing the line
+        for scope in scopes.reversed() {
+            if scope.startLine <= line && line <= scope.endLine {
+                return scope
+            }
+        }
+        return nil
+    }
+}
+
+// MARK: - Class Registry
+
+/// Tracks class definitions and their members
+struct ClassRegistry {
+    private var classes: [String: ClassInfo] = [:]
+    
+    struct ClassInfo {
+        let name: String
+        let startLine: Int
+        let endLine: Int
+        var members: [MemberInfo] = []
+    }
+    
+    mutating func registerClass(_ name: String, at startLine: Int, endLine: Int) {
+        classes[name] = ClassInfo(name: name, startLine: startLine, endLine: endLine)
+    }
+    
+    mutating func addMember(toClass className: String, name: String, type: PythonType, kind: MemberKind, line: Int) {
+        classes[className]?.members.append(MemberInfo(name: name, type: type, kind: kind, line: line))
+    }
+    
+    func getMembers(_ className: String) -> [MemberInfo] {
+        return classes[className]?.members ?? []
+    }
+}
+
+// MARK: - Enhanced Type Environment
+
+/// Manages variable types and scopes with line-aware lookups
+public struct TypeEnvironment {
+    private struct Scope {
+        var variables: [(name: String, type: PythonType, line: Int)] = []
+        var returnType: PythonType?
+    }
+    
+    private var scopes: [Scope] = [Scope()]
     
     mutating func pushScope() {
-        scopes.append([:])
-        returnTypes.append(nil)
+        scopes.append(Scope())
     }
     
     mutating func popScope() {
         if scopes.count > 1 {
             scopes.removeLast()
-            returnTypes.removeLast()
         }
     }
     
-    mutating func setType(_ name: String, type: PythonType) {
-        scopes[scopes.count - 1][name] = type
+    mutating func setType(_ name: String, type: PythonType, at line: Int) {
+        scopes[scopes.count - 1].variables.append((name: name, type: type, line: line))
     }
     
-    func getType(_ name: String) -> PythonType? {
+    func getType(_ name: String, at line: Int?) -> PythonType? {
         // Search from innermost to outermost scope
         for scope in scopes.reversed() {
-            if let type = scope[name] {
-                return type
+            // Find the most recent assignment at or before the line
+            var mostRecent: (type: PythonType, line: Int)?
+            
+            for (varName, varType, varLine) in scope.variables {
+                if varName == name {
+                    if let queryLine = line {
+                        if varLine <= queryLine {
+                            if mostRecent == nil || varLine > mostRecent!.line {
+                                mostRecent = (type: varType, line: varLine)
+                            }
+                        }
+                    } else {
+                        // No line filtering - return first match
+                        return varType
+                    }
+                }
+            }
+            
+            if let result = mostRecent {
+                return result.type
             }
         }
+        
         return nil
     }
     
+    func getAllSymbolsInScope(at line: Int) -> [(name: String, type: PythonType)] {
+        var symbols: [String: PythonType] = [:]
+        
+        // Collect from all scopes (outer to inner)
+        for scope in scopes {
+            for (name, type, varLine) in scope.variables {
+                if varLine <= line {
+                    symbols[name] = type
+                }
+            }
+        }
+        
+        return Array(symbols.map { ($0.key, $0.value) })
+    }
+    
     mutating func setReturnType(_ type: PythonType?) {
-        returnTypes[returnTypes.count - 1] = type
+        scopes[scopes.count - 1].returnType = type
     }
     
     func getReturnType() -> PythonType? {
-        returnTypes.last ?? nil
+        return scopes.last?.returnType
+    }
+}
+
+// MARK: - PythonType Extensions
+
+extension PythonType {
+    /// Create a PythonType from an Expression (type annotation)
+    public static func fromExpression(_ expr: Expression) -> PythonType {
+        switch expr {
+        case .name(let name):
+            switch name.id {
+            case "int": return .int
+            case "float": return .float
+            case "str": return .str
+            case "bool": return .bool
+            case "bytes": return .bytes
+            case "list": return .list(.any)
+            case "dict": return .dict(key: .any, value: .any)
+            case "set": return .set(.any)
+            case "tuple": return .tuple([.any])
+            case "Any": return .any
+            case "None": return .none
+            default: return .unknown
+            }
+            
+        case .subscriptExpr(let subscriptExpr):
+            // Handle generic types like list[str], dict[int, str]
+            if case .name(let baseType) = subscriptExpr.value {
+                switch baseType.id {
+                case "list", "List":
+                    let elementType = fromExpression(subscriptExpr.slice)
+                    return .list(elementType)
+                case "set", "Set":
+                    let elementType = fromExpression(subscriptExpr.slice)
+                    return .set(elementType)
+                case "tuple", "Tuple":
+                    if case .tuple(let tupleExpr) = subscriptExpr.slice {
+                        let types = tupleExpr.elts.map { fromExpression($0) }
+                        return .tuple(types)
+                    }
+                    return .tuple([fromExpression(subscriptExpr.slice)])
+                case "dict", "Dict":
+                    if case .tuple(let tupleExpr) = subscriptExpr.slice,
+                       tupleExpr.elts.count == 2 {
+                        let keyType = fromExpression(tupleExpr.elts[0])
+                        let valueType = fromExpression(tupleExpr.elts[1])
+                        return .dict(key: keyType, value: valueType)
+                    }
+                    return .dict(key: .any, value: .any)
+                default:
+                    return .unknown
+                }
+            }
+            return .unknown
+            
+        case .constant(let constant):
+            switch constant.value {
+            case .int: return .int
+            case .float: return .float
+            case .string: return .str
+            case .bool: return .bool
+            case .none: return .none
+            default: return .any
+            }
+            
+        default:
+            return .unknown
+        }
+    }
+    
+    /// Format type for display
+    public func toDisplayString() -> String {
+        switch self {
+        case .int: return "int"
+        case .float: return "float"
+        case .str: return "str"
+        case .bool: return "bool"
+        case .bytes: return "bytes"
+        case .none: return "None"
+        case .any: return "Any"
+        case .unknown: return "Unknown"
+        case .list(let elementType):
+            return "list[\(elementType.toDisplayString())]"
+        case .dict(let keyType, let valueType):
+            return "dict[\(keyType.toDisplayString()), \(valueType.toDisplayString())]"
+        case .set(let elementType):
+            return "set[\(elementType.toDisplayString())]"
+        case .tuple(let types):
+            if types.count == 1 {
+                return "tuple[\(types[0].toDisplayString()), ...]"
+            }
+            let typeStrs = types.map { $0.toDisplayString() }
+            return "tuple[\(typeStrs.joined(separator: ", "))]"
+        case .union(let types):
+            let typeStrs = types.map { $0.toDisplayString() }
+            return typeStrs.joined(separator: " | ")
+        case .function:
+            return "function"
+        case .classType(let name):
+            return name
+        case .instance(let name):
+            return name
+        }
     }
 }
