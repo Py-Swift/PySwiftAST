@@ -1294,6 +1294,26 @@ final class RealWorldTypeCheckingTests: XCTestCase {
             XCTFail("self.fetch_data attribute type not found")
         }
     }
+    
+    func testCustomClassTypeAnnotation() throws {
+        let checker = try analyze("""
+        class Product:
+            name: str
+            price: float
+        
+        class Order:
+            def add_item(self, product: Product):
+                pass
+            
+            def process(self):
+                pass
+        """)
+        
+        // Check that custom class type is recognized in parameter annotation
+        let productType = checker.getTypeAt(name: "product", line: 6, column: 0)
+        XCTAssertNotNil(productType, "product parameter should have a type")
+        XCTAssertEqual(productType?.toDisplayString(), "Product", "Should recognize Product as custom class, not Unknown")
+    }
 }
 
 

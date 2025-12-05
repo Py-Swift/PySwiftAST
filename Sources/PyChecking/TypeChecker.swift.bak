@@ -699,13 +699,13 @@ public final class TypeChecker: PyChecker {
                     if case let .name(nameExpr) = target, nameExpr.id == name {
                         if let queryLine = lineNumber {
                             if assign.lineno <= queryLine {
-                                let type = PythonType.fromExpression(assign.value, classRegistry: visitor.classRegistry)
+                                let type = PythonType.fromExpression(assign.value)
                                 if mostRecentAssignment == nil || assign.lineno > mostRecentAssignment!.line {
                                     mostRecentAssignment = (line: assign.lineno, type: type)
                                 }
                             }
                         } else {
-                            return PythonType.fromExpression(assign.value, classRegistry: visitor.classRegistry)
+                            return PythonType.fromExpression(assign.value)
                         }
                     }
                 }
@@ -713,13 +713,13 @@ public final class TypeChecker: PyChecker {
                 if case let .name(target) = annAssign.target, target.id == name {
                     if let queryLine = lineNumber {
                         if annAssign.lineno <= queryLine {
-                            let type = PythonType.fromExpression(annAssign.annotation, classRegistry: visitor.classRegistry)
+                            let type = PythonType.fromExpression(annAssign.annotation)
                             if mostRecentAssignment == nil || annAssign.lineno > mostRecentAssignment!.line {
                                 mostRecentAssignment = (line: annAssign.lineno, type: type)
                             }
                         }
                     } else {
-                        return PythonType.fromExpression(annAssign.annotation, classRegistry: visitor.classRegistry)
+                        return PythonType.fromExpression(annAssign.annotation)
                     }
                 }
             default:
@@ -905,7 +905,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     }
     
     func visitAnnAssign(_ node: AnnAssign) {
-        let annotatedType = PythonType.fromExpression(node.annotation, classRegistry: classRegistry)
+        let annotatedType = PythonType.fromExpression(node.annotation)
         
         if case .name(let name) = node.target {
             typeEnvironment.setType(name.id, type: annotatedType, at: node.lineno)
@@ -969,7 +969,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     
     func visitFunctionDef(_ node: FunctionDef) {
         // Register function with its return type in outer scope (before entering function scope)
-        let returnType = node.returns.map { PythonType.fromExpression($0, classRegistry: classRegistry) } ?? .any
+        let returnType = node.returns.map { PythonType.fromExpression($0) } ?? .any
         typeEnvironment.setType(node.name, type: returnType, at: node.lineno)
         
         // Use actual end line from AST node, or calculate from body
@@ -1002,7 +1002,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
         // Register parameter types
         for (index, arg) in node.args.args.enumerated() {
             if let annotation = arg.annotation {
-                let paramType = PythonType.fromExpression(annotation, classRegistry: classRegistry)
+                let paramType = PythonType.fromExpression(annotation)
                 typeEnvironment.setType(arg.arg, type: paramType, at: node.lineno)
             } else {
                 // Special handling for first parameter in methods
@@ -1029,7 +1029,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
         }
         
         // Store expected return type
-        let expectedReturn = node.returns.map { PythonType.fromExpression($0, classRegistry: classRegistry) }
+        let expectedReturn = node.returns.map { PythonType.fromExpression($0) }
         typeEnvironment.setReturnType(expectedReturn)
         
         // Check function body
@@ -1045,7 +1045,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
         // Register async function with its return type in outer scope
         let returnType: PythonType
         if let returns = node.returns {
-            returnType = PythonType.fromExpression(returns, classRegistry: classRegistry)
+            returnType = PythonType.fromExpression(returns)
         } else {
             // No annotation - infer from function body
             // Need to set up temporary scope with parameters for accurate inference
@@ -1055,7 +1055,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
             // Register parameters
             for arg in node.args.args {
                 if let annotation = arg.annotation {
-                    let paramType = PythonType.fromExpression(annotation, classRegistry: classRegistry)
+                    let paramType = PythonType.fromExpression(annotation)
                     typeEnvironment.setType(arg.arg, type: paramType, at: node.lineno)
                 }
             }
@@ -1092,7 +1092,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
         
         for (index, arg) in node.args.args.enumerated() {
             if let annotation = arg.annotation {
-                let paramType = PythonType.fromExpression(annotation, classRegistry: classRegistry)
+                let paramType = PythonType.fromExpression(annotation)
                 typeEnvironment.setType(arg.arg, type: paramType, at: node.lineno)
             } else {
                 // Special handling for first parameter in methods
@@ -1118,7 +1118,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
             }
         }
         
-        let expectedReturn = node.returns.map { PythonType.fromExpression($0, classRegistry: classRegistry) }
+        let expectedReturn = node.returns.map { PythonType.fromExpression($0) }
         typeEnvironment.setReturnType(expectedReturn)
         
         for statement in node.body {
@@ -1144,7 +1144,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
             // Track class-level annotations
             if case .annAssign(let annAssign) = statement,
                case .name(let target) = annAssign.target {
-                let memberType = PythonType.fromExpression(annAssign.annotation, classRegistry: classRegistry)
+                let memberType = PythonType.fromExpression(annAssign.annotation)
                 classRegistry.addMember(
                     toClass: node.name,
                     name: target.id,
@@ -1179,7 +1179,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
                 // Register method
                 let returnType: PythonType
                 if let returns = funcDef.returns {
-                    returnType = PythonType.fromExpression(returns, classRegistry: classRegistry)
+                    returnType = PythonType.fromExpression(returns)
                 } else {
                     // No annotation - infer from function body
                     // Need to set up temporary scope with parameters for accurate inference
@@ -1192,7 +1192,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
                             // First param in method is 'self'
                             typeEnvironment.setType(arg.arg, type: .instance(node.name), at: funcDef.lineno)
                         } else if let annotation = arg.annotation {
-                            let paramType = PythonType.fromExpression(annotation, classRegistry: classRegistry)
+                            let paramType = PythonType.fromExpression(annotation)
                             typeEnvironment.setType(arg.arg, type: paramType, at: funcDef.lineno)
                         }
                     }
@@ -1217,7 +1217,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
                     // Register parameter types in temporary scope
                     for arg in funcDef.args.args {
                         if let annotation = arg.annotation {
-                            let paramType = PythonType.fromExpression(annotation, classRegistry: classRegistry)
+                            let paramType = PythonType.fromExpression(annotation)
                             typeEnvironment.setType(arg.arg, type: paramType, at: funcDef.lineno)
                         }
                     }
@@ -1246,7 +1246,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
                            case .attribute(let attr) = annAssign.target,
                            case .name(let value) = attr.value,
                            value.id == "self" {
-                            let propType = PythonType.fromExpression(annAssign.annotation, classRegistry: classRegistry)
+                            let propType = PythonType.fromExpression(annAssign.annotation)
                             classRegistry.addMember(
                                 toClass: node.name,
                                 name: attr.attr,
@@ -1265,7 +1265,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
             if case .asyncFunctionDef(let funcDef) = statement {
                 let returnType: PythonType
                 if let returns = funcDef.returns {
-                    returnType = PythonType.fromExpression(returns, classRegistry: classRegistry)
+                    returnType = PythonType.fromExpression(returns)
                 } else {
                     // No annotation - infer from function body
                     // Need to set up temporary scope with parameters for accurate inference
@@ -1278,7 +1278,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
                             // First param in async method is 'self'
                             typeEnvironment.setType(arg.arg, type: .instance(node.name), at: funcDef.lineno)
                         } else if let annotation = arg.annotation {
-                            let paramType = PythonType.fromExpression(annotation, classRegistry: classRegistry)
+                            let paramType = PythonType.fromExpression(annotation)
                             typeEnvironment.setType(arg.arg, type: paramType, at: funcDef.lineno)
                         }
                     }
@@ -2030,7 +2030,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
         // Register parameter types if annotated
         for arg in node.args.args {
             if let annotation = arg.annotation {
-                let paramType = PythonType.fromExpression(annotation, classRegistry: classRegistry)
+                let paramType = PythonType.fromExpression(annotation)
                 typeEnvironment.setType(arg.arg, type: paramType, at: node.lineno)
             } else {
                 // Parameter type is unknown
@@ -2352,7 +2352,7 @@ final class ScopeTracker {
 // MARK: - Class Registry
 
 /// Tracks class definitions and their members
-public final class ClassRegistry {
+final class ClassRegistry {
     private var classes: [String: ClassInfo] = [:]
     
     class ClassInfo {
