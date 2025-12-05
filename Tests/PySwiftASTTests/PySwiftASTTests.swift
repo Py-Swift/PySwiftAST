@@ -1591,3 +1591,69 @@ func loadRealWorldResource(_ filename: String) throws -> String {
     }
 }
 
+@Test func testEndLinenoForClassAndFunction() async throws {
+    let source = """
+    def simple_function():
+        x = 1
+        return x
+    
+    class SimpleClass:
+        def method_one(self):
+            return 1
+        
+        def method_two(self):
+            return 2
+    
+    async def async_function():
+        await something()
+        return result
+    """
+    
+    let module = try parsePython(source)
+    
+    switch module {
+    case .module(let statements):
+        // Check function (lines 1-3)
+        if case .functionDef(let funcDef) = statements[0] {
+            #expect(funcDef.name == "simple_function")
+            #expect(funcDef.lineno == 1)
+            #expect(funcDef.endLineno == 3, "Function ending at line 3 should have endLineno=3")
+        } else {
+            Issue.record("Expected functionDef as first statement")
+        }
+        
+        // Check class (lines 5-10)
+        if case .classDef(let classDef) = statements[1] {
+            #expect(classDef.name == "SimpleClass")
+            #expect(classDef.lineno == 5)
+            #expect(classDef.endLineno == 10, "Class ending at line 10 should have endLineno=10")
+            
+            // Check methods within class
+            if case .functionDef(let method1) = classDef.body[0] {
+                #expect(method1.name == "method_one")
+                #expect(method1.lineno == 6)
+                #expect(method1.endLineno == 7, "Method ending at line 7 should have endLineno=7")
+            }
+            
+            if case .functionDef(let method2) = classDef.body[1] {
+                #expect(method2.name == "method_two")
+                #expect(method2.lineno == 9)
+                #expect(method2.endLineno == 10, "Method ending at line 10 should have endLineno=10")
+            }
+        } else {
+            Issue.record("Expected classDef as second statement")
+        }
+        
+        // Check async function (lines 12-14)
+        if case .asyncFunctionDef(let asyncFunc) = statements[2] {
+            #expect(asyncFunc.name == "async_function")
+            #expect(asyncFunc.lineno == 12)
+            #expect(asyncFunc.endLineno == 14, "Async function ending at line 14 should have endLineno=14")
+        } else {
+            Issue.record("Expected asyncFunctionDef as third statement")
+        }
+    default:
+        Issue.record("Expected module")
+    }
+}
+

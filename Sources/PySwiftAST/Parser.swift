@@ -1030,7 +1030,7 @@ public class Parser {
             typeParams: typeParams,
             lineno: defToken.line,
             colOffset: defToken.column,
-            endLineno: nil,
+            endLineno: calculateEndLine(from: body),
             endColOffset: nil
         ))
     }
@@ -1126,7 +1126,7 @@ public class Parser {
             typeParams: typeParams,
             lineno: classToken.line,
             colOffset: classToken.column,
-            endLineno: nil,
+            endLineno: calculateEndLine(from: body),
             endColOffset: nil
         ))
     }
@@ -1211,7 +1211,7 @@ public class Parser {
             typeParams: typeParams,
             lineno: defToken.line,
             colOffset: defToken.column,
-            endLineno: nil,
+            endLineno: calculateEndLine(from: body),
             endColOffset: nil
         ))
     }
@@ -3279,6 +3279,13 @@ public class Parser {
                 break
             }
         }
+    }
+    
+    /// Calculate the end line number from a statement body
+    /// Returns the endLineno of the last statement, or its lineno if endLineno is not set
+    private func calculateEndLine(from body: [Statement]) -> Int? {
+        guard let lastStatement = body.last else { return nil }
+        return lastStatement.endLineno ?? lastStatement.lineno
     }
     
     private func consume(_ type: TokenType, _ message: String) throws {
