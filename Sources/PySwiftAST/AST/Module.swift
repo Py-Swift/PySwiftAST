@@ -4,6 +4,19 @@ public enum Module: Sendable {
     case interactive([Statement])
     case expression(Expression)
     case functionType([Expression], Expression)
+
+    public var body: [Statement] {
+        switch self {
+        case .module(let statements):
+            return statements
+        case .interactive(let statements):
+            return statements
+        case .expression(_):
+            return []
+        default:
+            return []
+        }
+    }
 }
 
 // MARK: - TreeDisplayable Conformance

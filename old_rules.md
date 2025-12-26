@@ -1,0 +1,649 @@
+# Cline Rules for PySwiftAST Development
+
+## Parser Development Guidelines
+
+### Always Consult Grammar File
+When working on parser-related code (Parser.swift, Tokenizer.swift, or any parsing logic):
+
+1. **ALWAYS reference `/Volumes/CodeSSD/GitHub/PySwiftAST/Grammar/python.gram`** before making changes
+2. **Read the relevant grammar rules** for the feature you're implementing or fixing
+3. **Verify your implementation matches the official Python grammar** defined in python.gram
+4. **Include grammar rule references** in comments when implementing parser logic
+
+### Grammar File Usage Pattern
+```
+When fixing/implementing parser feature X:
+1. Read python.gram to find the rule for X
+2. Understand the grammar notation (e.g., ','.expression+, [optional], element*, etc.)
+3. Implement according to the grammar rule
+4. Add a comment referencing the grammar rule in the code
+```
+
+### Example Flow
+```
+Task: Fix type annotations
+↓
+1. Read python.gram for "ann_assign" or related rules
+2. Understand: target ':' annotation ['=' value]
+3. Check valid targets in grammar
+4. Implement in Parser.swift with grammar rule comment
+5. Test against real-world Python code
+```
+
+### Key Grammar Principles (from python.gram header)
+- **Implicit Line Joining**: Expressions inside (), [], {} can span multiple lines
+- **NEWLINES are significant** except inside (), [], {}
+- **Grammar Notation**:
+  - `,`.expression+ means "comma-separated list of expressions"
+  - [optional] means optional element
+  - element+ means one or more
+  - element* means zero or more
+  - ~ means "commit to this branch" (for better error messages)
+
+### Code Comment Convention
+When implementing a grammar rule, add a comment like:
+```swift
+// Grammar: ann_assign: target ':' annotation ['=' value]
+// Valid targets: NAME | attr | subscript (per Python grammar)
+```
+
+### Verification Steps
+1. ✅ Check python.gram for the official rule
+2. ✅ Verify implementation matches grammar
+3. ✅ Test with real-world Python files
+4. ✅ Ensure AST structure matches Python's AST module
+
+## Performance Optimization Guidelines
+
+### ALWAYS Follow OPTIMIZATION_GUIDELINES.md
+
+When making ANY performance-related changes, **MUST** follow the workflow in:
+`/Volumes/CodeSSD/GitHub/PySwiftAST/OPTIMIZATION_GUIDELINES.md`
+
+### Critical Rules (Never Skip These!)
+
+1. **Establish Baseline FIRST**
+   ```bash
+   swift test -c release --filter PerformanceTests 2>&1 | tee baseline.txt
+   ```
+   - Record current metrics before any changes
+   - Update `performance_history.json` with baseline
+
+2. **ONE Optimization at a Time**
+   - ✅ Good: "Optimize parseExpression() bounds checking"
+   - ❌ Bad: "Optimize parser, tokenizer, and codegen"
+   - Each change must be isolated and measurable
+
+3. **Profile Before Optimizing**
+   - **Never guess what's slow** - always profile first
+   - Use Instruments Time Profiler or sampling
+   - Focus on actual hotspots, not assumptions
+
+4. **Test Everything After Changes**
+   ```bash
+   swift test  # All 81 tests must pass
+   swift test -c release --filter PerformanceTests  # Measure impact
+   ```
+   - **If ANY test fails → REVERT immediately**
+   - **If performance regresses >2% → REVERT immediately**
+
+5. **Update Performance History**
+   - Add entry to `performance_history.json` after every optimization
+   - Include: date, commit, metrics, delta percentages, status
+   - Document what worked and what didn't
+
+### Performance Decision Matrix
+
+After measuring performance impact:
+- **Improved >2%**: ✅ Keep change, commit, update history
+- **Neutral ±2%**: 🤔 Keep only if code is simpler, otherwise revert
+- **Regressed >2%**: ❌ **REVERT immediately**, try different approach
+
+### Current Performance Baseline (2025-11-25)
+- **Parsing**: 6.5 ms median (1.34x vs Python, target: 2.0x)
+- **Round-trip**: 26.3 ms median (1.15x vs Python, target: 1.5x)
+- **Tokenization**: 44.2 ms median (51% faster than old baseline)
+
+### Optimization Priority (Based on Profiling)
+
+1. **High Impact**: Tokenization (44ms) - UTF-8 byte array could give 6x improvement
+2. **Medium Impact**: Code generation (~5ms) - String building optimization
+3. **Low Impact**: Parsing (6.5ms) - Already quite fast
+
+### Quick Reference: Safe vs Unsafe Optimizations
+
+**Safe (Try First)**:
+- Better algorithms (O(n²) → O(n))
+- Reduce allocations (`reserveCapacity`, reuse buffers)
+- Compiler hints (`@inline`, `@_optimize(speed)`)
+- Caching repeated work
+
+**Unsafe (Only After Profiling Proves >5% Benefit)**:
+- `unsafelyUnwrapped` (when bounds already checked)
+- `withUnsafeBufferPointer` (for hot loops)
+- `UnsafePointer` (for string scanning)
+- **MUST** document why it's safe in code comments
+
+### Commit Message Template for Optimizations
+
+```
+perf: [brief description of optimization]
+
+- [Component]: [before]ms -> [after]ms ([X]% improvement)
+- Overall speedup: [X.XX]x vs Python (was [X.XX]x)
+- All [N] tests passing
+- [Specific test] validated
+
+[Brief explanation of what was optimized and why it works]
+
+Profiling showed [finding]. [Approach taken]. [Result achieved].
+```
+
+## PySwiftIDE Development Guidelines
+
+### Monaco Editor API Compatibility
+
+PySwiftIDE provides **Monaco Editor-compatible** types for IDE integration. When working on PySwiftIDE:
+
+1. **ALWAYS reference Monaco Editor API documentation** at https://microsoft.github.io/monaco-editor/
+2. **Keep types compatible** with Monaco's TypeScript interfaces
+3. **Use 1-based indexing** for line/column (Monaco convention)
+4. **Make all types `Codable` and `Sendable`** for JSON and threading
+
+### Monaco API Mapping (Swift ↔ TypeScript)
+
+#### Core Range Type
+```swift
+// Swift: IDERange
+public struct IDERange: Codable, Sendable {
+    public let startLineNumber: Int    // 1-based
+    public let startColumn: Int        // 1-based
+    public let endLineNumber: Int
+    public let endColumn: Int
+}
+
+// Monaco: monaco.IRange
+interface IRange {
+    startLineNumber: number;  // 1-based
+    startColumn: number;      // 1-based
+    endLineNumber: number;
+    endColumn: number;
+}
+```
+
+#### Diagnostics (Error Markers)
+```swift
+// Swift: Diagnostic
+public struct Diagnostic: Codable, Sendable {
+    public let severity: DiagnosticSeverity  // 1=Hint, 2=Info, 4=Warning, 8=Error
+    public let message: String
+    public let range: IDERange
+    public let source: String                // "PySwiftAST"
+    public let code: String?
+    public let relatedInformation: [DiagnosticRelatedInformation]?
+    public let tags: [DiagnosticTag]?        // 1=Unnecessary, 2=Deprecated
+}
+
+// Monaco: monaco.editor.IMarkerData
+interface IMarkerData {
+    severity: MarkerSeverity;  // Hint=1, Info=2, Warning=4, Error=8
+    message: string;
+    startLineNumber: number;
+    startColumn: number;
+    endLineNumber: number;
+    endColumn: number;
+    code?: string | { value: string; target: Uri };
+    relatedInformation?: IRelatedInformation[];
+    tags?: MarkerTag[];  // Unnecessary=1, Deprecated=2
+    source?: string;
+}
+```
+
+#### Code Actions (Quick Fixes)
+```swift
+// Swift: CodeAction
+public struct CodeAction: Codable, Sendable {
+    public let title: String              // "Insert ':'"
+    public let kind: CodeActionKind       // "quickfix", "refactor.extract", etc.
+    public let diagnostics: [Diagnostic]?
+    public let edit: WorkspaceEdit?
+    public let isPreferred: Bool?
+}
+
+// Monaco: monaco.languages.CodeAction
+interface CodeAction {
+    title: string;
+    kind?: string;  // "quickfix" | "refactor" | "refactor.extract" | "source" | ...
+    diagnostics?: IMarkerData[];
+    edit?: WorkspaceEdit;
+    isPreferred?: boolean;
+}
+```
+
+#### Workspace Edits
+```swift
+// Swift: WorkspaceEdit & TextEdit
+public struct WorkspaceEdit: Codable, Sendable {
+    public let changes: [String: [TextEdit]]?  // URI -> edits
+}
+
+public struct TextEdit: Codable, Sendable {
+    public let range: IDERange
+    public let newText: String
+}
+
+// Monaco: monaco.languages.WorkspaceEdit
+interface WorkspaceEdit {
+    edits: WorkspaceTextEdit[];
+}
+
+interface WorkspaceTextEdit {
+    resource: Uri;
+    edit: TextEdit;
+}
+
+interface TextEdit {
+    range: IRange;
+    text: string;
+}
+```
+
+### Monaco Language Features to Implement
+
+When extending PySwiftIDE, refer to these Monaco language provider APIs:
+
+#### 1. Hover Provider
+```typescript
+// Monaco API
+monaco.languages.registerHoverProvider('python', {
+    provideHover: (model, position) => IHover
+});
+
+// Swift: Implemented in Sources/MonacoApi/Hover.swift
+public struct Hover: Codable, Sendable {
+    public let contents: [HoverContent]
+    public let range: IDERange?
+}
+```
+
+#### 2. Completion Provider
+```typescript
+// Monaco API
+monaco.languages.registerCompletionItemProvider('python', {
+    provideCompletionItems: (model, position) => CompletionList
+});
+
+// Swift: Implemented in Sources/MonacoApi/Completion.swift
+public struct CompletionItem: Codable, Sendable {
+    public let label: String
+    public let kind: CompletionItemKind
+    public let detail: String?
+    public let documentation: String?
+    public let insertText: String
+    public let range: IDERange?
+}
+```
+
+#### 3. Definition Provider
+```typescript
+// Monaco API
+monaco.languages.registerDefinitionProvider('python', {
+    provideDefinition: (model, position) => Definition
+});
+
+// Swift: Implemented in Sources/MonacoApi/Symbols.swift
+public struct Location: Codable, Sendable {
+    public let uri: String
+    public let range: IDERange
+}
+```
+
+#### 4. Document Symbols
+```typescript
+// Monaco API
+monaco.languages.registerDocumentSymbolProvider('python', {
+    provideDocumentSymbols: (model) => DocumentSymbol[]
+});
+
+// Swift: Implemented in Sources/MonacoApi/Symbols.swift
+public struct DocumentSymbol: Codable, Sendable {
+    public let name: String
+    public let detail: String?
+    public let kind: SymbolKind
+    public let range: IDERange
+    public let selectionRange: IDERange
+    public let children: [DocumentSymbol]?
+}
+```
+
+### Monaco Editor Module API
+
+When working with Monaco Editor configuration and options, reference https://microsoft.github.io/monaco-editor/docs.html#modules/editor.html
+
+#### Editor Types (Sources/MonacoApi/Editor/)
+All Editor API types are in the **MonacoApi** target under the `Editor/` folder:
+
+1. **EditorEnums.swift** - Core enums matching Monaco:
+   - `ScrollType` - Smooth vs immediate scrolling
+   - `TextEditorCursorStyle` - Line, block, underline, etc.
+   - `TextEditorCursorBlinkingStyle` - Blink animations
+   - `EndOfLineSequence` - LF vs CRLF
+   - `RenderLineNumbersType` - Line number display
+   - `ScrollbarVisibility` - Scrollbar options
+   - `WrappingIndent` - Word wrap indentation
+   - `AccessibilitySupport` - A11y options
+   - And 15+ more editor enums
+
+2. **EditorOptions.swift** - Configuration sub-options:
+   - `EditorScrollbarOptions` - Scrollbar configuration
+   - `EditorFindOptions` - Find widget settings
+   - `EditorMinimapOptions` - Minimap configuration
+   - `QuickSuggestionsOptions` - IntelliSense triggers
+   - `SuggestOptions` - Autocomplete settings
+   - `EditorHoverOptions` - Hover behavior
+   - `BracketPairColorizationOptions` - Bracket colors
+   - And more specialized option types
+
+3. **EditorConfiguration.swift** - Main types:
+   - `EditorConfiguration` - Complete editor config (100+ options)
+   - `TextModelOptions` - Text model settings
+   - `ScrollPosition` - Scroll state
+   - `EditorLayoutInfo` - Layout metrics
+
+#### Editor Configuration Categories
+
+The `EditorConfiguration` struct covers all Monaco editor options:
+
+**Content**: value, language
+**Appearance**: theme, lineNumbers, rulers, wordWrap, minimap, scrollbar
+**Behavior**: readOnly, tabSize, insertSpaces, autoIndent
+**Cursor**: cursorStyle, cursorBlinking, cursorWidth
+**Scrolling**: smoothScrolling, scrollBeyondLastLine
+**Selection**: selectionHighlight, multiCursorModifier
+**Find**: find widget options
+**Hover**: hover tooltip options
+**Suggestions**: quickSuggestions, suggest, parameterHints
+**Code Actions**: lightbulb options
+**Formatting**: formatOnPaste, formatOnType, autoClosingBrackets
+**Font**: fontFamily, fontSize, lineHeight
+**Dimensions**: width, height, automaticLayout
+**Performance**: stopRenderingLineAfter
+
+#### Usage Example
+```swift
+import MonacoApi
+
+// Create editor configuration
+let config = EditorConfiguration(
+    value: "def hello():\n    print('world')",
+    language: "python",
+    theme: "vs-dark",
+    lineNumbers: "on",
+    minimap: EditorMinimapOptions(enabled: true, side: .right),
+    scrollbar: EditorScrollbarOptions(
+        vertical: .auto,
+        horizontal: .auto,
+        useShadows: true
+    ),
+    cursorStyle: .line,
+    cursorBlinking: .blink,
+    fontSize: 14,
+    tabSize: 4,
+    insertSpaces: true,
+    autoIndent: .full,
+    formatOnPaste: true,
+    formatOnType: true,
+    bracketPairColorization: BracketPairColorizationOptions(enabled: true)
+)
+
+// Serialize to JSON for Monaco
+let json = try JSONEncoder().encode(config)
+```
+
+### PySwiftIDE Architecture Principles
+
+1. **Separation of Concerns**
+   - **PySwiftAST** = Core parser (pure, fast, no IDE logic)
+   - **MonacoApi** = Monaco Editor types (standalone, NO dependencies)
+   - **PySwiftIDE** = IDE layer (validation, code actions, uses MonacoApi)
+
+2. **Package Structure**
+   ```
+   PySwiftIDE/
+   ├── Sources/
+   │   ├── MonacoApi/           # Standalone Monaco types (NO dependencies)
+   │   │   ├── IRange.swift
+   │   │   ├── Diagnostic.swift
+   │   │   ├── CodeAction.swift
+   │   │   ├── Hover.swift
+   │   │   ├── Completion.swift
+   │   │   ├── Symbols.swift
+   │   │   ├── LanguageFeatures.swift
+   │   │   └── Editor/          # Editor configuration types
+   │   │       ├── EditorEnums.swift
+   │   │       ├── EditorOptions.swift
+   │   │       └── EditorConfiguration.swift
+   │   │
+   │   └── PySwiftIDE/          # Validation logic (depends on MonacoApi + PySwiftAST)
+   │       └── PythonValidator.swift
+   │
+   └── Package.swift
+   ```
+
+3. **Thread Safety**
+   - ALL types must be `Sendable`
+   - Parse on background threads without blocking UI
+   - No shared mutable state
+
+4. **JSON Serialization**
+   - ALL public types must be `Codable`
+   - Use exact Monaco property names (startLineNumber, not start_line)
+   - Match Monaco's number types (severity values, etc.)
+
+5. **Testing Strategy**
+   - Test JSON round-trip (encode → decode)
+   - Test Monaco compatibility (validate against TypeScript types)
+   - Test thread safety (async validation)
+   - Test quick fix generation
+
+### PySwiftIDE Implementation Checklist
+
+When adding a new Monaco feature:
+- [ ] Check Monaco TypeScript API documentation
+- [ ] Create matching Swift struct/enum with `Codable, Sendable`
+- [ ] Use Monaco naming conventions (startLineNumber, not line_start)
+- [ ] Add helper constructors for common cases
+- [ ] Write JSON serialization test
+- [ ] Update USAGE.md with examples
+- [ ] Add to PythonValidator if applicable
+
+### Common Pitfalls to Avoid
+
+❌ **Don't**: Use 0-based indexing (Monaco is 1-based)
+✅ **Do**: `startLineNumber: 1, startColumn: 1` for first character
+
+❌ **Don't**: Use snake_case for JSON properties
+✅ **Do**: Use camelCase matching Monaco exactly
+
+❌ **Don't**: Add IDE logic to PySwiftAST core
+✅ **Do**: Keep IDE features in PySwiftIDE package
+
+❌ **Don't**: Make types non-Sendable
+✅ **Do**: Everything must work on background threads
+
+❌ **Don't**: Guess Monaco API shape
+✅ **Do**: Check https://microsoft.github.io/monaco-editor/
+
+### Code Examples
+
+#### Adding a New Language Feature
+```swift
+// 1. Define Swift type matching Monaco
+public struct Hover: Codable, Sendable {
+    public let contents: [HoverContent]
+    public let range: IDERange?
+    
+    public init(contents: [HoverContent], range: IDERange? = nil) {
+        self.contents = contents
+        self.range = range
+    }
+}
+
+// 2. Add to PythonValidator
+public func provideHover(at position: IDERange) -> Hover? {
+    // Use AST to find symbol at position
+    // Generate hover content
+    // Return Monaco-compatible Hover
+}
+
+// 3. Test JSON compatibility
+@Test func testHoverSerialization() async throws {
+    let hover = Hover(contents: [...], range: ...)
+    let json = try JSONEncoder().encode(hover)
+    let decoded = try JSONDecoder().decode(Hover.self, from: json)
+    #expect(decoded.contents == hover.contents)
+}
+```
+
+## TODO Management (Package Coordination)
+
+### SwiftyMonacoIDE/TODO Directory
+
+The `SwiftyMonacoIDE/TODO/` folder contains coordination documents for package development:
+
+#### 1. PySwiftAST-TODO.md
+**Purpose**: Tasks that SwiftyMonacoIDE needs from PySwiftAST
+
+**Rules for PySwiftAST**:
+- ✅ **READ this file** at the start of each session
+- ✅ **CHECK for pending tasks** that SwiftyMonacoIDE requires
+- ✅ **IMPLEMENT the tasks** to improve SwiftyMonacoIDE functionality
+- ✅ **REMOVE tasks** from the file when 100% completed
+- ✅ **UPDATE tasks** with progress notes if partially complete
+
+**SwiftyMonacoIDE Responsibilities**:
+- Adds tasks when it discovers PySwiftAST is missing features
+- Tasks describe what's needed and why (for IDE functionality)
+- Tasks include examples and expected behavior
+
+**Example Task Entry**:
+```markdown
+## Task: Add getVariableDefinitionLocation() API
+
+**Why**: SwiftyMonacoIDE needs "Go to Definition" for variables
+
+**What**: Add method to TypeChecker:
+```swift
+public func getVariableDefinitionLocation(_ name: String, at line: Int) -> (file: String, line: Int, column: Int)?
+```
+
+**Status**: Not started
+```
+
+#### 2. SwiftyMonacoIDE-TODO.md
+**Purpose**: Internal tasks for SwiftyMonacoIDE development
+
+**Rules for PySwiftAST**:
+- ❌ **DO NOT read or modify** this file
+- ❌ **DO NOT implement** tasks from this file
+- ❌ This file is for SwiftyMonacoIDE's internal coordination only
+
+**SwiftyMonacoIDE Responsibilities**:
+- Tracks its own features, bugs, and improvements
+- Not relevant to PySwiftAST development
+
+### Workflow: Ping-Pong Development
+
+The TODO system enables coordination between packages:
+
+```
+SwiftyMonacoIDE discovers issue
+    ↓
+Adds task to PySwiftAST-TODO.md
+    ↓
+PySwiftAST reads PySwiftAST-TODO.md
+    ↓
+PySwiftAST implements the feature
+    ↓
+PySwiftAST removes completed task
+    ↓
+SwiftyMonacoIDE uses new feature
+    ↓
+Cycle repeats as needed
+```
+
+### Best Practices
+
+**When Starting Work on PySwiftAST**:
+1. Check `/Volumes/CodeSSD/GitHub/PySwiftAST/SwiftyMonacoIDE/TODO/PySwiftAST-TODO.md`
+2. Prioritize tasks that unblock SwiftyMonacoIDE features
+3. Implement with tests and documentation
+4. Remove task from file when complete
+5. Commit with reference to completed task
+
+**Task Completion Checklist**:
+- [ ] Feature fully implemented with tests
+- [ ] Public API documented
+- [ ] All tests passing
+- [ ] Task removed from PySwiftAST-TODO.md
+- [ ] Commit message references the task
+
+**Task Update Format** (if partially complete):
+```markdown
+## Task: [Name]
+
+**Status**: In Progress (50% - API added, tests pending)
+**Branch**: feature/task-name
+**Blocker**: Waiting on [dependency]
+```
+
+### Why This System Exists
+
+**Problem**: PySwiftAST is a pure parser with no IDE logic. SwiftyMonacoIDE needs specific features but can't implement them in the parser layer.
+
+**Solution**: SwiftyMonacoIDE documents what it needs via PySwiftAST-TODO.md. PySwiftAST implements these features to enable better IDE functionality.
+
+**Separation of Concerns**:
+- PySwiftAST = Pure parser + type checker + core APIs
+- SwiftyMonacoIDE = IDE features + Monaco integration + UI logic
+- TODO files = Communication bridge between packages
+
+## File References
+- Grammar: `/Volumes/CodeSSD/GitHub/PySwiftAST/Grammar/python.gram`
+- Optimization Guidelines: `/Volumes/CodeSSD/GitHub/PySwiftAST/OPTIMIZATION_GUIDELINES.md`
+- Performance History: `/Volumes/CodeSSD/GitHub/PySwiftAST/performance_history.json`
+- Profiling Analysis: `/Volumes/CodeSSD/GitHub/PySwiftAST/PROFILING_ANALYSIS.md`
+- Parser: `/Volumes/CodeSSD/GitHub/PySwiftAST/Sources/PySwiftAST/Parser.swift`
+- Tokenizer: `/Volumes/CodeSSD/GitHub/PySwiftAST/Sources/PySwiftAST/Tokenizer.swift`
+- Code Generator: `/Volumes/CodeSSD/GitHub/PySwiftAST/Sources/PySwiftCodeGen/`
+- PySwiftIDE: `/Volumes/CodeSSD/GitHub/PySwiftAST/PySwiftIDE/`
+- PySwiftIDE Docs: `/Volumes/CodeSSD/GitHub/PySwiftAST/PySwiftIDE/USAGE.md`
+- Monaco Editor API: https://microsoft.github.io/monaco-editor/
+- **PySwiftAST TODO**: `/Volumes/CodeSSD/GitHub/PySwiftAST/SwiftyMonacoIDE/TODO/PySwiftAST-TODO.md` ⚠️ **CHECK FIRST**
+- SwiftyMonacoIDE TODO: `/Volumes/CodeSSD/GitHub/PySwiftAST/SwiftyMonacoIDE/TODO/SwiftyMonacoIDE-TODO.md` (DO NOT MODIFY)
+
+## Workflow Summary
+
+### For Parser Changes:
+1. Check `Grammar/python.gram` for official rule
+2. Implement with grammar rule comment
+3. Test with real Python files
+4. Verify AST structure correctness
+
+### For Performance Changes:
+1. Read `OPTIMIZATION_GUIDELINES.md` completely
+2. Establish baseline and record metrics
+3. Profile to find actual hotspots
+4. Make ONE targeted change
+5. Test all 81 tests (must pass)
+6. Measure performance (must improve or stay neutral)
+7. Update `performance_history.json`
+8. Commit with performance metrics
+
+### Never:
+- ❌ Skip grammar verification for parser changes
+- ❌ Skip baseline measurement for optimizations
+- ❌ Make multiple optimizations at once
+- ❌ Accept test failures or performance regressions
+- ❌ Optimize without profiling first
+- ❌ Use unsafe operations without proven benefit
