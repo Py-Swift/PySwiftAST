@@ -23,6 +23,6 @@ public extension Name {
 
 public extension Arg {
 
-    static let `self`: Arg = "self"
+    static let ´self´: Arg = "self"
 
 }
