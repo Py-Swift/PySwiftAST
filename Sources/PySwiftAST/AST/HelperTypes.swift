@@ -9,13 +9,13 @@ public struct Arguments: Sendable {
     public var defaults: [Expression]
     
     public init(
-        posonlyArgs: [Arg],
-        args: [Arg],
-        vararg: Arg?,
-        kwonlyArgs: [Arg],
-        kwDefaults: [Expression?],
-        kwarg: Arg?,
-        defaults: [Expression]
+        posonlyArgs: [Arg] = [],
+        args: [Arg] = [],
+        vararg: Arg? = nil,
+        kwonlyArgs: [Arg] = [],
+        kwDefaults: [Expression?] = [],
+        kwarg: Arg? = nil,
+        defaults: [Expression] = []
     ) {
         self.posonlyArgs = posonlyArgs
         self.args = args
