@@ -52,7 +52,7 @@ public struct Set: ASTNode, Sendable {
 /// List literal
 public struct List: ASTNode, Sendable {
     public var elts: [Expression]
-    public var ctx: ExprContext
+    public var ctx: ExprContext = .load
     public var lineno: Int
     public var colOffset: Int
     public var endLineno: Int?
@@ -60,7 +60,7 @@ public struct List: ASTNode, Sendable {
 
     public init(
         elts: [Expression],
-        ctx: ExprContext,
+        ctx: ExprContext = .load,
         lineno: Int = 0,
         colOffset: Int = 0,
         endLineno: Int? = nil,
@@ -79,7 +79,7 @@ public struct List: ASTNode, Sendable {
 /// Tuple literal
 public struct Tuple: ASTNode, Sendable {
     public var elts: [Expression]
-    public var ctx: ExprContext
+    public var ctx: ExprContext = .load
     public var lineno: Int
     public var colOffset: Int
     public var endLineno: Int?
@@ -87,7 +87,7 @@ public struct Tuple: ASTNode, Sendable {
 
     public init(
         elts: [Expression],
-        ctx: ExprContext,
+        ctx: ExprContext = .load,
         lineno: Int = 0,
         colOffset: Int = 0,
         endLineno: Int? = nil,
