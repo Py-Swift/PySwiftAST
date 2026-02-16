@@ -14,4 +14,8 @@ public extension Name {
     static let frozenset: Name = "frozenset"
     static let type: Name = "type"
     static let object: Name = "object"
+
+    static let selfName: Name = "self"
+    static let staticmethod: Name = "staticmethod"
+    static let classmethod: Name = "classmethod"
 }
