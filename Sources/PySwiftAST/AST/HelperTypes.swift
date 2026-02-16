@@ -35,12 +35,18 @@ public struct Arg: Sendable {
     
     public init(
         arg: String,
-        annotation: Expression?,
-        typeComment: String?
+        annotation: Expression? = nil,
+        typeComment: String? = nil
     ) {
         self.arg = arg
         self.annotation = annotation
         self.typeComment = typeComment
+    }
+}
+
+extension Arg: ExpressibleByStringLiteral {
+    public init(stringLiteral value: String) {
+        self.init(arg: value)
     }
 }
 

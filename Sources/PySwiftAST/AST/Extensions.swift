@@ -19,3 +19,10 @@ public extension Name {
     static let staticmethod: Name = "staticmethod"
     static let classmethod: Name = "classmethod"
 }
+
+
+public extension Arg {
+
+    static let `self`: Arg = "self"
+
+}
