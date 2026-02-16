@@ -63,3 +63,9 @@ public struct Name: ASTNode, Sendable {
     }
 
 }
+
+extension Name: ExpressibleByStringLiteral {
+    public init(stringLiteral value: String) {
+        self.init(id: value)
+    }
+}
