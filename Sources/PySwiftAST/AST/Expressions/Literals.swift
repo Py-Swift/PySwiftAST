@@ -48,7 +48,7 @@ public struct Name: ASTNode, Sendable {
 
     public init(
         id: String,
-        ctx: ExprContext,
+        ctx: ExprContext = .load,
         lineno: Int = 0,
         colOffset: Int = 0,
         endLineno: Int? = nil,
