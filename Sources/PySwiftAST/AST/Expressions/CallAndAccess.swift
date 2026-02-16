@@ -71,7 +71,7 @@ public struct Subscript: ASTNode, Sendable {
     public init(
         value: Expression,
         slice: Expression,
-        ctx: ExprContext,
+        ctx: ExprContext = .load,
         lineno: Int = 0,
         colOffset: Int = 0,
         endLineno: Int? = nil,

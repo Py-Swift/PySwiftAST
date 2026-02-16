@@ -9,7 +9,7 @@ public struct Constant: ASTNode, Sendable {
 
     public init(
         value: ConstantValue,
-        kind: String?,
+        kind: String? = nil,
         lineno: Int = 0,
         colOffset: Int = 0,
         endLineno: Int? = nil,
