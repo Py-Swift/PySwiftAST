@@ -13,11 +13,11 @@ public struct ClassDef: ASTNode, Sendable {
 
     public init(
         name: String,
-        bases: [Expression],
-        keywords: [Keyword],
-        body: [Statement],
-        decoratorList: [Expression],
-        typeParams: [TypeParam],
+        bases: [Expression] = [],
+        keywords: [Keyword] = [],
+        body: [Statement] = [.pass(.init())],
+        decoratorList: [Expression] = [],
+        typeParams: [TypeParam] = [],
         lineno: Int = 0,
         colOffset: Int = 0,
         endLineno: Int? = nil,
