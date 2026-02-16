@@ -10,10 +10,10 @@ public struct Constant: ASTNode, Sendable {
     public init(
         value: ConstantValue,
         kind: String?,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.value = value
         self.kind = kind
@@ -49,10 +49,10 @@ public struct Name: ASTNode, Sendable {
     public init(
         id: String,
         ctx: ExprContext,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.id = id
         self.ctx = ctx

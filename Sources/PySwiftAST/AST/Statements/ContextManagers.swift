@@ -12,10 +12,10 @@ public struct With: ASTNode, Sendable {
         items: [WithItem],
         body: [Statement],
         typeComment: String?,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.items = items
         self.body = body
@@ -42,10 +42,10 @@ public struct AsyncWith: ASTNode, Sendable {
         items: [WithItem],
         body: [Statement],
         typeComment: String?,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.items = items
         self.body = body

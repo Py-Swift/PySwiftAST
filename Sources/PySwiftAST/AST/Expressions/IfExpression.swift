@@ -12,10 +12,10 @@ public struct IfExp: ASTNode, Sendable {
         test: Expression,
         body: Expression,
         orElse: Expression,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.test = test
         self.body = body

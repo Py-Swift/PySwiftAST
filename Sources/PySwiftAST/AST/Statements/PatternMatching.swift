@@ -10,10 +10,10 @@ public struct Match: ASTNode, Sendable {
     public init(
         subject: Expression,
         cases: [MatchCase],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.subject = subject
         self.cases = cases

@@ -10,10 +10,10 @@ public struct BoolOp: ASTNode, Sendable {
     public init(
         op: BoolOperator,
         values: [Expression],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.op = op
         self.values = values
@@ -39,10 +39,10 @@ public struct BinOp: ASTNode, Sendable {
         left: Expression,
         op: Operator,
         right: Expression,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.left = left
         self.op = op
@@ -67,10 +67,10 @@ public struct UnaryOp: ASTNode, Sendable {
     public init(
         op: UnaryOperator,
         operand: Expression,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.op = op
         self.operand = operand
@@ -96,10 +96,10 @@ public struct Compare: ASTNode, Sendable {
         left: Expression,
         ops: [CmpOp],
         comparators: [Expression],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.left = left
         self.ops = ops

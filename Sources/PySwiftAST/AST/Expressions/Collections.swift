@@ -10,10 +10,10 @@ public struct Dict: ASTNode, Sendable {
     public init(
         keys: [Expression?],
         values: [Expression],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.keys = keys
         self.values = values
@@ -35,10 +35,10 @@ public struct Set: ASTNode, Sendable {
 
     public init(
         elts: [Expression],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.elts = elts
         self.lineno = lineno
@@ -61,10 +61,10 @@ public struct List: ASTNode, Sendable {
     public init(
         elts: [Expression],
         ctx: ExprContext,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.elts = elts
         self.ctx = ctx
@@ -88,10 +88,10 @@ public struct Tuple: ASTNode, Sendable {
     public init(
         elts: [Expression],
         ctx: ExprContext,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.elts = elts
         self.ctx = ctx

@@ -20,10 +20,10 @@ public struct FunctionDef: ASTNode, Sendable {
         returns: Expression?,
         typeComment: String?,
         typeParams: [TypeParam],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.name = name
         self.args = args
@@ -62,10 +62,10 @@ public struct AsyncFunctionDef: ASTNode, Sendable {
         returns: Expression?,
         typeComment: String?,
         typeParams: [TypeParam],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.name = name
         self.args = args

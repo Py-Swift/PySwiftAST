@@ -10,10 +10,10 @@ public struct ListComp: ASTNode, Sendable {
     public init(
         elt: Expression,
         generators: [Comprehension],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.elt = elt
         self.generators = generators
@@ -37,10 +37,10 @@ public struct SetComp: ASTNode, Sendable {
     public init(
         elt: Expression,
         generators: [Comprehension],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.elt = elt
         self.generators = generators
@@ -66,10 +66,10 @@ public struct DictComp: ASTNode, Sendable {
         key: Expression,
         value: Expression,
         generators: [Comprehension],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.key = key
         self.value = value
@@ -94,10 +94,10 @@ public struct GeneratorExp: ASTNode, Sendable {
     public init(
         elt: Expression,
         generators: [Comprehension],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.elt = elt
         self.generators = generators

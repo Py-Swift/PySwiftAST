@@ -12,10 +12,10 @@ public struct Call: ASTNode, Sendable {
         fun: Expression,
         args: [Expression],
         keywords: [Keyword],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.fun = fun
         self.args = args
@@ -42,10 +42,10 @@ public struct Attribute: ASTNode, Sendable {
         value: Expression,
         attr: String,
         ctx: ExprContext,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.value = value
         self.attr = attr
@@ -72,10 +72,10 @@ public struct Subscript: ASTNode, Sendable {
         value: Expression,
         slice: Expression,
         ctx: ExprContext,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.value = value
         self.slice = slice
@@ -102,10 +102,10 @@ public struct Slice: ASTNode, Sendable {
         lower: Expression?,
         upper: Expression?,
         step: Expression?,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.lower = lower
         self.upper = upper

@@ -18,10 +18,10 @@ public struct ClassDef: ASTNode, Sendable {
         body: [Statement],
         decoratorList: [Expression],
         typeParams: [TypeParam],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.name = name
         self.bases = bases

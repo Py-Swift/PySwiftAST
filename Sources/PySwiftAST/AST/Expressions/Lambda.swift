@@ -10,10 +10,10 @@ public struct Lambda: ASTNode, Sendable {
     public init(
         args: Arguments,
         body: Expression,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.args = args
         self.body = body

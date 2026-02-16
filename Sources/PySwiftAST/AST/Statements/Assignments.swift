@@ -12,10 +12,10 @@ public struct Assign: ASTNode, Sendable {
         targets: [Expression],
         value: Expression,
         typeComment: String?,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.targets = targets
         self.value = value
@@ -42,10 +42,10 @@ public struct AugAssign: ASTNode, Sendable {
         target: Expression,
         op: Operator,
         value: Expression,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.target = target
         self.op = op
@@ -74,10 +74,10 @@ public struct AnnAssign: ASTNode, Sendable {
         annotation: Expression,
         value: Expression?,
         simple: Bool,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.target = target
         self.annotation = annotation
@@ -101,10 +101,10 @@ public struct Delete: ASTNode, Sendable {
 
     public init(
         targets: [Expression],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.targets = targets
         self.lineno = lineno

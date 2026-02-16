@@ -8,10 +8,10 @@ public struct Return: ASTNode, Sendable {
 
     public init(
         value: Expression?,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.value = value
         self.lineno = lineno
@@ -36,10 +36,10 @@ public struct If: ASTNode, Sendable {
         test: Expression,
         body: [Statement],
         orElse: [Statement],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.test = test
         self.body = body
@@ -66,10 +66,10 @@ public struct While: ASTNode, Sendable {
         test: Expression,
         body: [Statement],
         orElse: [Statement],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.test = test
         self.body = body
@@ -100,10 +100,10 @@ public struct For: ASTNode, Sendable {
         body: [Statement],
         orElse: [Statement],
         typeComment: String?,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.target = target
         self.iter = iter
@@ -136,10 +136,10 @@ public struct AsyncFor: ASTNode, Sendable {
         body: [Statement],
         orElse: [Statement],
         typeComment: String?,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.target = target
         self.iter = iter
@@ -162,10 +162,10 @@ public struct Break: ASTNode, Sendable {
     public var endColOffset: Int?
 
     public init(
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.lineno = lineno
         self.colOffset = colOffset
@@ -183,10 +183,10 @@ public struct Continue: ASTNode, Sendable {
     public var endColOffset: Int?
 
     public init(
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.lineno = lineno
         self.colOffset = colOffset
@@ -204,10 +204,10 @@ public struct Pass: ASTNode, Sendable {
     public var endColOffset: Int?
 
     public init(
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.lineno = lineno
         self.colOffset = colOffset

@@ -10,10 +10,10 @@ public struct Raise: ASTNode, Sendable {
     public init(
         exc: Expression?,
         cause: Expression?,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.exc = exc
         self.cause = cause
@@ -41,10 +41,10 @@ public struct Try: ASTNode, Sendable {
         handlers: [ExceptHandler],
         orElse: [Statement],
         finalBody: [Statement],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.body = body
         self.handlers = handlers
@@ -74,10 +74,10 @@ public struct TryStar: ASTNode, Sendable {
         handlers: [ExceptHandler],
         orElse: [Statement],
         finalBody: [Statement],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.body = body
         self.handlers = handlers
@@ -103,10 +103,10 @@ public struct Assert: ASTNode, Sendable {
     public init(
         test: Expression,
         msg: Expression?,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.test = test
         self.msg = msg

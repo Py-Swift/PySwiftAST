@@ -8,10 +8,10 @@ public struct Global: ASTNode, Sendable {
 
     public init(
         names: [String],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.names = names
         self.lineno = lineno
@@ -32,10 +32,10 @@ public struct Nonlocal: ASTNode, Sendable {
 
     public init(
         names: [String],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.names = names
         self.lineno = lineno
@@ -56,10 +56,10 @@ public struct Expr: ASTNode, Sendable {
 
     public init(
         value: Expression,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.value = value
         self.lineno = lineno
@@ -84,10 +84,10 @@ public struct TypeAlias: ASTNode, Sendable {
         name: Expression,
         typeParams: [TypeParam],
         value: Expression,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.name = name
         self.typeParams = typeParams

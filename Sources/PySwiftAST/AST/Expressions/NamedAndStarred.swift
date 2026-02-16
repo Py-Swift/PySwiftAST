@@ -10,10 +10,10 @@ public struct NamedExpr: ASTNode, Sendable {
     public init(
         target: Expression,
         value: Expression,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.target = target
         self.value = value
@@ -37,10 +37,10 @@ public struct Starred: ASTNode, Sendable {
     public init(
         value: Expression,
         ctx: ExprContext,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.value = value
         self.ctx = ctx

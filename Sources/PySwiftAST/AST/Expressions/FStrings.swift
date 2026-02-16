@@ -12,10 +12,10 @@ public struct FormattedValue: ASTNode, Sendable {
         value: Expression,
         conversion: Int,
         formatSpec: Expression?,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.value = value
         self.conversion = conversion
@@ -38,10 +38,10 @@ public struct JoinedStr: ASTNode, Sendable {
 
     public init(
         values: [Expression],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.values = values
         self.lineno = lineno

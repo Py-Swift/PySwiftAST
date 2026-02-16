@@ -8,10 +8,10 @@ public struct Import: ASTNode, Sendable {
 
     public init(
         names: [Alias],
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.names = names
         self.lineno = lineno
@@ -36,10 +36,10 @@ public struct ImportFrom: ASTNode, Sendable {
         module: String?,
         names: [Alias],
         level: Int,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.module = module
         self.names = names

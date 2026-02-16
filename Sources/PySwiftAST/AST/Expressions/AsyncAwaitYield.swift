@@ -8,10 +8,10 @@ public struct Await: ASTNode, Sendable {
 
     public init(
         value: Expression,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.value = value
         self.lineno = lineno
@@ -32,10 +32,10 @@ public struct Yield: ASTNode, Sendable {
 
     public init(
         value: Expression?,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.value = value
         self.lineno = lineno
@@ -56,10 +56,10 @@ public struct YieldFrom: ASTNode, Sendable {
 
     public init(
         value: Expression,
-        lineno: Int,
-        colOffset: Int,
-        endLineno: Int?,
-        endColOffset: Int?
+        lineno: Int = 0,
+        colOffset: Int = 0,
+        endLineno: Int? = nil,
+        endColOffset: Int? = nil
     ) {
         self.value = value
         self.lineno = lineno
