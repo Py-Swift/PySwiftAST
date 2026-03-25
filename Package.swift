@@ -27,7 +27,7 @@ let package = Package(
             targets: ["pyswift-benchmark"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-algorithms", from: "1.2.0"),
+        //.package(url: "https://github.com/apple/swift-algorithms", from: "1.2.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -35,7 +35,7 @@ let package = Package(
         .target(
             name: "PySwiftAST",
             dependencies: [
-                .product(name: "Algorithms", package: "swift-algorithms")
+                //.product(name: "Algorithms", package: "swift-algorithms")
             ],
             resources: [
                 .copy("AST/README.md")
@@ -45,7 +45,7 @@ let package = Package(
             name: "PySwiftCodeGen",
             dependencies: [
                 "PySwiftAST",
-                .product(name: "Algorithms", package: "swift-algorithms")
+                //.product(name: "Algorithms", package: "swift-algorithms")
             ]
         ),
         .target(
