@@ -12,7 +12,7 @@ final class TokenizerTests: XCTestCase {
         
         XCTAssertEqual(tokens.count, 4)
         XCTAssertEqual(tokens[0].type, .name("x"))
-        XCTAssertEqual(tokens[1].type, .equal)
+        XCTAssertEqual(tokens[1].type, .assign)
         XCTAssertEqual(tokens[2].type, .number("42"))
         XCTAssertEqual(tokens[3].type, .endmarker)
     }
@@ -158,8 +158,7 @@ final class TokenizerTests: XCTestCase {
     
     func testTokenizationPerformance() throws {
         // Load a large real-world Python file
-        let testFile = "tests/ml_pipeline.py"
-        let source = try String(contentsOfFile: testFile)
+        let source = try loadRealWorldResource("ml_pipeline")
         
         // Warm up
         _ = try Tokenizer(source: source).tokenize()
