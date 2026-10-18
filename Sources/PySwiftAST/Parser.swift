@@ -20,8 +20,17 @@ public class Parser {
     public func parse() throws -> Module {
         // For now, implement a simple expression parser
         // This will be expanded with the full Python grammar
-        let statements = try parseStatements()
-        return .module(statements)
+        do {
+            let statements = try parseStatements()
+            return .module(statements)
+        } catch let error as ParseError {
+            // Like CPython, blame a bracket that is never closed rather than where the parser gave up
+            if let bracket = unclosedBracket(openedBefore: position) {
+                let context = sourceLines.indices.contains(bracket.line - 1) ? sourceLines[bracket.line - 1] : nil
+                throw ParseError.unclosedBracket(bracket: bracket, context: context)
+            }
+            throw error
+        }
     }
     
     // MARK: - Basic Parsing Methods
@@ -3298,13 +3307,70 @@ public class Parser {
             
             if !expectedChar.isEmpty && !sourceLines.isEmpty && token.line > 0 && token.line <= sourceLines.count {
                 let context = sourceLines[token.line - 1]
-                throw ParseError.expectedToken(expected: expectedChar, got: token, context: context)
+                // A different closing bracket needs replacing, not an insertion
+                let isClosingBracket = token.type == .rightparen || token.type == .rightbracket || token.type == .rightbrace
+                let fix = isClosingBracket ? nil : insertionFix(expectedChar)
+                throw ParseError.expectedToken(expected: expectedChar, got: token, context: context, fix: fix)
             } else {
                 throw ParseError.expected(message: message, line: token.line)
             }
         }
     }
     
+    /// Suggest inserting `text` right after the last significant token before the current one
+    private func insertionFix(_ text: String) -> ParseFix? {
+        var index = position - 1
+        while index >= 0 {
+            switch tokens[index].type {
+            case .newline, .indent, .dedent, .comment, .typeComment:
+                index -= 1
+                continue
+            default:
+                break
+            }
+            break
+        }
+        guard index >= 0 else { return nil }
+
+        let previous = tokens[index]
+        guard previous.endLine > 0 && previous.endLine <= sourceLines.count else { return nil }
+
+        // Columns count Unicode scalars, so insert by scalar offset
+        let line = sourceLines[previous.endLine - 1]
+        var scalars = Array(line.unicodeScalars)
+        let offset = min(max(previous.endColumn - 1, 0), scalars.count)
+        scalars.insert(contentsOf: text.unicodeScalars, at: offset)
+        var fixedLine = ""
+        fixedLine.unicodeScalars.append(contentsOf: scalars)
+
+        return ParseFix(line: previous.endLine, column: offset + 1, text: text, fixedLine: fixedLine)
+    }
+
+    /// The innermost bracket opened at or before token `limit` that is still open at the end of input.
+    /// Returns nil when brackets are mismatched, since that error is reported where it happens.
+    private func unclosedBracket(openedBefore limit: Int) -> Token? {
+        var stack: [Int] = []  // indices of open brackets
+        for (index, token) in tokens.enumerated() {
+            switch token.type {
+            case .leftparen, .leftbracket, .leftbrace:
+                stack.append(index)
+            case .rightparen, .rightbracket, .rightbrace:
+                guard let open = stack.popLast(), bracketsMatch(tokens[open].type, token.type) else { return nil }
+            default:
+                break
+            }
+        }
+        guard let open = stack.last, open <= limit else { return nil }
+        return tokens[open]
+    }
+
+    private func bracketsMatch(_ open: TokenType, _ close: TokenType) -> Bool {
+        switch (open, close) {
+        case (.leftparen, .rightparen), (.leftbracket, .rightbracket), (.leftbrace, .rightbrace): return true
+        default: return false
+        }
+    }
+
     private func getExpectedChar(for type: TokenType) -> String {
         switch type {
         case .colon: return ":"
@@ -3653,55 +3719,120 @@ public class Parser {
             result = String(result.dropFirst().dropLast())
         }
         
-        // Unescape common escape sequences
-        result = result
-            .replacingOccurrences(of: "\\n", with: "\n")
-            .replacingOccurrences(of: "\\r", with: "\r")
-            .replacingOccurrences(of: "\\t", with: "\t")
-            .replacingOccurrences(of: "\\\\", with: "\\")
-            .replacingOccurrences(of: "\\\"", with: "\"")
-            .replacingOccurrences(of: "\\'", with: "'")
-        
+        return unescape(result)
+    }
+
+    // Unescape common escape sequences in a single pass, so "\\\\n" stays a backslash followed by "n"
+    private func unescape(_ str: String) -> String {
+        guard str.contains("\\") else { return str }
+
+        var result = ""
+        var iterator = str.makeIterator()
+        while let char = iterator.next() {
+            guard char == "\\", let next = iterator.next() else {
+                result.append(char)
+                continue
+            }
+            switch next {
+            case "n": result.append("\n")
+            case "r": result.append("\r")
+            case "t": result.append("\t")
+            case "\\", "\"", "'": result.append(next)
+            default:
+                // Unknown escapes are kept as written
+                result.append(char)
+                result.append(next)
+            }
+        }
         return result
     }
 }
 
 // MARK: - Parse Errors
+
+/// A suggested insertion that fixes a parse error
+public struct ParseFix: Sendable, Equatable {
+    /// Line the text is inserted on (1-indexed)
+    public let line: Int
+    /// Column the text is inserted at (1-indexed, counted like `Token.column`)
+    public let column: Int
+    /// Text to insert
+    public let text: String
+    /// The source line with the text inserted
+    public let fixedLine: String
+
+    public init(line: Int, column: Int, text: String, fixedLine: String) {
+        self.line = line
+        self.column = column
+        self.text = text
+        self.fixedLine = fixedLine
+    }
+}
+
 public enum ParseError: Error, CustomStringConvertible {
     case unexpectedToken(token: Token)
     case expectedName(line: Int)
     case expected(message: String, line: Int)
-    case expectedToken(expected: String, got: Token, context: String?)
+    /// `context` is the source line of `got`; `fix` inserts `expected` after the last token before `got`
+    case expectedToken(expected: String, got: Token, context: String?, fix: ParseFix?)
+    /// A bracket that is never closed; `context` is the source line of `bracket`
+    case unclosedBracket(bracket: Token, context: String?)
     case syntaxError(message: String, line: Int)
-    
+
+    /// Line of the error (1-indexed)
+    public var line: Int {
+        switch self {
+        case .unexpectedToken(let token): return token.line
+        case .expectedName(let line): return line
+        case .expected(_, let line): return line
+        case .expectedToken(_, let got, _, _): return got.line
+        case .unclosedBracket(let bracket, _): return bracket.line
+        case .syntaxError(_, let line): return line
+        }
+    }
+
+    /// Column of the error (1-indexed), when known
+    public var column: Int? {
+        switch self {
+        case .unexpectedToken(let token): return token.column
+        case .expectedToken(_, let got, _, _): return got.column
+        case .unclosedBracket(let bracket, _): return bracket.column
+        case .expectedName, .expected, .syntaxError: return nil
+        }
+    }
+
     public var description: String {
         switch self {
         case .unexpectedToken(let token):
-            return "Unexpected token '\(token.value)' at line \(token.line)"
+            return "Unexpected \(token.displayName) at line \(token.line), column \(token.column)"
         case .expectedName(let line):
             return "Expected name at line \(line)"
         case .expected(let message, let line):
             return "\(message) at line \(line)"
-        case .expectedToken(let expected, let got, let context):
-            let gotDesc = got.value.isEmpty ? "newline" : "'\(got.value)'"
-            var message = "Expected '\(expected)' but got \(gotDesc) at line \(got.line), column \(got.column)"
+        case .expectedToken(let expected, let got, let context, let fix):
+            var message = "Expected '\(expected)' but got \(got.displayName) at line \(got.line), column \(got.column)"
             if let ctx = context, !ctx.isEmpty {
-                message += "\n\n  \(ctx)"
-                // Add caret pointing to error location
-                // Column is 1-indexed, so column value already points to the position after the last character
-                // We need 2 spaces for prefix, plus (column - 1) spaces to reach the position
-                let spaces = String(repeating: " ", count: got.column + 1)
-                message += "\n\(spaces)^"
-                // Show suggestion with the fix
-                // Insert the expected character at the error position
-                let insertPos = ctx.index(ctx.startIndex, offsetBy: min(got.column, ctx.count))
-                var fixed = ctx
-                fixed.insert(contentsOf: expected, at: insertPos)
-                message += "\n\nDid you mean:\n  \(fixed)"
+                message += Self.sourceExcerpt(ctx, column: got.column)
+            }
+            if let fix {
+                let location = fix.line == got.line ? "" : " (line \(fix.line))"
+                message += "\n\nDid you mean\(location):\n  \(fix.fixedLine)"
+            }
+            return message
+        case .unclosedBracket(let bracket, let context):
+            var message = "'\(bracket.value)' was never closed at line \(bracket.line), column \(bracket.column)"
+            if let ctx = context, !ctx.isEmpty {
+                message += Self.sourceExcerpt(ctx, column: bracket.column)
             }
             return message
         case .syntaxError(let message, let line):
             return "Syntax error: \(message) at line \(line)"
         }
+    }
+
+    /// The source line indented by two spaces, with a caret under the 1-indexed column
+    private static func sourceExcerpt(_ line: String, column: Int) -> String {
+        let spaces = String(repeating: " ", count: 2 + max(column - 1, 0))
+        return "\n\n  \(line)\n\(spaces)^"
     }
 }
