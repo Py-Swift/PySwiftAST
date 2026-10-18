@@ -602,9 +602,9 @@ enum TestError: Error {
     let tokens = try tokenizePython(source)
     #expect(tokens.count > 0)
     
-    // Has match/case keywords
-    let hasMatchKeyword = tokens.contains { $0.type == .match }
-    let hasCaseKeyword = tokens.contains { $0.type == .case }
+    // Has match/case soft keywords, tokenized as names like CPython does
+    let hasMatchKeyword = tokens.contains { $0.type == .name("match") }
+    let hasCaseKeyword = tokens.contains { $0.type == .name("case") }
     
     #expect(hasMatchKeyword, "Expected 'match' keyword")
     #expect(hasCaseKeyword, "Expected 'case' keyword")
@@ -1093,15 +1093,8 @@ func loadRealWorldResource(_ filename: String) throws -> String {
         #expect(tokens.count > 100, "Should have many tokens for complex file")
         
         // Count match/case keywords
-        let matchCount = tokens.filter {
-            if case .match = $0.type { return true }
-            return false
-        }.count
-        
-        let caseCount = tokens.filter {
-            if case .case = $0.type { return true }
-            return false
-        }.count
+        let matchCount = tokens.filter { $0.type == .name("match") }.count
+        let caseCount = tokens.filter { $0.type == .name("case") }.count
         
         print("Pattern matching keywords:")
         print("  'match': \(matchCount)")

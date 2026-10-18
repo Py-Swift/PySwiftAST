@@ -131,7 +131,7 @@ public class Parser {
         case .assert:
             return try parseAssert()
             
-        case .match:
+        case .name(let name) where name == "match" && isMatchStatement():
             return try parseMatch()
             
         case .global:
@@ -143,7 +143,7 @@ public class Parser {
         case .del:
             return try parseDel()
             
-        case .name(let name) where name == "type":
+        case .name(let name) where name == "type" && isTypeAlias():
             // "type" is a soft keyword in Python 3.12+ for type aliases
             return try parseTypeAlias()
             
@@ -626,7 +626,10 @@ public class Parser {
         let subject = try parseExpression()
         try consume(.colon, "Expected ':' after match subject")
         
+        // Skip an inline comment (match x:  # comment) and comment lines before the cases
+        skipComments()
         try consume(.newline, "Expected newline before match cases")
+        skipNewlinesAndComments()
         try consume(.indent, "Expected indent for match cases")
         
         var cases: [MatchCase] = []
@@ -636,8 +639,12 @@ public class Parser {
                 advance()
                 continue
             }
+            if case .comment = currentToken().type {
+                advance()
+                continue
+            }
             
-            guard currentToken().type == .case else {
+            guard currentToken().type == .name("case") else {
                 throw ParseError.expected(message: "Expected 'case' in match statement", line: currentToken().line)
             }
             advance() // consume 'case'
@@ -686,8 +693,9 @@ public class Parser {
         }
         
         // For now, simple pattern matching - just parse as expression
-        // Full pattern syntax would need more sophisticated parsing
-        let expr = try parseExpression()
+        // Full pattern syntax would need more sophisticated parsing.
+        // Below the conditional expression, so `case x if cond:` leaves the guard to parseMatch
+        let expr = try parseOrExpression()
         
         // Convert expression to pattern (simplified)
         return .matchValue(MatchValue(
@@ -3249,6 +3257,35 @@ public class Parser {
     }
     
     // MARK: - Helper Methods
+    
+    /// Whether the soft keyword `match` at the current token starts a match statement:
+    /// `match <subject>:` followed by a newline. Otherwise it is a name (`match = re.match(...)`).
+    private func isMatchStatement() -> Bool {
+        let start = position
+        defer { position = start }
+        
+        advance() // 'match'
+        switch currentToken().type {
+        case .newline, .endmarker, .assign, .dot, .colon, .comma, .rightparen, .rightbracket, .rightbrace:
+            return false
+        default:
+            break
+        }
+        
+        // Parse the subject like parseMatch does; parsing only moves `position`, which is restored
+        guard (try? parseExpression()) != nil else { return false }
+        guard currentToken().type == .colon else { return false }
+        advance()
+        skipComments()
+        return currentToken().type == .newline
+    }
+    
+    /// Whether the soft keyword `type` at the current token starts a type alias: `type Name =` or `type Name[`
+    private func isTypeAlias() -> Bool {
+        guard position + 2 < tokens.count, case .name = tokens[position + 1].type else { return false }
+        let next = tokens[position + 2].type
+        return next == .assign || next == .leftbracket
+    }
     
     @inline(__always)
     private func currentToken() -> Token {

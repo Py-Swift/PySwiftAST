@@ -398,10 +398,9 @@ public class Tokenizer {
         case "while": tokenType = .while
         case "with": tokenType = .with
         case "yield": tokenType = .yield
-        case "match": tokenType = .match  // Python 3.10+ soft keyword
-        case "case": tokenType = .case    // Python 3.10+ soft keyword
-        // Note: "type" is a soft keyword in Python 3.12+ but should be treated as a name
-        // in most contexts (e.g., type[int], type(x)). The parser handles it contextually.
+        // Soft keywords "match", "case" (3.10+) and "type" (3.12+) are names, as in CPython's
+        // tokenizer, since they are also valid identifiers (match = re.match(...)).
+        // The parser recognizes them contextually.
         default: tokenType = .name(value)
         }
         
