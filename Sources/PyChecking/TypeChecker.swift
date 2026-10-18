@@ -164,8 +164,13 @@ public final class TypeChecker: PyChecker {
     private var visitor: TypeCheckingVisitor
     private var currentModule: Module?
     
-    public init() {
-        self.visitor = TypeCheckingVisitor()
+    /// Stubs used to type imported modules
+    public let stubs: StubRegistry
+    
+    /// - Parameter stubs: Stubs used to type imported modules; the standard library by default
+    public init(stubs: StubRegistry = .standardLibrary) {
+        self.stubs = stubs
+        self.visitor = TypeCheckingVisitor(stubs: stubs)
     }
     
     /// Analyze a module and cache the results for querying
@@ -173,7 +178,7 @@ public final class TypeChecker: PyChecker {
     /// - Returns: Diagnostics found during analysis
     public func analyze(_ module: Module) -> [Diagnostic] {
         self.currentModule = module
-        visitor = TypeCheckingVisitor() // Fresh visitor for new analysis
+        visitor = TypeCheckingVisitor(stubs: stubs) // Fresh visitor for new analysis
         visitor.visitModule(module)
         return visitor.diagnostics
     }
@@ -546,6 +551,10 @@ public final class TypeChecker: PyChecker {
             return nil
         }
         
+        if case .module(let moduleName) = objectType {
+            return stubs.memberType(module: moduleName, attribute: attribute)
+        }
+        
         // Check built-in type methods
         if let builtinMethod = BuiltinTypesRegistry.getMethodReturnType(
             forType: objectType,
@@ -753,7 +762,15 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     var classRegistry = ClassRegistry()
     var scopeTracker = ScopeTracker()
     
-    init() {}
+    /// Whether the function body being visited contains `yield`
+    private var bodyYields = false
+    
+    /// Stubs used to type imported modules
+    let stubs: StubRegistry
+    
+    init(stubs: StubRegistry = StubRegistry()) {
+        self.stubs = stubs
+    }
     
     // MARK: - Helper Methods
     
@@ -968,165 +985,95 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     }
     
     func visitFunctionDef(_ node: FunctionDef) {
-        // Register function with its return type in outer scope (before entering function scope)
-        let returnType = node.returns.map { PythonType.fromExpression($0, classRegistry: classRegistry) } ?? .any
-        typeEnvironment.setType(node.name, type: returnType, at: node.lineno)
+        visitFunction(name: node.name, args: node.args, body: node.body, decorators: node.decoratorList,
+                      returns: node.returns, lineno: node.lineno, endLineno: node.endLineno)
+    }
+    
+    func visitAsyncFunctionDef(_ node: AsyncFunctionDef) {
+        visitFunction(name: node.name, args: node.args, body: node.body, decorators: node.decoratorList,
+                      returns: node.returns, lineno: node.lineno, endLineno: node.endLineno)
+    }
+    
+    /// Shared handling of `def` and `async def`
+    private func visitFunction(name: String, args: Arguments, body: [Statement], decorators: [Expression],
+                               returns: Expression?, lineno: Int, endLineno: Int?) {
+        let parameters = functionParameters(args)
+        let expectedReturn = returns.map { PythonType.fromExpression($0, classRegistry: classRegistry) }
+        
+        // Register the function in the outer scope before the body, so recursive calls resolve
+        typeEnvironment.setType(name, type: .function(parameters: parameters, returnType: expectedReturn ?? .any), at: lineno)
         
         // Use actual end line from AST node, or calculate from body
-        let endLine = node.endLineno ?? calculateEndLine(node.body) ?? node.lineno
+        let endLine = endLineno ?? calculateEndLine(body) ?? lineno
         
         // Check if we're inside a class
-        let containingClass = scopeTracker.getScopeAt(line: node.lineno)?.kind == .classScope 
-            ? scopeTracker.getScopeAt(line: node.lineno)?.name 
+        let containingClass = scopeTracker.getScopeAt(line: lineno)?.kind == .classScope
+            ? scopeTracker.getScopeAt(line: lineno)?.name
             : nil
         
         // Check decorators for method type
-        let isStaticMethod = node.decoratorList.contains { decorator in
-            if case .name(let name) = decorator, name.id == "staticmethod" {
-                return true
+        func hasDecorator(_ decoratorName: String) -> Bool {
+            decorators.contains { decorator in
+                if case .name(let name) = decorator, name.id == decoratorName {
+                    return true
+                }
+                return false
             }
-            return false
         }
-        
-        let isClassMethod = node.decoratorList.contains { decorator in
-            if case .name(let name) = decorator, name.id == "classmethod" {
-                return true
-            }
-            return false
-        }
+        let isStaticMethod = hasDecorator("staticmethod")
+        let isClassMethod = hasDecorator("classmethod")
         
         // Track function scope
-        scopeTracker.enterScope(kind: .function, name: node.name, startLine: node.lineno, endLine: endLine)
-        typeEnvironment.pushScope(startLine: node.lineno, endLine: endLine)
+        scopeTracker.enterScope(kind: .function, name: name, startLine: lineno, endLine: endLine)
+        typeEnvironment.pushScope(startLine: lineno, endLine: endLine)
         
-        // Register parameter types
-        for (index, arg) in node.args.args.enumerated() {
-            if let annotation = arg.annotation {
-                let paramType = PythonType.fromExpression(annotation, classRegistry: classRegistry)
-                typeEnvironment.setType(arg.arg, type: paramType, at: node.lineno)
-            } else {
-                // Special handling for first parameter in methods
-                if index == 0 && containingClass != nil && !isStaticMethod {
-                    if isClassMethod {
-                        // First param in @classmethod is 'cls' - reference to the class itself
-                        if let className = containingClass {
-                            typeEnvironment.setType(arg.arg, type: .classType(className), at: node.lineno)
-                        } else {
-                            typeEnvironment.setType(arg.arg, type: .any, at: node.lineno)
-                        }
-                    } else {
-                        // First param in regular method is 'self' - reference to class instance
-                        if let className = containingClass {
-                            typeEnvironment.setType(arg.arg, type: .instance(className), at: node.lineno)
-                        } else {
-                            typeEnvironment.setType(arg.arg, type: .any, at: node.lineno)
-                        }
-                    }
+        // Register parameter types as seen inside the body
+        for (index, param) in parameters.enumerated() {
+            let paramType: PythonType
+            switch param.kind {
+            case .varPositional:
+                paramType = .tuple([param.type ?? .any])
+            case .varKeyword:
+                paramType = .dict(key: .str, value: param.type ?? .any)
+            case .positionalOnly, .positionalOrKeyword, .keywordOnly:
+                if let annotated = param.type {
+                    paramType = annotated
+                } else if index == 0, param.kind != .keywordOnly, let className = containingClass, !isStaticMethod {
+                    // First param is 'cls' in a @classmethod, 'self' in a regular method
+                    paramType = isClassMethod ? .classType(className) : .instance(className)
                 } else {
-                    typeEnvironment.setType(arg.arg, type: .any, at: node.lineno)
+                    paramType = .any
                 }
             }
+            typeEnvironment.setType(param.name, type: paramType, at: lineno)
         }
         
         // Store expected return type
-        let expectedReturn = node.returns.map { PythonType.fromExpression($0, classRegistry: classRegistry) }
         typeEnvironment.setReturnType(expectedReturn)
         
         // Check function body
-        for statement in node.body {
+        let outerYields = bodyYields
+        bodyYields = false
+        for statement in body {
             visitStatement(statement)
+        }
+        let isGenerator = bodyYields
+        bodyYields = outerYields
+        
+        // Without an annotation, the function returns what its return statements return
+        // (generators are left as Any, there is no generator type yet)
+        if expectedReturn == nil {
+            let inferredReturn = isGenerator ? .any : inferFunctionReturnType(body)
+            typeEnvironment.setTypeInEnclosingScope(name, type: .function(parameters: parameters, returnType: inferredReturn), at: lineno)
         }
         
         typeEnvironment.popScope()
         scopeTracker.exitScope()
     }
     
-    func visitAsyncFunctionDef(_ node: AsyncFunctionDef) {
-        // Register async function with its return type in outer scope
-        let returnType: PythonType
-        if let returns = node.returns {
-            returnType = PythonType.fromExpression(returns, classRegistry: classRegistry)
-        } else {
-            // No annotation - infer from function body
-            // Need to set up temporary scope with parameters for accurate inference
-            let funcEndLine = node.endLineno ?? node.body.last?.lineno ?? node.lineno
-            typeEnvironment.pushScope(startLine: node.lineno, endLine: funcEndLine)
-            
-            // Register parameters
-            for arg in node.args.args {
-                if let annotation = arg.annotation {
-                    let paramType = PythonType.fromExpression(annotation, classRegistry: classRegistry)
-                    typeEnvironment.setType(arg.arg, type: paramType, at: node.lineno)
-                }
-            }
-            
-            returnType = inferFunctionReturnType(node.body)
-            typeEnvironment.popScope()
-        }
-        typeEnvironment.setType(node.name, type: returnType, at: node.lineno)
-        
-        let endLine = node.endLineno ?? calculateEndLine(node.body) ?? node.lineno
-        
-        // Check if we're inside a class
-        let containingClass = scopeTracker.getScopeAt(line: node.lineno)?.kind == .classScope 
-            ? scopeTracker.getScopeAt(line: node.lineno)?.name 
-            : nil
-        
-        // Check decorators for method type
-        let isStaticMethod = node.decoratorList.contains { decorator in
-            if case .name(let name) = decorator, name.id == "staticmethod" {
-                return true
-            }
-            return false
-        }
-        
-        let isClassMethod = node.decoratorList.contains { decorator in
-            if case .name(let name) = decorator, name.id == "classmethod" {
-                return true
-            }
-            return false
-        }
-        
-        scopeTracker.enterScope(kind: .function, name: node.name, startLine: node.lineno, endLine: endLine)
-        typeEnvironment.pushScope(startLine: node.lineno, endLine: endLine)
-        
-        for (index, arg) in node.args.args.enumerated() {
-            if let annotation = arg.annotation {
-                let paramType = PythonType.fromExpression(annotation, classRegistry: classRegistry)
-                typeEnvironment.setType(arg.arg, type: paramType, at: node.lineno)
-            } else {
-                // Special handling for first parameter in methods
-                if index == 0 && containingClass != nil && !isStaticMethod {
-                    if isClassMethod {
-                        // First param in @classmethod is 'cls' - reference to the class itself
-                        if let className = containingClass {
-                            typeEnvironment.setType(arg.arg, type: .classType(className), at: node.lineno)
-                        } else {
-                            typeEnvironment.setType(arg.arg, type: .any, at: node.lineno)
-                        }
-                    } else {
-                        // First param in regular method is 'self' - reference to class instance
-                        if let className = containingClass {
-                            typeEnvironment.setType(arg.arg, type: .instance(className), at: node.lineno)
-                        } else {
-                            typeEnvironment.setType(arg.arg, type: .any, at: node.lineno)
-                        }
-                    }
-                } else {
-                    typeEnvironment.setType(arg.arg, type: .any, at: node.lineno)
-                }
-            }
-        }
-        
-        let expectedReturn = node.returns.map { PythonType.fromExpression($0, classRegistry: classRegistry) }
-        typeEnvironment.setReturnType(expectedReturn)
-        
-        for statement in node.body {
-            visitStatement(statement)
-        }
-        
-        typeEnvironment.popScope()
-        scopeTracker.exitScope()
+    /// Parameters of a function or lambda in declaration order
+    private func functionParameters(_ args: Arguments) -> [FunctionParameter] {
+        FunctionParameter.parameters(of: args, classRegistry: classRegistry)
     }
     
     func visitClassDef(_ node: ClassDef) {
@@ -1465,7 +1412,10 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     
     func visitName(_ node: Name) -> PythonType {
         // Look up type in environment (will search scopes properly)
-        return typeEnvironment.getType(node.id, at: nil) ?? .unknown
+        // Fall back to any scope for names used before their definition, e.g. functions called from other functions
+        return typeEnvironment.getType(node.id, at: node.lineno)
+            ?? typeEnvironment.getType(node.id, at: nil)
+            ?? .unknown
     }
     
     func visitBinOp(_ node: BinOp) -> PythonType {
@@ -1575,6 +1525,16 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
         // Handle method calls (obj.method())
         if case .attribute(let attr) = node.fun {
             let objectType = visitExpression(attr.value)
+            
+            // Module functions and classes, e.g. math.sin(1.0) or random.Random()
+            if case .module = objectType {
+                switch visitAttribute(attr) {
+                case .function(_, let returnType): return returnType
+                case .classType(let className): return .instance(className)
+                case .any: return .any
+                default: return .unknown
+                }
+            }
             
             // Check built-in type methods
             if let returnType = BuiltinTypesRegistry.getMethodReturnType(
@@ -1762,11 +1722,19 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
                     return .instance(name.id)
                 }
                 
-                // Check if it's a known function
-                if let funcType = typeEnvironment.getType(name.id, at: nil) {
-                    return funcType
+                // Calling a known function gives its return type
+                let calleeType = typeEnvironment.getType(name.id, at: node.lineno)
+                    ?? typeEnvironment.getType(name.id, at: nil)
+                switch calleeType {
+                case .function(_, let returnType):
+                    return returnType
+                case .classType(let className):
+                    return .instance(className)
+                case .any:
+                    return .any
+                default:
+                    return .unknown
                 }
-                return .unknown
             }
         }
         
@@ -1832,20 +1800,63 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     func visitBreakStmt(_ node: Break) {}
     func visitContinueStmt(_ node: Continue) {}
     func visitImportStmt(_ node: Import) {
-        // Track imported modules
         for alias in node.names {
-            let moduleName = alias.asName ?? alias.name
-            // Register module as Any type (we don't have type stubs)
-            typeEnvironment.setType(moduleName, type: .any, at: node.lineno)
+            registerStubClasses(of: alias.name)
+            if let asName = alias.asName {
+                // `import os.path as p` binds the submodule itself
+                typeEnvironment.setType(asName, type: .module(alias.name), at: node.lineno)
+            } else {
+                // `import os.path` binds the top-level package `os`
+                let topLevel = alias.name.split(separator: ".").first.map(String.init) ?? alias.name
+                typeEnvironment.setType(topLevel, type: .module(topLevel), at: node.lineno)
+            }
         }
     }
     
     func visitImportFrom(_ node: ImportFrom) {
-        // Track from X import Y statements
+        // Relative imports refer to the script's own package, which has no stub
+        let moduleName = node.level == 0 ? node.module : nil
+        if let moduleName {
+            registerStubClasses(of: moduleName)
+        }
+        
         for alias in node.names {
+            if alias.name == "*" {
+                // `from math import *` binds the stub's public names
+                if let moduleName, let stub = stubs.module(moduleName) {
+                    for (name, type) in stub.members where !name.hasPrefix("_") {
+                        typeEnvironment.setType(name, type: type, at: node.lineno)
+                    }
+                }
+                continue
+            }
+            
             let name = alias.asName ?? alias.name
-            // Register imported name as Any type (we don't have type stubs)
-            typeEnvironment.setType(name, type: .any, at: node.lineno)
+            let type: PythonType
+            if let moduleName, let memberType = stubs.memberType(module: moduleName, attribute: alias.name) {
+                type = memberType
+                if case .module(let submodule) = memberType {
+                    registerStubClasses(of: submodule)
+                }
+            } else if let moduleName, stubs.module(moduleName) != nil {
+                // The module has a stub, but the name isn't in it
+                type = .unknown
+            } else {
+                type = .any
+            }
+            typeEnvironment.setType(name, type: type, at: node.lineno)
+        }
+    }
+    
+    /// Make the classes of a stubbed module known, so their members resolve.
+    /// A class the script defines itself is never replaced.
+    private func registerStubClasses(of moduleName: String) {
+        guard let stub = stubs.module(moduleName) else { return }
+        for (className, members) in stub.classes where !classRegistry.classExists(className) {
+            classRegistry.registerClass(className, at: 0, endLine: 0)
+            for member in members {
+                classRegistry.addMember(toClass: className, name: member.name, type: member.type, kind: member.kind, line: member.line)
+            }
         }
     }
     func visitGlobal(_ node: Global) {}
@@ -1953,6 +1964,16 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
         // Infer the type of the object being accessed
         let objectType = visitExpression(node.value)
         
+        if case .module(let moduleName) = objectType {
+            guard let memberType = stubs.memberType(module: moduleName, attribute: node.attr) else {
+                return .unknown
+            }
+            if case .module(let submodule) = memberType {
+                registerStubClasses(of: submodule)
+            }
+            return memberType
+        }
+        
         // Check built-in type methods first
         if let builtinMethod = BuiltinTypesRegistry.getMethodReturnType(
             forType: objectType,
@@ -2027,15 +2048,16 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
         // Create temporary scope for lambda parameters
         typeEnvironment.pushScope(startLine: node.lineno, endLine: node.endLineno ?? node.lineno)
         
-        // Register parameter types if annotated
-        for arg in node.args.args {
-            if let annotation = arg.annotation {
-                let paramType = PythonType.fromExpression(annotation, classRegistry: classRegistry)
-                typeEnvironment.setType(arg.arg, type: paramType, at: node.lineno)
-            } else {
-                // Parameter type is unknown
-                typeEnvironment.setType(arg.arg, type: .any, at: node.lineno)
+        // Lambda parameters can't be annotated
+        let parameters = functionParameters(node.args)
+        for param in parameters {
+            let paramType: PythonType
+            switch param.kind {
+            case .varPositional: paramType = .tuple([.any])
+            case .varKeyword: paramType = .dict(key: .str, value: .any)
+            case .positionalOnly, .positionalOrKeyword, .keywordOnly: paramType = .any
             }
+            typeEnvironment.setType(param.name, type: paramType, at: node.lineno)
         }
         
         // Infer return type from body expression
@@ -2043,8 +2065,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
         
         typeEnvironment.popScope()
         
-        // Return callable type (simplified - we don't have full function type support)
-        return returnType  // For now, just return the return type
+        return .function(parameters: parameters, returnType: returnType)
     }
     
     func visitListComp(_ node: ListComp) -> PythonType {
@@ -2165,6 +2186,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     }
     
     func visitYield(_ node: Yield) -> PythonType {
+        bodyYields = true
         // Yield returns the yielded value type
         if let value = node.value {
             return visitExpression(value)
@@ -2173,6 +2195,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     }
     
     func visitYieldFrom(_ node: YieldFrom) -> PythonType {
+        bodyYields = true
         // Yield from returns the element type of the iterable
         let iterType = visitExpression(node.value)
         return extractElementType(from: iterType)
@@ -2248,14 +2271,23 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
             return .none
         }
         
-        // Check if all non-None types are the same
-        let firstNonNone = nonNoneTypes[0]
-        if nonNoneTypes.allSatisfy({ $0 == firstNonNone }) {
-            return firstNonNone
+        // Drop Any when something more specific is returned too (e.g. a recursive call
+        // that is still the Any placeholder) and repeated types
+        var distinctTypes: [PythonType] = []
+        for type in nonNoneTypes where !distinctTypes.contains(type) {
+            distinctTypes.append(type)
+        }
+        if distinctTypes.count > 1 {
+            distinctTypes.removeAll { $0 == .any }
         }
         
-        // Mixed types - return union or any
-        return .union(nonNoneTypes)
+        // Check if all non-None types are the same
+        if distinctTypes.count == 1 {
+            return distinctTypes[0]
+        }
+        
+        // Mixed types - return union
+        return .union(distinctTypes)
     }
 }
 
@@ -2433,6 +2465,20 @@ public final class TypeEnvironment {
         activeScopes[activeScopes.count - 1].variables.append((name: name, type: type, line: line, isConstant: isConstant))
     }
     
+    /// Set a type in the scope enclosing the current one, replacing an entry for the same name and line
+    func setTypeInEnclosingScope(_ name: String, type: PythonType, at line: Int) {
+        guard activeScopes.count >= 2 else {
+            setType(name, type: type, at: line)
+            return
+        }
+        let scope = activeScopes[activeScopes.count - 2]
+        if let index = scope.variables.firstIndex(where: { $0.name == name && $0.line == line }) {
+            scope.variables[index].type = type
+        } else {
+            scope.variables.append((name: name, type: type, line: line, isConstant: isConstantName(name)))
+        }
+    }
+    
     func setReturnType(_ type: PythonType?) {
         activeScopes[activeScopes.count - 1].returnType = type
     }
@@ -2502,25 +2548,24 @@ public final class TypeEnvironment {
     
     func getAllSymbolsInScope(at line: Int) -> [(name: String, type: PythonType)] {
         var symbols: [String: PythonType] = [:]
-        
-        // Collect from all scopes (outer to inner)
-        for scope in allScopes {
-            for (name, type, varLine, _) in scope.variables {
-                if varLine <= line {
-                    // Use the most recent assignment for each variable
-                    if symbols[name] != nil {
-                        // Check if this assignment is more recent
-                        if let existingLine = findMostRecentLine(for: name, in: allScopes, before: line),
-                           varLine > existingLine {
-                            symbols[name] = type
-                        }
-                    } else {
-                        symbols[name] = type
-                    }
-                }
+
+        // Only scopes that contain the line, outermost first so inner scopes shadow outer ones
+        let relevantScopes = allScopes
+            .filter { $0.startLine <= line && line <= $0.endLine }
+            .sorted { ($0.endLine - $0.startLine) > ($1.endLine - $1.startLine) }
+
+        for scope in relevantScopes {
+            // Most recent assignment at or before the line within this scope
+            var scopeSymbols: [String: (type: PythonType, line: Int)] = [:]
+            for (name, type, varLine, _) in scope.variables where varLine <= line {
+                if let existing = scopeSymbols[name], existing.line > varLine { continue }
+                scopeSymbols[name] = (type, varLine)
+            }
+            for (name, entry) in scopeSymbols {
+                symbols[name] = entry.type
             }
         }
-        
+
         return Array(symbols.map { ($0.key, $0.value) })
     }
     
@@ -2535,23 +2580,6 @@ public final class TypeEnvironment {
             }
         }
         return false
-    }
-    
-    /// Find the most recent line where a variable was assigned
-    private func findMostRecentLine(for name: String, in scopes: [Scope], before line: Int) -> Int? {
-        var mostRecent: Int?
-        
-        for scope in scopes {
-            for (varName, _, varLine, _) in scope.variables {
-                if varName == name && varLine <= line {
-                    if mostRecent == nil || varLine > mostRecent! {
-                        mostRecent = varLine
-                    }
-                }
-            }
-        }
-        
-        return mostRecent
     }
     
     func getReturnType() -> PythonType? {
@@ -2603,6 +2631,19 @@ public final class TypeEnvironment {
 
 extension PythonType {
     /// Create a PythonType from an Expression (type annotation)
+    /// Members of a `X | Y | Z` annotation, flattened
+    private static func unionMembers(_ binOp: BinOp, classRegistry: ClassRegistry?) -> [PythonType] {
+        var members: [PythonType] = []
+        for side in [binOp.left, binOp.right] {
+            if case .binOp(let inner) = side, inner.op == .bitOr {
+                members += unionMembers(inner, classRegistry: classRegistry)
+            } else {
+                members.append(fromExpression(side, classRegistry: classRegistry))
+            }
+        }
+        return members
+    }
+    
     public static func fromExpression(_ expr: Expression, classRegistry: ClassRegistry? = nil) -> PythonType {
         switch expr {
         case .name(let name):
@@ -2618,6 +2659,7 @@ extension PythonType {
             case "tuple": return .tuple([.any])
             case "Any": return .any
             case "None": return .none
+            case "object": return .instance("object")
             default:
                 // Check if this is a registered custom class
                 if let registry = classRegistry, registry.classExists(name.id) {
@@ -2625,6 +2667,10 @@ extension PythonType {
                 }
                 return .unknown
             }
+            
+        case .binOp(let binOp) where binOp.op == .bitOr:
+            // X | Y
+            return .union(unionMembers(binOp, classRegistry: classRegistry))
             
         case .subscriptExpr(let subscriptExpr):
             // Handle generic types like list[str], dict[int, str]
@@ -2638,6 +2684,10 @@ extension PythonType {
                     return .set(elementType)
                 case "tuple", "Tuple":
                     if case .tuple(let tupleExpr) = subscriptExpr.slice {
+                        // tuple[X, ...] is shown as a one-element tuple
+                        if tupleExpr.elts.count == 2, case .constant(let last) = tupleExpr.elts[1], case .ellipsis = last.value {
+                            return .tuple([fromExpression(tupleExpr.elts[0], classRegistry: classRegistry)])
+                        }
                         let types = tupleExpr.elts.map { fromExpression($0, classRegistry: classRegistry) }
                         return .tuple(types)
                     }
@@ -2650,7 +2700,18 @@ extension PythonType {
                         return .dict(key: keyType, value: valueType)
                     }
                     return .dict(key: .any, value: .any)
+                case "Optional":
+                    return .optional(fromExpression(subscriptExpr.slice, classRegistry: classRegistry))
+                case "Union":
+                    if case .tuple(let tupleExpr) = subscriptExpr.slice {
+                        return .union(tupleExpr.elts.map { fromExpression($0, classRegistry: classRegistry) })
+                    }
+                    return fromExpression(subscriptExpr.slice, classRegistry: classRegistry)
                 default:
+                    // Generic custom class, e.g. Match[str]
+                    if let registry = classRegistry, registry.classExists(baseType.id) {
+                        return .instance(baseType.id)
+                    }
                     return .unknown
                 }
             }
@@ -2697,12 +2758,14 @@ extension PythonType {
         case .union(let types):
             let typeStrs = types.map { $0.toDisplayString() }
             return typeStrs.joined(separator: " | ")
-        case .function:
-            return "function"
+        case .function(let params, let returnType):
+            return PythonType.signature(params, returnType) { $0.toDisplayString() }
         case .classType(let name):
             return "type[\(name)]"
         case .instance(let name):
             return name
+        case .module(let name):
+            return "Module(\"\(name)\")"
         }
     }
 }

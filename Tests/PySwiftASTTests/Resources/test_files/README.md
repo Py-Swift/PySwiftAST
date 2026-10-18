@@ -25,7 +25,7 @@ A production-quality async HTTP API client demonstrating:
 
 ---
 
-### 2. parser_combinators.py ⚠️ (Partial - Soft Keyword Conflict)
+### 2. parser_combinators.py ✅ FULLY PARSES!
 **Lines:** 172 | **Tokens:** 1,470
 
 A functional parser combinator library demonstrating:
@@ -39,12 +39,10 @@ A functional parser combinator library demonstrating:
 - **Pattern matching**: Regex compilation and matching
 - **Lambda expressions**: Inline transformations
 
-**Known Limitation:**
-- Line 67: `match = self.pattern.match(input_str)` - Using 'match' as variable name
-- Python allows 'match' as identifier, but parser treats it as keyword (soft keyword issue)
-- Requires context-sensitive keyword handling
+**Previously a limitation:** Line 67 `match = self.pattern.match(input_str)` uses 'match' as a
+variable name. Soft keywords are now tokenized as names and recognized contextually.
 
-**Test Status:** ⚠️ Tokenizes successfully, parser limitation with soft keywords
+**Test Status:** ✅ Parses
 
 ---
 
@@ -77,7 +75,7 @@ A complete database ORM implementation demonstrating:
 
 ---
 
-### 4. state_machine.py ⚠️ (Partial - Soft Keyword Conflict)
+### 4. state_machine.py ✅ FULLY PARSES!
 **Lines:** 176 | **Tokens:** 1,378
 
 An event-driven state machine demonstrating:
@@ -92,12 +90,10 @@ An event-driven state machine demonstrating:
 - **List operations**: `.copy()`, `.clear()`, `.append()`
 - **Property decorators**: `@property` for computed attributes
 
-**Known Limitation:**
-- Line 26: `type: EventType` - Using 'type' as dataclass field name
-- Valid Python (soft keyword), but parser treats as `type` statement keyword
-- Requires context-sensitive parsing
+**Previously a limitation:** Line 26 `type: EventType` uses 'type' as a field name, and guard
+clauses (`case ... if cond:`) were read as conditional expressions. Both now parse.
 
-**Test Status:** ⚠️ Tokenizes successfully, parser limitation with soft keywords
+**Test Status:** ✅ Parses
 
 ---
 
@@ -136,12 +132,11 @@ This is intentional - these files serve as **stress tests** to identify edge cas
 
 ### 2. Soft Keywords as Identifiers
 **Keywords:** `match`, `case`, `type`
-**Issue:** Parser treats as hard keywords, but Python allows as identifiers in many contexts
+**Issue:** Parser treated them as hard keywords, but Python allows them as identifiers
 **Examples:**
 - `match = pattern.match(string)` - 'match' as variable
 - `type: EventType` - 'type' as field name
-**Status:** Requires context-sensitive keyword handling
-**Impact:** Relatively uncommon but valid Python code
+**Status:** ✅ Fixed - tokenized as names, recognized contextually like CPython
 
 ## Features Successfully Tested
 

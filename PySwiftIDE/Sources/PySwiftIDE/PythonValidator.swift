@@ -54,15 +54,14 @@ public class PythonValidator {
     
     private func convertParseError(_ error: ParseError) -> Diagnostic {
         switch error {
-        case .expectedToken(let expected, let got, let context):
+        case .expectedToken(let expected, let got, let context, _):
             let range = IDERange.from(
                 line: got.line,
                 column: got.column,
                 length: got.value.isEmpty ? 1 : got.value.count
             )
             
-            var message = "Expected '\(expected)' but got "
-            message += got.value.isEmpty ? "newline" : "'\(got.value)'"
+            var message = "Expected '\(expected)' but got \(got.displayName)"
             
             if let ctx = context, !ctx.isEmpty {
                 message += "\n\n\(ctx)"
@@ -94,13 +93,21 @@ public class PythonValidator {
         case .unexpectedToken(let token):
             return Diagnostic(
                 severity: .error,
-                message: "Unexpected token '\(token.value)'",
+                message: "Unexpected \(token.displayName)",
                 range: IDERange.from(
                     line: token.line,
                     column: token.column,
-                    length: token.value.count
+                    length: max(token.value.count, 1)
                 ),
                 code: "unexpected-token"
+            )
+            
+        case .unclosedBracket(let bracket, _):
+            return Diagnostic(
+                severity: .error,
+                message: "'\(bracket.value)' was never closed",
+                range: IDERange.from(line: bracket.line, column: bracket.column, length: 1),
+                code: "unclosed-bracket"
             )
             
         case .syntaxError(let msg, let line):
@@ -115,18 +122,18 @@ public class PythonValidator {
     
     private func generateQuickFix(for error: ParseError) -> CodeAction? {
         switch error {
-        case .expectedToken(let expected, let got, let context):
-            // Generate a quick fix to insert the missing character
-            guard let ctx = context, !ctx.isEmpty else { return nil }
+        case .expectedToken(let expected, _, _, let fix):
+            // Generate a quick fix to insert the missing character after the previous token
+            guard let fix else { return nil }
             
             let range = IDERange(
-                startLineNumber: got.line,
-                startColumn: got.column,
-                endLineNumber: got.line,
-                endColumn: got.column
+                startLineNumber: fix.line,
+                startColumn: fix.column,
+                endLineNumber: fix.line,
+                endColumn: fix.column
             )
             
-            let edit = TextEdit(range: range, newText: expected)
+            let edit = TextEdit(range: range, newText: fix.text)
             
             return CodeAction(
                 title: "Insert '\(expected)'",
