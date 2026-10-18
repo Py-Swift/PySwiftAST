@@ -164,8 +164,13 @@ public final class TypeChecker: PyChecker {
     private var visitor: TypeCheckingVisitor
     private var currentModule: Module?
     
-    public init() {
-        self.visitor = TypeCheckingVisitor()
+    /// Stubs used to type imported modules
+    public let stubs: StubRegistry
+    
+    /// - Parameter stubs: Stubs used to type imported modules; the standard library by default
+    public init(stubs: StubRegistry = .standardLibrary) {
+        self.stubs = stubs
+        self.visitor = TypeCheckingVisitor(stubs: stubs)
     }
     
     /// Analyze a module and cache the results for querying
@@ -173,7 +178,7 @@ public final class TypeChecker: PyChecker {
     /// - Returns: Diagnostics found during analysis
     public func analyze(_ module: Module) -> [Diagnostic] {
         self.currentModule = module
-        visitor = TypeCheckingVisitor() // Fresh visitor for new analysis
+        visitor = TypeCheckingVisitor(stubs: stubs) // Fresh visitor for new analysis
         visitor.visitModule(module)
         return visitor.diagnostics
     }
@@ -546,6 +551,10 @@ public final class TypeChecker: PyChecker {
             return nil
         }
         
+        if case .module(let moduleName) = objectType {
+            return stubs.memberType(module: moduleName, attribute: attribute)
+        }
+        
         // Check built-in type methods
         if let builtinMethod = BuiltinTypesRegistry.getMethodReturnType(
             forType: objectType,
@@ -756,7 +765,12 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     /// Whether the function body being visited contains `yield`
     private var bodyYields = false
     
-    init() {}
+    /// Stubs used to type imported modules
+    let stubs: StubRegistry
+    
+    init(stubs: StubRegistry = StubRegistry()) {
+        self.stubs = stubs
+    }
     
     // MARK: - Helper Methods
     
@@ -1059,34 +1073,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     
     /// Parameters of a function or lambda in declaration order
     private func functionParameters(_ args: Arguments) -> [FunctionParameter] {
-        func annotationType(_ arg: Arg) -> PythonType? {
-            arg.annotation.map { PythonType.fromExpression($0, classRegistry: classRegistry) }
-        }
-        
-        var parameters: [FunctionParameter] = []
-        
-        // `defaults` belong to the last positional parameters
-        let positional = args.posonlyArgs.map { ($0, FunctionParameter.Kind.positionalOnly) }
-            + args.args.map { ($0, FunctionParameter.Kind.positionalOrKeyword) }
-        let firstDefault = positional.count - args.defaults.count
-        for (index, (arg, kind)) in positional.enumerated() {
-            parameters.append(FunctionParameter(name: arg.arg, type: annotationType(arg), kind: kind, hasDefault: index >= firstDefault))
-        }
-        
-        if let vararg = args.vararg {
-            parameters.append(FunctionParameter(name: vararg.arg, type: annotationType(vararg), kind: .varPositional))
-        }
-        
-        for (index, arg) in args.kwonlyArgs.enumerated() {
-            let hasDefault = index < args.kwDefaults.count && args.kwDefaults[index] != nil
-            parameters.append(FunctionParameter(name: arg.arg, type: annotationType(arg), kind: .keywordOnly, hasDefault: hasDefault))
-        }
-        
-        if let kwarg = args.kwarg {
-            parameters.append(FunctionParameter(name: kwarg.arg, type: annotationType(kwarg), kind: .varKeyword))
-        }
-        
-        return parameters
+        FunctionParameter.parameters(of: args, classRegistry: classRegistry)
     }
     
     func visitClassDef(_ node: ClassDef) {
@@ -1539,6 +1526,16 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
         if case .attribute(let attr) = node.fun {
             let objectType = visitExpression(attr.value)
             
+            // Module functions and classes, e.g. math.sin(1.0) or random.Random()
+            if case .module = objectType {
+                switch visitAttribute(attr) {
+                case .function(_, let returnType): return returnType
+                case .classType(let className): return .instance(className)
+                case .any: return .any
+                default: return .unknown
+                }
+            }
+            
             // Check built-in type methods
             if let returnType = BuiltinTypesRegistry.getMethodReturnType(
                 forType: objectType,
@@ -1803,20 +1800,63 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     func visitBreakStmt(_ node: Break) {}
     func visitContinueStmt(_ node: Continue) {}
     func visitImportStmt(_ node: Import) {
-        // Track imported modules
         for alias in node.names {
-            let moduleName = alias.asName ?? alias.name
-            // Register module as Any type (we don't have type stubs)
-            typeEnvironment.setType(moduleName, type: .any, at: node.lineno)
+            registerStubClasses(of: alias.name)
+            if let asName = alias.asName {
+                // `import os.path as p` binds the submodule itself
+                typeEnvironment.setType(asName, type: .module(alias.name), at: node.lineno)
+            } else {
+                // `import os.path` binds the top-level package `os`
+                let topLevel = alias.name.split(separator: ".").first.map(String.init) ?? alias.name
+                typeEnvironment.setType(topLevel, type: .module(topLevel), at: node.lineno)
+            }
         }
     }
     
     func visitImportFrom(_ node: ImportFrom) {
-        // Track from X import Y statements
+        // Relative imports refer to the script's own package, which has no stub
+        let moduleName = node.level == 0 ? node.module : nil
+        if let moduleName {
+            registerStubClasses(of: moduleName)
+        }
+        
         for alias in node.names {
+            if alias.name == "*" {
+                // `from math import *` binds the stub's public names
+                if let moduleName, let stub = stubs.module(moduleName) {
+                    for (name, type) in stub.members where !name.hasPrefix("_") {
+                        typeEnvironment.setType(name, type: type, at: node.lineno)
+                    }
+                }
+                continue
+            }
+            
             let name = alias.asName ?? alias.name
-            // Register imported name as Any type (we don't have type stubs)
-            typeEnvironment.setType(name, type: .any, at: node.lineno)
+            let type: PythonType
+            if let moduleName, let memberType = stubs.memberType(module: moduleName, attribute: alias.name) {
+                type = memberType
+                if case .module(let submodule) = memberType {
+                    registerStubClasses(of: submodule)
+                }
+            } else if let moduleName, stubs.module(moduleName) != nil {
+                // The module has a stub, but the name isn't in it
+                type = .unknown
+            } else {
+                type = .any
+            }
+            typeEnvironment.setType(name, type: type, at: node.lineno)
+        }
+    }
+    
+    /// Make the classes of a stubbed module known, so their members resolve.
+    /// A class the script defines itself is never replaced.
+    private func registerStubClasses(of moduleName: String) {
+        guard let stub = stubs.module(moduleName) else { return }
+        for (className, members) in stub.classes where !classRegistry.classExists(className) {
+            classRegistry.registerClass(className, at: 0, endLine: 0)
+            for member in members {
+                classRegistry.addMember(toClass: className, name: member.name, type: member.type, kind: member.kind, line: member.line)
+            }
         }
     }
     func visitGlobal(_ node: Global) {}
@@ -1923,6 +1963,16 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     func visitAttribute(_ node: Attribute) -> PythonType {
         // Infer the type of the object being accessed
         let objectType = visitExpression(node.value)
+        
+        if case .module(let moduleName) = objectType {
+            guard let memberType = stubs.memberType(module: moduleName, attribute: node.attr) else {
+                return .unknown
+            }
+            if case .module(let submodule) = memberType {
+                registerStubClasses(of: submodule)
+            }
+            return memberType
+        }
         
         // Check built-in type methods first
         if let builtinMethod = BuiltinTypesRegistry.getMethodReturnType(
@@ -2581,6 +2631,19 @@ public final class TypeEnvironment {
 
 extension PythonType {
     /// Create a PythonType from an Expression (type annotation)
+    /// Members of a `X | Y | Z` annotation, flattened
+    private static func unionMembers(_ binOp: BinOp, classRegistry: ClassRegistry?) -> [PythonType] {
+        var members: [PythonType] = []
+        for side in [binOp.left, binOp.right] {
+            if case .binOp(let inner) = side, inner.op == .bitOr {
+                members += unionMembers(inner, classRegistry: classRegistry)
+            } else {
+                members.append(fromExpression(side, classRegistry: classRegistry))
+            }
+        }
+        return members
+    }
+    
     public static func fromExpression(_ expr: Expression, classRegistry: ClassRegistry? = nil) -> PythonType {
         switch expr {
         case .name(let name):
@@ -2596,6 +2659,7 @@ extension PythonType {
             case "tuple": return .tuple([.any])
             case "Any": return .any
             case "None": return .none
+            case "object": return .instance("object")
             default:
                 // Check if this is a registered custom class
                 if let registry = classRegistry, registry.classExists(name.id) {
@@ -2603,6 +2667,10 @@ extension PythonType {
                 }
                 return .unknown
             }
+            
+        case .binOp(let binOp) where binOp.op == .bitOr:
+            // X | Y
+            return .union(unionMembers(binOp, classRegistry: classRegistry))
             
         case .subscriptExpr(let subscriptExpr):
             // Handle generic types like list[str], dict[int, str]
@@ -2616,6 +2684,10 @@ extension PythonType {
                     return .set(elementType)
                 case "tuple", "Tuple":
                     if case .tuple(let tupleExpr) = subscriptExpr.slice {
+                        // tuple[X, ...] is shown as a one-element tuple
+                        if tupleExpr.elts.count == 2, case .constant(let last) = tupleExpr.elts[1], case .ellipsis = last.value {
+                            return .tuple([fromExpression(tupleExpr.elts[0], classRegistry: classRegistry)])
+                        }
                         let types = tupleExpr.elts.map { fromExpression($0, classRegistry: classRegistry) }
                         return .tuple(types)
                     }
@@ -2628,7 +2700,18 @@ extension PythonType {
                         return .dict(key: keyType, value: valueType)
                     }
                     return .dict(key: .any, value: .any)
+                case "Optional":
+                    return .optional(fromExpression(subscriptExpr.slice, classRegistry: classRegistry))
+                case "Union":
+                    if case .tuple(let tupleExpr) = subscriptExpr.slice {
+                        return .union(tupleExpr.elts.map { fromExpression($0, classRegistry: classRegistry) })
+                    }
+                    return fromExpression(subscriptExpr.slice, classRegistry: classRegistry)
                 default:
+                    // Generic custom class, e.g. Match[str]
+                    if let registry = classRegistry, registry.classExists(baseType.id) {
+                        return .instance(baseType.id)
+                    }
                     return .unknown
                 }
             }
@@ -2681,6 +2764,8 @@ extension PythonType {
             return "type[\(name)]"
         case .instance(let name):
             return name
+        case .module(let name):
+            return "Module(\"\(name)\")"
         }
     }
 }

@@ -23,6 +23,9 @@ public indirect enum PythonType: Sendable, Equatable {
     case classType(String)
     case instance(String)
     
+    // Imported module, by its full dotted name
+    case module(String)
+    
     // Union type (for Optional, unions)
     case union([PythonType])
     
@@ -122,6 +125,39 @@ public struct FunctionParameter: Sendable, Equatable {
     }
 }
 
+extension FunctionParameter {
+    /// Parameters of a function or lambda in declaration order
+    static func parameters(of args: Arguments, classRegistry: ClassRegistry?) -> [FunctionParameter] {
+        func annotationType(_ arg: Arg) -> PythonType? {
+            arg.annotation.map { PythonType.fromExpression($0, classRegistry: classRegistry) }
+        }
+        
+        var parameters: [FunctionParameter] = []
+        
+        // `defaults` belong to the last positional parameters
+        let positional = args.posonlyArgs.map { ($0, Kind.positionalOnly) } + args.args.map { ($0, Kind.positionalOrKeyword) }
+        let firstDefault = positional.count - args.defaults.count
+        for (index, (arg, kind)) in positional.enumerated() {
+            parameters.append(FunctionParameter(name: arg.arg, type: annotationType(arg), kind: kind, hasDefault: index >= firstDefault))
+        }
+        
+        if let vararg = args.vararg {
+            parameters.append(FunctionParameter(name: vararg.arg, type: annotationType(vararg), kind: .varPositional))
+        }
+        
+        for (index, arg) in args.kwonlyArgs.enumerated() {
+            let hasDefault = index < args.kwDefaults.count && args.kwDefaults[index] != nil
+            parameters.append(FunctionParameter(name: arg.arg, type: annotationType(arg), kind: .keywordOnly, hasDefault: hasDefault))
+        }
+        
+        if let kwarg = args.kwarg {
+            parameters.append(FunctionParameter(name: kwarg.arg, type: annotationType(kwarg), kind: .varKeyword))
+        }
+        
+        return parameters
+    }
+}
+
 extension PythonType {
     /// Python-style signature, e.g. `(samples: list[float], *, scale: float = ...) -> list[float]`
     static func signature(_ parameters: [FunctionParameter], _ returnType: PythonType, _ show: (PythonType) -> String) -> String {
@@ -173,6 +209,7 @@ extension PythonType: CustomStringConvertible {
         case .function(let params, let ret): return PythonType.signature(params, ret, \.description)
         case .classType(let name): return "type[\(name)]"
         case .instance(let name): return name
+        case .module(let name): return "Module(\"\(name)\")"
         case .union(let types): return types.map(\.description).joined(separator: " | ")
         case .any: return "Any"
         case .unknown: return "?"

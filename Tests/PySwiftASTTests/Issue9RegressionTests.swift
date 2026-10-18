@@ -108,6 +108,117 @@ final class Issue9RegressionTests: XCTestCase {
         XCTAssertEqual(checker.getVariableType("r"), "int")
     }
 
+    // MARK: - Modules and stubs
+
+    func testImportedModulesHaveModuleType() throws {
+        let checker = try analyze("""
+        import math
+        import os.path
+        import os.path as osp
+        from os import path
+        from json import loads as parse
+        from mystery import thing
+        x = 1
+        """)
+
+        let vars = checker.getAllVariablesInScope(at: 7)
+        XCTAssertEqual(vars["math"], "Module(\"math\")")
+        XCTAssertEqual(vars["os"], "Module(\"os\")")
+        XCTAssertEqual(vars["osp"], "Module(\"os.path\")")
+        XCTAssertEqual(vars["path"], "Module(\"os.path\")")
+        XCTAssertEqual(vars["parse"], "(s: str | bytes, *, object_hook: Any = ..., parse_float: Any = ..., parse_int: Any = ..., parse_constant: Any = ..., object_pairs_hook: Any = ...) -> Any")
+        XCTAssertEqual(vars["thing"], "Any")
+    }
+
+    func testStandardLibraryTypes() throws {
+        let checker = try analyze("""
+        import math
+        import os
+        import random
+        from time import sleep, localtime
+        x = math.pi
+        y = math.sin(1.0)
+        n = math.floor(2.5)
+        p = os.path.join("a", "b")
+        rng = random.Random()
+        r = rng.randint(1, 6)
+        t = localtime()
+        year = t.tm_year
+        z = math.not_there
+        """)
+
+        XCTAssertEqual(checker.getVariableType("x"), "float")
+        XCTAssertEqual(checker.getVariableType("y"), "float")
+        XCTAssertEqual(checker.getVariableType("n"), "int")
+        XCTAssertEqual(checker.getVariableType("p"), "str")
+        XCTAssertEqual(checker.getVariableType("rng"), "Random")
+        XCTAssertEqual(checker.getVariableType("r"), "int")
+        XCTAssertEqual(checker.getVariableType("sleep"), "(seconds: float, /) -> None")
+        XCTAssertEqual(checker.getVariableType("t"), "struct_time")
+        XCTAssertEqual(checker.getVariableType("year"), "int")
+        XCTAssertEqual(checker.getVariableType("z"), "Unknown")
+        XCTAssertEqual(checker.getAttributeTypeString(object: "math", attribute: "tau", line: 13), "float")
+    }
+
+    func testStarImportAndOptionalReturn() throws {
+        let checker = try analyze("""
+        from math import *
+        import re
+        a = sqrt(2.0)
+        m = re.match("a", "abc")
+        """)
+
+        XCTAssertEqual(checker.getVariableType("a"), "float")
+        XCTAssertEqual(checker.getVariableType("pi"), "float")
+        XCTAssertEqual(checker.getVariableType("m"), "Match | None")
+    }
+
+    func testCustomStubs() throws {
+        var stubs = StubRegistry.standardLibrary
+        try stubs.register(module: "touchbay", source: """
+        class Pad:
+            name: str
+            def pressure(self) -> float: ...
+
+        VERSION: str
+        def pad(index: int) -> Pad: ...
+        """)
+
+        let checker = TypeChecker(stubs: stubs)
+        _ = checker.analyze(try parsePython("""
+        import touchbay
+        p = touchbay.pad(0)
+        level = p.pressure()
+        label = p.name
+        v = touchbay.VERSION
+        """))
+
+        XCTAssertEqual(checker.getVariableType("p"), "Pad")
+        XCTAssertEqual(checker.getVariableType("level"), "float")
+        XCTAssertEqual(checker.getVariableType("label"), "str")
+        XCTAssertEqual(checker.getVariableType("v"), "str")
+    }
+
+    func testScriptClassIsNotReplacedByStubClass() throws {
+        let checker = try analyze("""
+        class Match:
+            def score(self) -> int:
+                return 1
+
+        import re
+        s = Match().score()
+        """)
+
+        XCTAssertEqual(checker.getVariableType("s"), "int")
+    }
+
+    func testBundledStubsParse() {
+        for (name, _) in StandardLibraryStubs.sources {
+            XCTAssertNotNil(StubRegistry.standardLibrary.module(name), "Stub for \(name) missing")
+        }
+        XCTAssertEqual(StubRegistry.standardLibrary.module("math")?.members["pi"], .float)
+    }
+
     // MARK: - Parse errors
 
     func testUnclosedBracketReportedAtBracket() {
@@ -166,6 +277,46 @@ final class Issue9RegressionTests: XCTestCase {
     }
 
     // MARK: - Found while investigating
+    
+    func testSoftKeywordsAsNames() throws {
+        let names = [
+            "match = 1\n", "x = match\n", "m = re.match(a, b)\n", "def match(): pass\n",
+            "class C:\n    def match(self): pass\n", "f(match=1)\n", "case = 2\n",
+            "type = 3\n", "print(type(x))\n", "match(x)\n", "match[0] = 1\n",
+        ]
+        for code in names {
+            XCTAssertNoThrow(try parsePython(code), code.debugDescription)
+        }
+    }
+    
+    func testSoftKeywordTestFilesParse() throws {
+        // Both files use `match` as a variable name next to match statements
+        for name in ["parser_combinators", "state_machine"] {
+            XCTAssertNoThrow(try parsePython(loadTestFileResource(name)), name)
+        }
+    }
+    
+    func testMatchStatementsStillParse() throws {
+        let statements = [
+            "match x:\n    case 1:\n        pass\n",
+            "match (x):\n    case 1:\n        pass\n",
+            "match -x:\n    case 1:\n        pass\n",
+            "match [a, b]:\n    case [1, 2]:\n        pass\n",
+            "match x:  # comment\n    case _:\n        pass\n",
+            "match x:\n    # comment\n    case 1:\n        pass\n    # between\n    case _:\n        pass\n",
+            "type X = int\n",
+        ]
+        for code in statements {
+            let module = try parsePython(code)
+            guard case .module(let body) = module, let first = body.first else {
+                return XCTFail("No statement for \(code.debugDescription)")
+            }
+            switch first {
+            case .match, .typeAlias: break
+            default: XCTFail("Expected match or type alias for \(code.debugDescription), got \(first)")
+            }
+        }
+    }
 
     func testTokenTypeDescriptionDoesNotRecurse() {
         XCTAssertEqual(TokenType.assign.description, "ASSIGN")
