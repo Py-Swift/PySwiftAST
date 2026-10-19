@@ -1110,9 +1110,9 @@ final class RealWorldTypeCheckingTests: XCTestCase {
                 result = self.add(1, 2)
         """)
         
-        // Get type of self.add attribute (returns the method's return type)
+        // Get type of self.add attribute (the method bound to self)
         if let attrType = checker.getAttributeType(object: "self", attribute: "add", line: 6) {
-            XCTAssertEqual(attrType.toDisplayString(), "int")
+            XCTAssertEqual(attrType.toDisplayString(), "(x: int, y: int) -> int")
         } else {
             XCTFail("self.add attribute type not found")
         }
@@ -1209,9 +1209,9 @@ final class RealWorldTypeCheckingTests: XCTestCase {
         """)
         
         // Test convenience method that returns string directly
-        // Method's return type is None
+        // Bound method returning None
         if let typeString = checker.getAttributeTypeString(object: "self", attribute: "add_item", line: 6) {
-            XCTAssertEqual(typeString, "None")
+            XCTAssertEqual(typeString, "(product: str) -> None")
         } else {
             XCTFail("self.add_item type string not found")
         }
@@ -1231,7 +1231,7 @@ final class RealWorldTypeCheckingTests: XCTestCase {
         
         // Method without return annotation and no return statement should infer None
         if let attrType = checker.getAttributeType(object: "self", attribute: "add_item", line: 6) {
-            XCTAssertEqual(attrType.toDisplayString(), "None")
+            XCTAssertEqual(attrType.toDisplayString(), "(x: int) -> None")
         } else {
             XCTFail("self.add_item attribute type not found")
         }
@@ -1251,7 +1251,7 @@ final class RealWorldTypeCheckingTests: XCTestCase {
         
         // Method returns int values, should infer int
         if let attrType = checker.getAttributeType(object: "self", attribute: "compute", line: 8) {
-            XCTAssertEqual(attrType.toDisplayString(), "int")
+            XCTAssertEqual(attrType.toDisplayString(), "(x: int) -> int")
         } else {
             XCTFail("self.compute attribute type not found")
         }
@@ -1271,7 +1271,7 @@ final class RealWorldTypeCheckingTests: XCTestCase {
         
         // Method with bare return should infer None
         if let attrType = checker.getAttributeType(object: "self", attribute: "validate", line: 8) {
-            XCTAssertEqual(attrType.toDisplayString(), "None")
+            XCTAssertEqual(attrType.toDisplayString(), "(data) -> None")
         } else {
             XCTFail("self.validate attribute type not found")
         }
@@ -1289,7 +1289,7 @@ final class RealWorldTypeCheckingTests: XCTestCase {
         
         // Async method returns string, should infer str
         if let attrType = checker.getAttributeType(object: "self", attribute: "fetch_data", line: 6) {
-            XCTAssertEqual(attrType.toDisplayString(), "str")
+            XCTAssertEqual(attrType.toDisplayString(), "(url: str) -> str")
         } else {
             XCTFail("self.fetch_data attribute type not found")
         }
