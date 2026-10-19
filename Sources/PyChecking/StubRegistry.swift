@@ -115,7 +115,7 @@ public struct StubRegistry: Sendable {
         return .function(parameters: FunctionParameter.parameters(of: args, classRegistry: classRegistry), returnType: returnType)
     }
 
-    /// Class members, following `ClassRegistry`'s convention that a method's type is its return type
+    /// Class members: a property's type is its value, any other method's is its callable type
     private static func classMembers(_ classDef: ClassDef, _ classRegistry: ClassRegistry) -> [MemberInfo] {
         var members: [MemberInfo] = []
 
@@ -128,16 +128,10 @@ public struct StubRegistry: Sendable {
                 }
             case .functionDef(let funcDef):
                 guard !members.contains(where: { $0.name == funcDef.name }) else { continue }
-                let decorators = funcDef.decoratorList.compactMap { decorator -> String? in
-                    if case .name(let name) = decorator { return name.id }
-                    return nil
-                }
-                let kind: MemberKind = decorators.contains("property") ? .property
-                    : decorators.contains("classmethod") ? .classMethod
-                    : decorators.contains("staticmethod") ? .staticMethod
-                    : .method
+                let kind = MemberKind(decorators: funcDef.decoratorList)
                 let returnType = funcDef.returns.map { PythonType.fromExpression($0, classRegistry: classRegistry) } ?? .any
-                members.append(MemberInfo(name: funcDef.name, type: returnType, kind: kind, line: funcDef.lineno))
+                let memberType = kind == .property ? returnType : functionType(funcDef.args, funcDef.returns, classRegistry)
+                members.append(MemberInfo(name: funcDef.name, type: memberType, kind: kind, line: funcDef.lineno))
             default:
                 break
             }

@@ -564,17 +564,7 @@ public final class TypeChecker: PyChecker {
         }
         
         // Check custom class members
-        switch objectType {
-        case .classType(let className), .instance(let className):
-            let members = visitor.classRegistry.getMembers(className)
-            if let member = members.first(where: { $0.name == attribute }) {
-                return member.type
-            }
-        default:
-            break
-        }
-        
-        return nil
+        return visitor.classRegistry.attributeType(attribute, on: objectType)
     }
     
     /// Get the type of an attribute access as a display string
@@ -1078,7 +1068,10 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
     
     func visitClassDef(_ node: ClassDef) {
         let endLine = node.endLineno ?? calculateEndLine(node.body) ?? node.lineno
-        
+
+        // The class name is a symbol of the enclosing scope
+        typeEnvironment.setType(node.name, type: .classType(node.name), at: node.lineno)
+
         // Track class scope
         scopeTracker.enterScope(kind: .classScope, name: node.name, startLine: node.lineno, endLine: endLine)
         typeEnvironment.pushScope(startLine: node.lineno, endLine: endLine)
@@ -1102,60 +1095,60 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
             }
             
             // Track methods (regular and async)
-            if case .functionDef(let funcDef) = statement {
-                // Determine method kind
-                let methodKind: MemberKind
-                if funcDef.decoratorList.contains(where: { decorator in
-                    if case .name(let name) = decorator, name.id == "classmethod" {
-                        return true
-                    }
-                    return false
-                }) {
-                    methodKind = .classMethod
-                } else if funcDef.decoratorList.contains(where: { decorator in
-                    if case .name(let name) = decorator, name.id == "staticmethod" {
-                        return true
-                    }
-                    return false
-                }) {
-                    methodKind = .staticMethod
-                } else {
-                    methodKind = .method
-                }
-                
-                // Register method
+            let method: (name: String, args: Arguments, body: [Statement], decorators: [Expression],
+                         returns: Expression?, lineno: Int, endLineno: Int?)?
+            switch statement {
+            case .functionDef(let funcDef):
+                method = (funcDef.name, funcDef.args, funcDef.body, funcDef.decoratorList,
+                          funcDef.returns, funcDef.lineno, funcDef.endLineno)
+            case .asyncFunctionDef(let funcDef):
+                method = (funcDef.name, funcDef.args, funcDef.body, funcDef.decoratorList,
+                          funcDef.returns, funcDef.lineno, funcDef.endLineno)
+            default:
+                method = nil
+            }
+            if let method {
+                let methodKind = MemberKind(decorators: method.decorators)
+
                 let returnType: PythonType
-                if let returns = funcDef.returns {
+                if let returns = method.returns {
                     returnType = PythonType.fromExpression(returns, classRegistry: classRegistry)
                 } else {
                     // No annotation - infer from function body
                     // Need to set up temporary scope with parameters for accurate inference
-                    let funcEndLine = funcDef.endLineno ?? funcDef.body.last?.lineno ?? funcDef.lineno
-                    typeEnvironment.pushScope(startLine: funcDef.lineno, endLine: funcEndLine)
-                    
-                    // Register parameters (including self for methods)
-                    for (index, arg) in funcDef.args.args.enumerated() {
-                        if index == 0 && methodKind == .method {
-                            // First param in method is 'self'
-                            typeEnvironment.setType(arg.arg, type: .instance(node.name), at: funcDef.lineno)
+                    let funcEndLine = method.endLineno ?? method.body.last?.lineno ?? method.lineno
+                    typeEnvironment.pushScope(startLine: method.lineno, endLine: funcEndLine)
+
+                    // Register parameters, with 'self' or 'cls' first unless the method is static
+                    for (index, arg) in method.args.args.enumerated() {
+                        if index == 0 && methodKind != .staticMethod {
+                            let firstType: PythonType = methodKind == .classMethod ? .classType(node.name) : .instance(node.name)
+                            typeEnvironment.setType(arg.arg, type: firstType, at: method.lineno)
                         } else if let annotation = arg.annotation {
                             let paramType = PythonType.fromExpression(annotation, classRegistry: classRegistry)
-                            typeEnvironment.setType(arg.arg, type: paramType, at: funcDef.lineno)
+                            typeEnvironment.setType(arg.arg, type: paramType, at: method.lineno)
                         }
                     }
-                    
-                    returnType = inferFunctionReturnType(funcDef.body)
+
+                    returnType = inferFunctionReturnType(method.body)
                     typeEnvironment.popScope()
                 }
+
+                // A property reads as its value, any other method as its callable type
+                let memberType: PythonType = methodKind == .property
+                    ? returnType
+                    : .function(parameters: functionParameters(method.args), returnType: returnType)
                 classRegistry.addMember(
                     toClass: node.name,
-                    name: funcDef.name,
-                    type: returnType,
+                    name: method.name,
+                    type: memberType,
                     kind: methodKind,
-                    line: funcDef.lineno
+                    line: method.lineno
                 )
-                
-                // Track __init__ for instance properties
+            }
+
+            // Track __init__ for instance properties
+            if case .functionDef(let funcDef) = statement {
                 if funcDef.name == "__init__" {
                     // Create temporary scope and register parameters to properly infer property types
                     let endLine = funcDef.endLineno ?? funcDef.body.last?.lineno ?? funcDef.lineno
@@ -1207,41 +1200,7 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
                     typeEnvironment.popScope()
                 }
             }
-            
-            // Track async methods
-            if case .asyncFunctionDef(let funcDef) = statement {
-                let returnType: PythonType
-                if let returns = funcDef.returns {
-                    returnType = PythonType.fromExpression(returns, classRegistry: classRegistry)
-                } else {
-                    // No annotation - infer from function body
-                    // Need to set up temporary scope with parameters for accurate inference
-                    let funcEndLine = funcDef.endLineno ?? funcDef.body.last?.lineno ?? funcDef.lineno
-                    typeEnvironment.pushScope(startLine: funcDef.lineno, endLine: funcEndLine)
-                    
-                    // Register parameters (including self for methods)
-                    for (index, arg) in funcDef.args.args.enumerated() {
-                        if index == 0 {
-                            // First param in async method is 'self'
-                            typeEnvironment.setType(arg.arg, type: .instance(node.name), at: funcDef.lineno)
-                        } else if let annotation = arg.annotation {
-                            let paramType = PythonType.fromExpression(annotation, classRegistry: classRegistry)
-                            typeEnvironment.setType(arg.arg, type: paramType, at: funcDef.lineno)
-                        }
-                    }
-                    
-                    returnType = inferFunctionReturnType(funcDef.body)
-                    typeEnvironment.popScope()
-                }
-                classRegistry.addMember(
-                    toClass: node.name,
-                    name: funcDef.name,
-                    type: returnType,
-                    kind: .method,
-                    line: funcDef.lineno
-                )
-            }
-            
+
             visitStatement(statement)
         }
         
@@ -1566,18 +1525,13 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
                 }
             }
             
-            // Check custom class methods
-            switch objectType {
-            case .classType(let className), .instance(let className):
-                let members = classRegistry.getMembers(className)
-                if let member = members.first(where: { $0.name == attr.attr && $0.kind == .method }) {
-                    return member.type
-                }
-            default:
-                break
+            // Custom class methods, called on the class or on an instance
+            switch classRegistry.attributeType(attr.attr, on: objectType) {
+            case .function(_, let returnType): return returnType
+            case .classType(let className): return .instance(className)
+            case .any: return .any
+            default: return .unknown
             }
-            
-            return .unknown
         }
         
         // Handle direct function calls
@@ -1982,19 +1936,8 @@ private class TypeCheckingVisitor: StatementVisitor, ExpressionVisitor {
             return builtinMethod
         }
         
-        // Check custom class members
-        switch objectType {
-        case .classType(let className), .instance(let className):
-            let members = classRegistry.getMembers(className)
-            if let member = members.first(where: { $0.name == node.attr }) {
-                return member.type
-            }
-        default:
-            break
-        }
-        
-        // Unknown attribute
-        return .unknown
+        // Check custom class members, unknown otherwise
+        return classRegistry.attributeType(node.attr, on: objectType) ?? .unknown
     }
     
     func visitSubscript(_ node: Subscript) -> PythonType { 
@@ -2322,6 +2265,18 @@ public enum MemberKind: Sendable {
     case method
     case classMethod
     case staticMethod
+
+    /// Kind of a method with these decorators
+    init(decorators: [Expression]) {
+        let names = decorators.compactMap { decorator -> String? in
+            if case .name(let name) = decorator { return name.id }
+            return nil
+        }
+        self = names.contains("property") || names.contains("cached_property") ? .property
+            : names.contains("classmethod") ? .classMethod
+            : names.contains("staticmethod") ? .staticMethod
+            : .method
+    }
 }
 
 // MARK: - Scope Tracker
@@ -2410,6 +2365,27 @@ public final class ClassRegistry {
     
     func getMembers(_ className: String) -> [MemberInfo] {
         return classes[className]?.members ?? []
+    }
+
+    /// Type of an attribute looked up on a class (`type[C]`) or on an instance of it.
+    /// Class methods, and methods looked up on an instance, are bound: `self` or `cls` is dropped.
+    func attributeType(_ attribute: String, on objectType: PythonType) -> PythonType? {
+        let className: String
+        let onInstance: Bool
+        switch objectType {
+        case .classType(let name): (className, onInstance) = (name, false)
+        case .instance(let name): (className, onInstance) = (name, true)
+        default: return nil
+        }
+
+        guard let member = getMembers(className).first(where: { $0.name == attribute }) else {
+            return nil
+        }
+        switch member.kind {
+        case .classMethod: return member.type.bound
+        case .method: return onInstance ? member.type.bound : member.type
+        case .property, .staticMethod: return member.type
+        }
     }
     
     func classExists(_ name: String) -> Bool {

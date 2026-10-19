@@ -1164,8 +1164,14 @@ public class Parser {
             return try parseFunctionDef(decorators: decorators)
         } else if currentToken().type == .class {
             return try parseClassDef(decorators: decorators)
+        } else if currentToken().type == .async {
+            advance() // consume 'async'
+            guard currentToken().type == .def else {
+                throw ParseError.expected(message: "Expected 'def' after 'async'", line: currentToken().line)
+            }
+            return try parseAsyncFunctionDef(decorators: decorators)
         } else {
-            throw ParseError.expected(message: "Expected 'def' or 'class' after decorator(s)", line: currentToken().line)
+            throw ParseError.expected(message: "Expected 'def', 'async def' or 'class' after decorator(s)", line: currentToken().line)
         }
     }
     

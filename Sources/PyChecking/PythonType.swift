@@ -159,6 +159,16 @@ extension FunctionParameter {
 }
 
 extension PythonType {
+    /// A method bound to its object: the first positional parameter (`self` or `cls`) is dropped
+    var bound: PythonType {
+        guard case .function(let parameters, let returnType) = self,
+              let first = parameters.first,
+              first.kind == .positionalOnly || first.kind == .positionalOrKeyword else {
+            return self
+        }
+        return .function(parameters: Array(parameters.dropFirst()), returnType: returnType)
+    }
+
     /// Python-style signature, e.g. `(samples: list[float], *, scale: float = ...) -> list[float]`
     static func signature(_ parameters: [FunctionParameter], _ returnType: PythonType, _ show: (PythonType) -> String) -> String {
         var parts: [String] = []
